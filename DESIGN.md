@@ -1,41 +1,48 @@
+# Project Codename: Smackhem
+
 WIP: TODO: Clean up, edit as we go
 
-# Project Codename: Smackhem
 - First-Person Geometric Exploration Engine
 - (Web-First, Platform-Agnostic by Design)
 
-## Inspired by:
+## Inspired by
+
 Cross Code was made with spit, grit, and javascript. It was ported to consoles and it’s a great game. Since the lead dev is a javascript dude, he’s going to follow their path and do the same thing. We can use OpenGL like them, and do a 2.5D game, OUR WAY (cool emoji the kid’s relate to here, or not).
 Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most confusing games to pick up! But the lead dev thinks there’s something there. We’re taking inspiration and trying to see what we can do with the old magic:
--Dungeons and dragons-esque stat blocks
--Gear
--The open 3D map exploration
--The time of day
--Monster Fights
--Conversation(s)
--Random Encounter(s)
--Explorable instance(s)
--Shops / Inns / Shrines
--Quests
--No bodies of water, disco dragon summons, or tombstone dogs allowed!
--Illegible Spells!
 
-## The MVP Vision:
--Since this is the lead (and only) dev’s first venture into 3D game development We’ve decided to go with only geometric shapes and black/white shades. Lead dev’s going to pretend people will enjoy the demo so much that he’s prepping the game with a rendering layer for console porting.
--The whole RPG experience, in geometric form!
--No plagiarism, only inspiration.
--The rounds have been cast out of geometromena, the angled ones rule supreme. Will our circles, ovals, spirals, and parabolics be able to end roundism once and for all? Or will the “cycle” continue, as round things tend to do.
--Day/Dusk/Night/Dawn cycle
--Cheeky but appropriate humor. Dad jokes, math jokes, we’re going to make it weird.
--The game is both 3D and 2D, ala Dragonview and Drakkhen. First person exploration in the main map, until combat or events, then party pops out and fights or has a conversation/investigates.
--NPC/Enemy/Party AI. Different than Drakkhen. Party will follow the hero, follow turn based commands, or follow set tactics in real time. Enemies/NPCs will do their own thing as set by the game logic.
--Enter an instance and be shown a 2D scene. If a dunny or explorable place, you can wobble/roll around. Otherwise only the scene.
--EASIER TO UNDERSTAND UI THAN DRAKKHEN. That game has a terrible UI and we aren’t plagiarizing.
--Modern, and more intuitive controls.
--Keep the demo’s code into the open source wild, put up on itch.io, and try to get funding for a full game, or get hired by a small team of indie game devs?
-TBD / Next steps
-	We might transition into doing something more akin to Dragonview? Not sure, that’s more complicated and having party AI do their own thing while following the leader seem’s like a fine enough plan.
--Character creation
+- Dungeons and dragons-esque stat blocks
+- Gear
+- The open 3D map exploration
+- The time of day
+- Monster Fights
+- Conversation(s)
+- Random Encounter(s)
+- Explorable instance(s)
+- Shops / Inns / Shrines
+- Quests
+- No bodies of water, disco dragon summons, or tombstone dogs allowed!
+- Illegible Spells!
+
+## The MVP Vision
+
+- Since this is the lead (and only) dev’s first venture into 3D game development We’ve decided to go with only geometric shapes and black/white shades. Lead dev’s going to pretend people will enjoy the demo so much that he’s prepping the game with a rendering layer for console porting.
+- The whole RPG experience, in geometric form!
+- No plagiarism, only inspiration.
+- The rounds have been cast out of geometromena, the angled ones rule supreme. Will our circles, ovals, spirals, and parabolics be able to end roundism once and for all? Or will the “cycle” continue, as round things tend to do.
+- Day/Dusk/Night/Dawn cycle
+- Cheeky but appropriate humor. Dad jokes, math jokes, we’re going to make it weird.
+- The game is both 3D and 2D, ala Dragonview and Drakkhen. First person exploration in the main map, until combat or events, then party pops out and fights or has a conversation/investigates.
+- NPC/Enemy/Party AI. Different than Drakkhen. Party will follow the hero, follow turn based commands, or follow set tactics in real time. Enemies/NPCs will do their own thing as set by the game logic.
+- Enter an instance and be shown a 2D scene. If a dunny or explorable place, you can wobble/roll around. Otherwise only the scene.
+- EASIER TO UNDERSTAND UI THAN DRAKKHEN. That game has a terrible UI and we aren’t plagiarizing.
+- Modern, and more intuitive controls.
+- Keep the demo’s code into the open source wild, put up on itch.io, and try to get funding for a full game, or get hired by a small team of indie game devs?
+
+### TBD / Next steps
+
+ We might transition into doing something more akin to Dragonview? Not sure, that’s more complicated and having party AI do their own thing while following the leader seem’s like a fine enough plan.
+
+- Character creation
 -A plot
 -Spells: Unlock, fire, ice, light, lightning, invisibility, poison cloud, acid spray, buff, debuff, shield, etc.. If we have time and the spell’s not broken, we’ll have a good amount!
 -Strengthen/upgrade system involving math formulae (Algebraic! Geometric!)
@@ -43,20 +50,25 @@ TBD / Next steps
 -Add color
 -Port demo code to Godot, because “why not?”. We’re building for fun.
 
-# Smackhem – Portability Enforcement Rules
+## Smackhem – Portability Enforcement Rules
+
 -Purpose
 These rules exist to protect future portability (desktop, console, native) while allowing fast learning and iteration today.
 They are not style preferences. They are constraints. Breaking them knowingly is a design decision, not an accident.
 
-## 0. The Prime Directive
+### 0. The Prime Directive
+
 The engine core is platform-agnostic.
 Platforms are backends. Backends may change; core logic and data must not.
 If a feature cannot be described without referencing a specific platform, it must be isolated or redesigned.
 
-## 1. Layer Boundaries (Hard Rule)
+### 1. Layer Boundaries (Hard Rule)
+
 The project is divided into three layers. Code may only depend downward.
 CORE  →  SERVICES  →  BACKENDS
-###1.1 Core (Portable Forever)
+
+#### 1.1 Core (Portable Forever)
+
 Allowed:
     • Math
     • World logic
@@ -73,7 +85,8 @@ Forbidden:
     • Asset paths or fetch calls
 If code in core/ references a platform concept, it is a violation.
 
-### 1.2 Services (Abstract Interfaces)
+#### 1.2 Services (Abstract Interfaces)
+
 Services define what the engine needs, never how it is done.
 Examples:
     • Renderer
@@ -84,7 +97,8 @@ Services:
     • Contain no platform code
     • Contain no logic beyond type definitions
 
-### 1.3 Backends (Replaceable)
+#### 1.3 Backends (Replaceable)
+
 Backends implement services for a specific platform.
 Examples:
     • WebGL renderer
@@ -95,7 +109,8 @@ Backends:
     • May change freely
     • Must not leak upward
 
-## 2. Rendering Enforcement Rules
+### 2. Rendering Enforcement Rules
+
 RULE R-1: No GPU Calls Outside the Renderer
 Allowed:
 renderer.drawMesh(mesh, transform);
@@ -122,7 +137,8 @@ Lighting must never be:
     • A world system
     • A camera concern
 
-## 3. Input Enforcement Rules
+### 3. Input Enforcement Rules
+
 RULE I-1: Input Is Intent, Not Hardware
 Core systems consume intent, never devices.
 Allowed:
@@ -138,7 +154,8 @@ Every gameplay feature must be usable with:
     • Buttons
 If it requires a mouse or keyboard, it is invalid by default.
 
-## 4. Time & Simulation Rules
+### 4. Time & Simulation Rules
+
 RULE T-1: Fixed Timestep Only
 Simulation must run at a fixed rate.
 Forbidden:
@@ -153,7 +170,8 @@ No:
     • performance.now()
     • Implicit timing
 
-## 5. World & Data Rules
+### 5. World & Data Rules
+
 RULE W-1: Data Is Pure
 World data:
     • Is serializable
@@ -168,7 +186,8 @@ Chunks:
     • Are loaded/unloaded deliberately
 No global hidden state.
 
-## 6. Memory & Performance Rules (Console-Safe)
+### 6. Memory & Performance Rules (Console-Safe)
+
 RULE M-1: No Allocation in Hot Loops
 Gameplay update loops must not:
     • Allocate memory
@@ -182,7 +201,8 @@ All runtime objects must have:
     • A clear destruction point
 Garbage collection should never be relied upon for correctness.
 
-## 7. Asset Loading Rules
+### 7. Asset Loading Rules
+
 RULE A-1: Assets Are Requested by ID
 Allowed:
 AssetLoader.loadMap("overworld_01")
@@ -190,14 +210,16 @@ Forbidden:
 fetch("./maps/overworld_01.json")
 Paths are backend details.
 
-## 8. Debugging Rules
+### 8. Debugging Rules
+
 RULE D-1: Debug Is Optional
 Debug features:
     • Must be toggleable
     • Must not affect core logic
     • Must not be required for gameplay
 
-## 9. Fake Port Validation Rule
+### 9. Fake Port Validation Rule
+
 RULE P-1: Deletion Test
 At any time, it must be possible to:
     1. Delete all backend code
@@ -205,14 +227,16 @@ At any time, it must be possible to:
     3. Compile the core
 If this fails, portability has already been broken.
 
-## 10. The Final Sanity Check
+### 10. The Final Sanity Check
+
 Before adding any feature, ask:
 Could this exist unchanged on a console with no browser, no mouse, and no JIT?
 If the answer is:
     • Yes → proceed
     • No → redesign or isolate
 
-## Closing Statement
+### Closing Statement
+
 These rules are not about restriction — they are about freedom later.
 If followed consistently:
     • Web is fast
@@ -220,10 +244,10 @@ If followed consistently:
     • Console is realistic
 Break them knowingly, not accidentally.
 
+## “Smackhem” Design Principles
 
-#“Smackhem” Design Principles
+### 1. Core Goal (Re-Stated)
 
-## 1. Core Goal (Re-Stated)
 Build a small, deterministic 3D exploration engine that:
     • Runs in the browser using WebGL + TypeScript
     • Feels good to move around in first-person
@@ -232,7 +256,8 @@ Build a small, deterministic 3D exploration engine that:
     • Can later “snap” onto other platforms by swapping backends
 This is engine scaffolding, not content.
 
-## 2. Design Principles (Non-Negotiable)
+### 2. Design Principles (Non-Negotiable)
+
 These principles exist only to protect portability:
     1. Rendering is a service, not a dependency
     2. Input is intent, not hardware
@@ -241,7 +266,8 @@ These principles exist only to protect portability:
     5. WebGL is one backend, not the engine
 If something violates these, it doesn’t go in.
 
-## 3. Platform Strategy (High Level)
+### 3. Platform Strategy (High Level)
+
 Today
     • WebGL2
     • TypeScript
@@ -253,7 +279,8 @@ Tomorrow (Optional)
 Rule:
 The game should not know or care what GPU or input device exists.
 
-## 4. High-Level Architecture
+### 4. High-Level Architecture
+
 ┌──────────────────────────┐
 │        Game Loop         │
 ├──────────────────────────┤
@@ -266,8 +293,10 @@ The game should not know or care what GPU or input device exists.
 │   Platform Backends      │
 └──────────────────────────┘
 
-## 5. Core Systems
-### 5.1 Game Loop (Fixed Step)
+### 5. Core Systems
+
+#### 5.1 Game Loop (Fixed Step)
+
 Console-safe, deterministic.
 while (accumulator >= FIXED_DT) {
   input.update();
@@ -282,8 +311,10 @@ renderer.render(world, party, camera);
     • Rendering interpolates
     • No logic in render
 
-## 6. Rendering Layer (Portable by Design)
-### 6.1 Renderer Interface
+### 6. Rendering Layer (Portable by Design)
+
+#### 6.1 Renderer Interface
+
 interface Renderer {
   beginFrame(): void;
   drawMesh(
@@ -293,21 +324,27 @@ interface Renderer {
   ): void;
   endFrame(): void;
 }
-### 6.2 WebGL Implementation
+
+#### 6.2 WebGL Implementation
+
     • Uses WebGL2
     • One shader pair
     • No textures
     • No lighting
     • Depth test only
-### 6.3 Future Native Renderer
+
+#### 6.3 Future Native Renderer
+
     • Same interface
     • Different implementation
     • Game code unchanged
 Key Rule:
 gl.* never leaks upward.
 
-##7. World System
-###7.1 World Structure
+### 7. World System
+
+#### 7.1 World Structure
+
 World {
   activeChunks: Map<ChunkID, Chunk>
 }
@@ -316,7 +353,8 @@ Each chunk is:
     • Collision bounds
     • No logic
 
-### 7.2 Chunk Definition
+#### 7.2 Chunk Definition
+
 Chunk {
   id: string;
   bounds: AABB;
@@ -329,7 +367,8 @@ StaticMesh {
   color: Vec3;
 }
 
-### 7.3 Chunk Streaming
+#### 7.3 Chunk Streaming
+
     • Player position determines active radius
     • Load:
         ◦ Current chunk
@@ -340,7 +379,8 @@ This works identically on:
     • Desktop
     • Console
 
-## 8. Geometry Rules (Intentional Constraints)
+### 8. Geometry Rules (Intentional Constraints)
+
     • No Curves or Smooth Surfaces: The game will strictly use geometric shapes such as cubes, pyramids, prisms, and planes. This constraint is intentional to simplify the design and rendering pipeline, making it easier to batch objects and optimize performance.
     • No Textures: The game will only use solid colors or shaders for visual effects, making it more minimalist and geometric in appearance.
     • Spheres/Organic Shapes: While we've added spheres, they'll be used sparingly for specific objects (e.g., spheres for certain enemies, or environmental details like orbs), and they won't dominate the design language.
@@ -350,35 +390,47 @@ Why:
     • Easy to port
     • Easy to debug
 
-## 9. Camera System (First-Person Focus)
-### 9.1 Camera Modes
+### 9. Camera System (First-Person Focus)
+
+#### 9.1 Camera Modes
+
     • First-person (default)
     • Optional slightly elevated free camera (toggleable)
-### 9.2 Camera Rules
+
+#### 9.2 Camera Rules
+
     • Yaw + pitch only
     • No roll
     • Clamped pitch
     • Explicit smoothing (no browser magic)
 Camera is a system, not math in input code.
 
-## 10. Input System (Console-Ready)
-### 10.1 Input Intent
+### 10. Input System (Console-Ready)
+
+#### 10.1 Input Intent
+
 interface PlayerIntent {
   move: Vec2;     // forward/back, strafe
   look: Vec2;     // yaw/pitch
   toggleCamera: boolean;
 }
-### 10.2 Web Input Backend
+
+#### 10.2 Web Input Backend
+
     • Keyboard → move
     • Mouse → look
     • Gamepad → move/look
-### 10.3 Console Input Backend (Future)
+
+#### 10.3 Console Input Backend (Future)
+
     • Controller only
     • Same intent output
 Game logic never sees devices.
 
-## 11. Party System (Drakkhen-Style)
-### 11.1 Party Structure
+### 11. Party System (Drakkhen-Style)
+
+#### 11.1 Party Structure
+
 Party {
   leaderTransform: Transform;
   members: PartyMember[4];
@@ -390,7 +442,8 @@ PartyMember {
   mesh: MeshHandle;
 }
 
-### 11.2 Party/Enemy Behavior
+#### 11.2 Party/Enemy Behavior
+
     • Party leader follows camera/player
     • Members “pop out” around leader
     • Party and Instance Transitions:
@@ -403,15 +456,18 @@ PartyMember {
     • Enemy movement will be constrained to the 2D plane, and they will collide with some 3D environmental features.
 This is cheap, readable, and portable.
 
-## 12. Collision System
+### 12. Collision System
+
     • Manual AABB checks
     • Player vs world
     • No physics engine
     • Deterministic
 This is console-friendly and debuggable.
 
-## 13. Data Formats
-### 13.1 Map Data (JSON)
+### 13. Data Formats
+
+#### 13.1 Map Data (JSON)
+
 {
   "id": "overworld_01",
   "chunks": [
@@ -426,7 +482,8 @@ This is console-friendly and debuggable.
 }
 Pure data. No logic. Portable forever.
 
-## 14. Project Structure
+### 14. Project Structure
+
 src/
 ├─ core/
 │  ├─ gameLoop.ts
@@ -447,7 +504,8 @@ render/NativeRenderer.ts
 platform/consoleInput.ts
 No rewrites. Just additions.
 
-## 15. What “Snap-On Porting” Actually Means (Honest)
+### 15. What “Snap-On Porting” Actually Means (Honest)
+
 Porting later means:
     • Replace renderer backend
     • Replace input backend
@@ -459,7 +517,8 @@ It does not mean:
     • Rewriting chunking
 That’s the win.
 
-## 16. What You Should Build First (Learning Path)
+### 16. What You Should Build First (Learning Path)
+
     1. WebGL renderer (single cube)
         a. Uses WebGL2
         b. One shader pair
@@ -472,7 +531,7 @@ That’s the win.
     6. Clean separation audit
 If it feels clean, it will port.
 
-## 17. Final Ground Rule (Most Important)
+### 17. Final Ground Rule (Most Important)
+
 If something feels convenient but makes the engine aware it’s running in a browser — don’t do it.
 Web is the current backend, not the identity of the engine.
-

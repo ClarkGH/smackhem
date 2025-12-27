@@ -11,6 +11,11 @@ Inspired by crosscode's use of web technologies. Since that's what I'm comfortab
 
 ## Tech Stack
 
-1.WebGL/HTML5 - Web-based engine for 3D model rendering
-2.Typescript - Language of choice
-3.Vite - Bundling
+1. WebGL 2.0/HTML5 - Web-based engine for 3D model rendering.
+2. Typescript - Language of choice.
+3. Vite - Building/Bundling.
+4. ESLint/Prettier - Formatting.
+5. Node.js/pnpm - Package management.
+6. JSON - Map/Chunk/Asset metadata.
+7. Math - Custom Vec2/Vec3/Mat4
+8. Target Platforms - Web -> Desktop -> Console(future).
