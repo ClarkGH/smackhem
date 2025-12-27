@@ -1,1 +1,5 @@
-// Abstract Game Clock service logic
+export interface Clock {
+    getTime(): number;
+    getDeltaTime(): number;
+    update(): void;
+}
