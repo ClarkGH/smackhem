@@ -1,7 +1,5 @@
 # Project Codename: Smackhem
 
-WIP: TODO: Clean up, edit as we go
-
 - First-Person Geometric Exploration Engine
 - (Web-First, Platform-Agnostic by Design)
 
@@ -29,7 +27,7 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most conf
 - The whole RPG experience, in geometric form!
 - No plagiarism, only inspiration.
 - The rounds have been cast out of geometromena, the angled ones rule supreme. Will our circles, ovals, spirals, and parabolics be able to end roundism once and for all? Or will the “cycle” continue, as round things tend to do.
-- Day/Dusk/Night/Dawn cycle
+- Day/Dusk/Night/Dawn cycle.
 - Cheeky but appropriate humor. Dad jokes, math jokes, we’re going to make it weird.
 - The game is both 3D and 2D, ala Dragonview and Drakkhen. First person exploration in the main map, until combat or events, then party pops out and fights or has a conversation/investigates.
 - NPC/Enemy/Party AI. Different than Drakkhen. Party will follow the hero, follow turn based commands, or follow set tactics in real time. Enemies/NPCs will do their own thing as set by the game logic.
@@ -45,9 +43,9 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most conf
 - Character creation
 - A plot
 - Spells: Unlock, fire, ice, light, lightning, invisibility, poison cloud, acid spray, buff, debuff, shield, etc.. If we have time and the spell's not broken, we'll have a good amount!
-- Strengthen/upgrade system involving math formulae (Algebraic! Geometric!)
-- Accessibility options
-- Add color
+- Strengthen/upgrade system involving math formulae (Algebraic! Geometric!).
+- Accessibility options.
+- Add some color for... reasons.
 - Port demo code to Godot, because "why not?". We're building for fun.
 
 ## Smackhem – Portability Enforcement Rules
@@ -66,6 +64,7 @@ If a feature cannot be described without referencing a specific platform, it mus
 ### 1. Layer Boundaries (Hard Rule)
 
 The project is divided into three layers. Code may only depend downward.
+
 CORE  →  SERVICES  →  BACKENDS
 
 #### 1.1 Core (Portable Forever)
@@ -113,10 +112,12 @@ Backends:
 ### 2. Rendering Enforcement Rules
 
 RULE R-1: No GPU Calls Outside the Renderer
+
 Allowed:
-renderer.drawMesh(mesh, transform);
+```renderer.drawMesh(mesh, transform);```
 Forbidden:
-gl.bindBuffer(...);
+```gl.bindBuffer(...);```
+
 If a non-render file mentions a GPU concept, the boundary is broken.
 
 RULE R-2: Rendering Is Declarative
@@ -282,6 +283,7 @@ The game should not know or care what GPU or input device exists.
 
 ### 4. High-Level Architecture
 
+```text
 ┌──────────────────────────┐
 │        Game Loop         │
 ├──────────────────────────┤
@@ -293,6 +295,7 @@ The game should not know or care what GPU or input device exists.
 ├──────────────────────────┤
 │   Platform Backends      │
 └──────────────────────────┘
+```
 
 ### 5. Core Systems
 
@@ -397,7 +400,8 @@ This works identically on:
 
 • No Curves or Smooth Surfaces: The game will strictly use geometric shapes such as cubes, pyramids, prisms, and planes. This constraint is intentional to simplify the design and rendering pipeline, making it easier to batch objects and optimize performance.
 • No Textures: The game will only use solid colors or shaders for visual effects, making it more minimalist and geometric in appearance.
-• Spheres/Organic Shapes: While we've added spheres, they'll be used sparingly for specific objects (e.g., spheres for certain enemies, or environmental details like orbs), and they won't dominate the design language.
+• 3D Spheres/Organic Shapes: While we've added spheres, they'll be used sparingly for specific objects (e.g., environmental details like orbs), and they won't dominate the design language.
+• 2D simulated 'Spheres' and weird shapes will be a thing. Don't expect much from the lighting, but we'll do what we can because we must. If we can get a weird parabolic squiggle as a playable character, that looks gorgeous with the lighting, I've done my job.
 
 Why:
 
