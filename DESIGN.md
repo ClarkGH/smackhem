@@ -70,180 +70,255 @@ CORE  →  SERVICES  →  BACKENDS
 #### 1.1 Core (Portable Forever)
 
 Allowed:
-    • Math
-    • World logic
-    • Chunking
-    • Camera
-    • Party logic
-    • Time Logic
-    • Event Logic
-    • Deterministic simulation
+
+- Math
+- World logic
+- Chunking
+- Camera
+- Party logic
+- Time Logic
+- Event Logic
+- Deterministic simulation
+
 Forbidden:
-    • WebGL / GPU APIs
-    • DOM / browser APIs
-    • Input devices (keyboard, mouse, gamepad)
-    • Asset paths or fetch calls
+
+- WebGL / GPU APIs
+- DOM / browser APIs
+- Input devices (keyboard, mouse, gamepad)
+- Asset paths or fetch calls
+
 If code in core/ references a platform concept, it is a violation.
 
 #### 1.2 Services (Abstract Interfaces)
 
 Services define what the engine needs, never how it is done.
+
 Examples:
-    • Renderer
-    • Input
-    • Clock
-    • AssetLoader
+
+- Renderer
+- Input
+- Clock
+- AssetLoader
+
 Services:
-    • Contain no platform code
-    • Contain no logic beyond type definitions
+
+- Contain no platform code
+- Contain no logic beyond type definitions
 
 #### 1.3 Backends (Replaceable)
 
 Backends implement services for a specific platform.
+
 Examples:
-    • WebGL renderer
-    • Web input
-    • Native renderer (future)
+
+- WebGL renderer
+- Web input
+- Native renderer (future)
+
 Backends:
-    • May depend on platform APIs
-    • May change freely
-    • Must not leak upward
+
+- May depend on platform APIs
+- May change freely
+- Must not leak upward
 
 ### 2. Rendering Enforcement Rules
 
 RULE R-1: No GPU Calls Outside the Renderer
 
 Allowed:
-```renderer.drawMesh(mesh, transform);```
+
+```typescript
+renderer.drawMesh(mesh, transform);
+```
+
 Forbidden:
-```gl.bindBuffer(...);```
+
+```typescript
+gl.bindBuffer(...);
+```
 
 If a non-render file mentions a GPU concept, the boundary is broken.
 
 RULE R-2: Rendering Is Declarative
+
 Game code declares intent:
-    • What mesh
-    • Where it is
+
+- What mesh
+- Where it is
+
 The renderer decides:
-    • How it is drawn
-    • How lighting is applied
+
+- How it is drawn
+- How lighting is applied
+
 Game logic must never adjust lighting values directly.
 
 RULE R-3: Lighting Lives in the Renderer
+
 Lighting:
-    • Is grayscale only
-    • Is derived from mesh data
-    • Is applied in shaders
+
+- Is grayscale only
+- Is derived from mesh data
+- Is applied in shaders
+
 Lighting must never be:
-    • A gameplay mechanic
-    • A world system
-    • A camera concern
+
+- A gameplay mechanic
+- A world system
+- A camera concern
 
 ### 3. Input Enforcement Rules
 
 RULE I-1: Input Is Intent, Not Hardware
 Core systems consume intent, never devices.
+
 Allowed:
+
+```typescript
 intent.move
 intent.look
+```
+
 Forbidden:
+
+```typescript
 keydown
 mouseDelta
+```
 
 RULE I-2: Controller-First Assumption
+
 Every gameplay feature must be usable with:
-    • Two sticks
-    • Buttons
+
+- Two sticks
+- Buttons
+
 If it requires a mouse or keyboard, it is invalid by default.
 
 ### 4. Time & Simulation Rules
 
 RULE T-1: Fixed Timestep Only
+
 Simulation must run at a fixed rate.
+
 Forbidden:
-    • Frame-dependent movement
-    • Browser timing assumptions
+
+- Frame-dependent movement
+- Browser timing assumptions
+
 Rendering may interpolate, simulation may not.
 
 RULE T-2: No Hidden Time Sources
+
 The only valid time source is the engine clock service.
+
 No:
-    • Date.now()
-    • performance.now()
-    • Implicit timing
+
+- `Date.now()`
+- `performance.now()`
+- Implicit timing
 
 ### 5. World & Data Rules
 
 RULE W-1: Data Is Pure
+
 World data:
-    • Is serializable
-    • Contains no logic
-    • Contains no platform assumptions
+
+- Is serializable
+- Contains no logic
+- Contains no platform assumptions
+
 JSON today, binary later — same structure.
 
 RULE W-2: Chunk Ownership Is Explicit
+
 Chunks:
-    • Own their meshes
-    • Own their bounds
-    • Are loaded/unloaded deliberately
+
+- Own their meshes
+- Own their bounds
+- Are loaded/unloaded deliberately
+
 No global hidden state.
 
 ### 6. Memory & Performance Rules (Console-Safe)
 
 RULE M-1: No Allocation in Hot Loops
+
 Gameplay update loops must not:
-    • Allocate memory
-    • Create arrays
-    • Spawn objects
+
+- Allocate memory
+- Create arrays
+- Spawn objects
+
 Chunk loading is the only allowed allocation boundary.
 
 RULE M-2: Predictable Lifetime
+
 All runtime objects must have:
-    • A clear creation point
-    • A clear destruction point
+
+- A clear creation point
+- A clear destruction point
+
 Garbage collection should never be relied upon for correctness.
 
 ### 7. Asset Loading Rules
 
 RULE A-1: Assets Are Requested by ID
+
 Allowed:
+
+```typescript
 AssetLoader.loadMap("overworld_01")
+```
+
 Forbidden:
+
+```typescript
 fetch("./maps/overworld_01.json")
+```
+
 Paths are backend details.
 
 ### 8. Debugging Rules
 
 RULE D-1: Debug Is Optional
+
 Debug features:
-    • Must be toggleable
-    • Must not affect core logic
-    • Must not be required for gameplay
+
+- Must be toggleable
+- Must not affect core logic
+- Must not be required for gameplay
 
 ### 9. Fake Port Validation Rule
 
 RULE P-1: Deletion Test
 At any time, it must be possible to:
-    1. Delete all backend code
-    2. Replace it with stubs
-    3. Compile the core
+
+1. Delete all backend code
+2. Replace it with stubs
+3. Compile the core
 If this fails, portability has already been broken.
 
 ### 10. The Final Sanity Check
 
 Before adding any feature, ask:
 Could this exist unchanged on a console with no browser, no mouse, and no JIT?
+
 If the answer is:
-    • Yes → proceed
-    • No → redesign or isolate
+
+- Yes → proceed
+- No → redesign or isolate
 
 ### Closing Statement
 
 These rules are not about restriction — they are about freedom later.
+
 If followed consistently:
-    • Web is fast
-    • Desktop is easy
-    • Console is realistic
+
+- Web is fast
+- Desktop is easy
+- Console is realistic
+
 Break them knowingly, not accidentally.
 
 ## “Smackhem” Design Principles
@@ -251,33 +326,40 @@ Break them knowingly, not accidentally.
 ### 1. Core Goal (Re-Stated)
 
 Build a small, deterministic 3D exploration engine that:
-    • Runs in the browser using WebGL + TypeScript
-    • Feels good to move around in first-person
-    • Supports a visible party of 4
-    • Streams a simple geometric world in chunks
-    • Can later “snap” onto other platforms by swapping backends
+
+- Runs in the browser using WebGL + TypeScript
+- Feels good to move around in first-person
+- Supports a visible party of 4
+- Streams a simple geometric world in chunks
+- Can later "snap" onto other platforms by swapping backends
+
 This is engine scaffolding, not content.
 
 ### 2. Design Principles (Non-Negotiable)
 
 These principles exist only to protect portability:
-    1. Rendering is a service, not a dependency
-    2. Input is intent, not hardware
-    3. Simulation is deterministic
-    4. World data is pure data
-    5. WebGL is one backend, not the engine
-If something violates these, it doesn’t go in.
+
+1. Rendering is a service, not a dependency
+2. Input is intent, not hardware
+3. Simulation is deterministic
+4. World data is pure data
+5. WebGL is one backend, not the engine
+If something violates these, it doesn't go in.
 
 ### 3. Platform Strategy (High Level)
 
-Today
-    • WebGL2
-    • TypeScript
-    • Browser-hosted
-Tomorrow (Optional)
-    • Desktop wrapper
-    • Native renderer
-    • Console renderer
+Today:
+
+- WebGL2
+- TypeScript
+- Browser-hosted
+
+Tomorrow (Optional):
+
+- Desktop wrapper
+- Native renderer
+- Console renderer
+
 Rule:
 The game should not know or care what GPU or input device exists.
 
@@ -315,9 +397,9 @@ while (accumulator >= FIXED_DT) {
 renderer.render(world, party, camera);
 ```
 
-• Fixed timestep (e.g. 60Hz)
-• Rendering interpolates
-• No logic in render
+- Fixed timestep (e.g. 60Hz)
+- Rendering interpolates
+- No logic in render
 
 ### 6. Rendering Layer (Portable by Design)
 
@@ -337,17 +419,17 @@ interface Renderer {
 
 #### 6.2 WebGL Implementation
 
-• Uses WebGL2
-• One shader pair
-• No textures
-• No lighting
-• Depth test only
+- Uses WebGL2
+- One shader pair
+- No textures
+- No lighting
+- Depth test only
 
 #### 6.3 Future Native Renderer
 
-• Same interface
-• Different implementation
-• Game code unchanged
+- Same interface
+- Different implementation
+- Game code unchanged
 
 #### Key Rule: gl.* never leaks upward
 
@@ -362,9 +444,10 @@ World {
 ```
 
 Each chunk is:
-    • Static geometry
-    • Collision bounds
-    • No logic
+
+- Static geometry
+- Collision bounds
+- No logic
 
 #### 7.2 Chunk Definition
 
@@ -384,45 +467,45 @@ StaticMesh {
 
 #### 7.3 Chunk Streaming
 
-• Player position determines active radius
-• Load:
+- Player position determines active radius
+- Load:
     ◦ Current chunk
     ◦ Adjacent chunks
-• Unload far chunks
+- Unload far chunks
 
 This works identically on:
 
-• Web
-• Desktop
-• Console
+- Web
+- Desktop
+- Console
 
 ### 8. Geometry Rules (Intentional Constraints)
 
-• No Curves or Smooth Surfaces: The game will strictly use geometric shapes such as cubes, pyramids, prisms, and planes. This constraint is intentional to simplify the design and rendering pipeline, making it easier to batch objects and optimize performance.
-• No Textures: The game will only use solid colors or shaders for visual effects, making it more minimalist and geometric in appearance.
-• 3D Spheres/Organic Shapes: While we've added spheres, they'll be used sparingly for specific objects (e.g., environmental details like orbs), and they won't dominate the design language.
-• 2D simulated 'Spheres' and weird shapes will be a thing. Don't expect much from the lighting, but we'll do what we can because we must. If we can get a weird parabolic squiggle as a playable character, that looks gorgeous with the lighting, I've done my job.
+- No Curves or Smooth Surfaces: The game will strictly use geometric shapes such as cubes, pyramids, prisms, and planes. This constraint is intentional to simplify the design and rendering pipeline, making it easier to batch objects and optimize performance.
+- No Textures: The game will only use solid colors or shaders for visual effects, making it more minimalist and geometric in appearance.
+- 3D Spheres/Organic Shapes: While we've added spheres, they'll be used sparingly for specific objects (e.g., environmental details like orbs), and they won't dominate the design language.
+- 2D simulated 'Spheres' and weird shapes will be a thing. Don't expect much from the lighting, but we'll do what we can because we must. If we can get a weird parabolic squiggle as a playable character, that looks gorgeous with the lighting, I've done my job.
 
 Why:
 
-• Easy to batch
-• Easy to serialize
-• Easy to port
-• Easy to debug
+- Easy to batch
+- Easy to serialize
+- Easy to port
+- Easy to debug
 
 ### 9. Camera System (First-Person Focus)
 
 #### 9.1 Camera Modes
 
-• First-person (default)
-• Optional slightly elevated free camera (toggleable)
+- First-person (default)
+- Optional slightly elevated free camera (toggleable)
 
 #### 9.2 Camera Rules
 
-• Yaw + pitch only
-• No roll
-• Clamped pitch
-• Explicit smoothing (no browser magic)
+- Yaw + pitch only
+- No roll
+- Clamped pitch
+- Explicit smoothing (no browser magic)
 
 Camera is a system, not math in input code.
 
@@ -440,14 +523,14 @@ interface PlayerIntent {
 
 #### 10.2 Web Input Backend
 
-• Keyboard → move
-• Mouse → look
-• Gamepad → move/look
+- Keyboard → move
+- Mouse → look
+- Gamepad → move/look
 
 #### 10.3 Console Input Backend (Future)
 
-• Controller only
-• Same intent output
+- Controller only
+- Same intent output
 
 Game logic never sees devices.
 
@@ -470,25 +553,25 @@ PartyMember {
 
 #### 11.2 Party/Enemy Behavior
 
-• Party leader follows camera/player
-• Members “pop out” around leader
-• Party and Instance Transitions:
-    ◦ When entering an instance (such as a dungeon or explorable area), the game will switch to a 2D view where the party remains in the scene. The player will not be able to return to first-person exploration during this time.
-    ◦ The party will always be displayed as 2D characters when in combat or exploration mode inside an instance.
-    ◦ The 3D landscape and any buildings are part of the geometry, but party models and enemies will always remain 2D.
-    ◦ Collisions and interaction mechanics will still be governed by the same 3D world logic but applied in the 2D instance (i.e., no physical simulation in the 3D world when in instances, but standard 2D interaction applies).
-• Offsets are relative, not simulated
-• NPCs and enemies will be 2D models with simple AI patterns that follow set behaviors, including spawning, patrolling, attacking, and reacting to player presence.
-• Enemy movement will be constrained to the 2D plane, and they will collide with some 3D environmental features.
+- Party leader follows camera/player
+- Members “pop out” around leader
+- Party and Instance Transitions:
+  - When entering an instance (such as a dungeon or explorable area), the game will switch to a 2D view where the party remains in the scene. The player will not be able to return to first-person exploration during this time.
+  - The party will always be displayed as 2D characters when in combat or exploration mode inside an instance.
+  - The 3D landscape and any buildings are part of the geometry, but party models and enemies will always remain 2D.
+  - Collisions and interaction mechanics will still be governed by the same 3D world logic but applied in the 2D instance (i.e., no physical simulation in the 3D world when in instances, but standard 2D interaction applies).
+- Offsets are relative, not simulated
+- NPCs and enemies will be 2D models with simple AI patterns that follow set behaviors, including spawning, patrolling, attacking, and reacting to player presence.
+- Enemy movement will be constrained to the 2D plane, and they will collide with some 3D environmental features.
 
 This is cheap, readable, and portable.
 
 ### 12. Collision System
 
-• Manual AABB checks
-• Player vs world
-• No physics engine
-• Deterministic
+- Manual AABB checks
+- Player vs world
+- No physics engine
+- Deterministic
 
 This is console-friendly and debuggable.
 
@@ -550,15 +633,19 @@ No rewrites. Just additions.
 ### 15. What “Snap-On Porting” Actually Means (Honest)
 
 Porting later means:
-    • Replace renderer backend
-    • Replace input backend
-    • Possibly replace audio backend
+
+- Replace renderer backend
+- Replace input backend
+- Possibly replace audio backend
+
 It does not mean:
-    • Rewriting world logic
-    • Rewriting party logic
-    • Rewriting camera
-    • Rewriting chunking
-That’s the win.
+
+- Rewriting world logic
+- Rewriting party logic
+- Rewriting camera
+- Rewriting chunking
+
+That's the win.
 
 ### 16. What You Should Build First (Learning Path)
 
