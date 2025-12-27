@@ -1,5 +1,5 @@
-// src/platforms/web/webGLRenderer.ts
-import type { Renderer } from '../../services/renderer';
+import type { Renderer, MeshHandle } from '../../services/renderer';
+import type { Mat4, Vec3 } from 'src/types/common';
 
 export class WebGLRenderer implements Renderer {
     private gl: WebGL2RenderingContext;
@@ -12,7 +12,7 @@ export class WebGLRenderer implements Renderer {
             throw new Error('WebGL2 not supported');
         }
         this.gl = gl;
-        this.gl.clearColor(0, 0, 0, 1);
+        this.gl.clearColor(38/255, 151/255, 121/255, 1); // Neat teal color for now
     }
 
     beginFrame(): void {
