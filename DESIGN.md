@@ -40,15 +40,15 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most conf
 
 ### TBD / Next steps
 
- We might transition into doing something more akin to Dragonview? Not sure, that’s more complicated and having party AI do their own thing while following the leader seem’s like a fine enough plan.
+ We might transition into doing something more akin to Dragonview? Not sure, that's more complicated and having party AI do their own thing while following the leader seem's like a fine enough plan.
 
 - Character creation
--A plot
--Spells: Unlock, fire, ice, light, lightning, invisibility, poison cloud, acid spray, buff, debuff, shield, etc.. If we have time and the spell’s not broken, we’ll have a good amount!
--Strengthen/upgrade system involving math formulae (Algebraic! Geometric!)
--Accessibility options
--Add color
--Port demo code to Godot, because “why not?”. We’re building for fun.
+- A plot
+- Spells: Unlock, fire, ice, light, lightning, invisibility, poison cloud, acid spray, buff, debuff, shield, etc.. If we have time and the spell's not broken, we'll have a good amount!
+- Strengthen/upgrade system involving math formulae (Algebraic! Geometric!)
+- Accessibility options
+- Add color
+- Port demo code to Godot, because "why not?". We're building for fun.
 
 ## Smackhem – Portability Enforcement Rules
 
@@ -559,15 +559,16 @@ That’s the win.
 ### 16. What You Should Build First (Learning Path)
 
 1. WebGL renderer (single cube)
-        a. Uses WebGL2
-        b. One shader pair
-        c. No textures
-        e. Depth test only
-    2. Camera movement
-    3. Chunked world loading
-    4. Party pop-out rendering
-    5. Input abstraction
-    6. Clean separation audit
+   - Uses WebGL2
+   - One shader pair
+   - No textures
+   - Depth test only
+2. Camera movement
+3. Chunked world loading
+4. Party pop-out rendering
+5. Input abstraction
+6. Clean separation audit
+
 If it feels clean, it will port.
 
 ### 17. Final Ground Rule (Most Important)
