@@ -52,7 +52,8 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most conf
 
 ## Smackhem – Portability Enforcement Rules
 
--Purpose
+### Purpose
+
 These rules exist to protect future portability (desktop, console, native) while allowing fast learning and iteration today.
 They are not style preferences. They are constraints. Breaking them knowingly is a design decision, not an accident.
 
@@ -298,6 +299,8 @@ The game should not know or care what GPU or input device exists.
 #### 5.1 Game Loop (Fixed Step)
 
 Console-safe, deterministic.
+
+```typescript
 while (accumulator >= FIXED_DT) {
   input.update();
   world.update(FIXED_DT);
@@ -307,14 +310,17 @@ while (accumulator >= FIXED_DT) {
 }
 
 renderer.render(world, party, camera);
-    • Fixed timestep (e.g. 60Hz)
-    • Rendering interpolates
-    • No logic in render
+```
+
+• Fixed timestep (e.g. 60Hz)
+• Rendering interpolates
+• No logic in render
 
 ### 6. Rendering Layer (Portable by Design)
 
 #### 6.1 Renderer Interface
 
+```typescript
 interface Renderer {
   beginFrame(): void;
   drawMesh(
@@ -324,30 +330,34 @@ interface Renderer {
   ): void;
   endFrame(): void;
 }
+```
 
 #### 6.2 WebGL Implementation
 
-    • Uses WebGL2
-    • One shader pair
-    • No textures
-    • No lighting
-    • Depth test only
+• Uses WebGL2
+• One shader pair
+• No textures
+• No lighting
+• Depth test only
 
 #### 6.3 Future Native Renderer
 
-    • Same interface
-    • Different implementation
-    • Game code unchanged
-Key Rule:
-gl.* never leaks upward.
+• Same interface
+• Different implementation
+• Game code unchanged
+
+#### Key Rule: gl.* never leaks upward
 
 ### 7. World System
 
 #### 7.1 World Structure
 
+```typescript
 World {
-  activeChunks: Map<ChunkID, Chunk>
+    activeChunks: Map<ChunkID, Chunk>
 }
+```
+
 Each chunk is:
     • Static geometry
     • Collision bounds
@@ -355,119 +365,134 @@ Each chunk is:
 
 #### 7.2 Chunk Definition
 
+```typescript
 Chunk {
   id: string;
   bounds: AABB;
   meshes: StaticMesh[];
 }
-Mesh:
+
 StaticMesh {
   mesh: MeshHandle;
   transform: Mat4;
   color: Vec3;
 }
+```
 
 #### 7.3 Chunk Streaming
 
-    • Player position determines active radius
-    • Load:
-        ◦ Current chunk
-        ◦ Adjacent chunks
-    • Unload far chunks
+• Player position determines active radius
+• Load:
+    ◦ Current chunk
+    ◦ Adjacent chunks
+• Unload far chunks
+
 This works identically on:
-    • Web
-    • Desktop
-    • Console
+
+• Web
+• Desktop
+• Console
 
 ### 8. Geometry Rules (Intentional Constraints)
 
-    • No Curves or Smooth Surfaces: The game will strictly use geometric shapes such as cubes, pyramids, prisms, and planes. This constraint is intentional to simplify the design and rendering pipeline, making it easier to batch objects and optimize performance.
-    • No Textures: The game will only use solid colors or shaders for visual effects, making it more minimalist and geometric in appearance.
-    • Spheres/Organic Shapes: While we've added spheres, they'll be used sparingly for specific objects (e.g., spheres for certain enemies, or environmental details like orbs), and they won't dominate the design language.
+• No Curves or Smooth Surfaces: The game will strictly use geometric shapes such as cubes, pyramids, prisms, and planes. This constraint is intentional to simplify the design and rendering pipeline, making it easier to batch objects and optimize performance.
+• No Textures: The game will only use solid colors or shaders for visual effects, making it more minimalist and geometric in appearance.
+• Spheres/Organic Shapes: While we've added spheres, they'll be used sparingly for specific objects (e.g., spheres for certain enemies, or environmental details like orbs), and they won't dominate the design language.
+
 Why:
-    • Easy to batch
-    • Easy to serialize
-    • Easy to port
-    • Easy to debug
+
+• Easy to batch
+• Easy to serialize
+• Easy to port
+• Easy to debug
 
 ### 9. Camera System (First-Person Focus)
 
 #### 9.1 Camera Modes
 
-    • First-person (default)
-    • Optional slightly elevated free camera (toggleable)
+• First-person (default)
+• Optional slightly elevated free camera (toggleable)
 
 #### 9.2 Camera Rules
 
-    • Yaw + pitch only
-    • No roll
-    • Clamped pitch
-    • Explicit smoothing (no browser magic)
+• Yaw + pitch only
+• No roll
+• Clamped pitch
+• Explicit smoothing (no browser magic)
+
 Camera is a system, not math in input code.
 
 ### 10. Input System (Console-Ready)
 
 #### 10.1 Input Intent
 
+```typescript
 interface PlayerIntent {
   move: Vec2;     // forward/back, strafe
   look: Vec2;     // yaw/pitch
   toggleCamera: boolean;
 }
+```
 
 #### 10.2 Web Input Backend
 
-    • Keyboard → move
-    • Mouse → look
-    • Gamepad → move/look
+• Keyboard → move
+• Mouse → look
+• Gamepad → move/look
 
 #### 10.3 Console Input Backend (Future)
 
-    • Controller only
-    • Same intent output
+• Controller only
+• Same intent output
+
 Game logic never sees devices.
 
 ### 11. Party System (Drakkhen-Style)
 
 #### 11.1 Party Structure
 
+```typescript
 Party {
   leaderTransform: Transform;
   members: PartyMember[4];
 }
-Each member:
+
 PartyMember {
   class: ClassType;
   offset: Vec3;
   mesh: MeshHandle;
 }
+```
 
 #### 11.2 Party/Enemy Behavior
 
-    • Party leader follows camera/player
-    • Members “pop out” around leader
-    • Party and Instance Transitions:
-        ◦ When entering an instance (such as a dungeon or explorable area), the game will switch to a 2D view where the party remains in the scene. The player will not be able to return to first-person exploration during this time.
-        ◦ The party will always be displayed as 2D characters when in combat or exploration mode inside an instance.
-        ◦ The 3D landscape and any buildings are part of the geometry, but party models and enemies will always remain 2D.
-        ◦ Collisions and interaction mechanics will still be governed by the same 3D world logic but applied in the 2D instance (i.e., no physical simulation in the 3D world when in instances, but standard 2D interaction applies).
-    • Offsets are relative, not simulated
-    • NPCs and enemies will be 2D models with simple AI patterns that follow set behaviors, including spawning, patrolling, attacking, and reacting to player presence.
-    • Enemy movement will be constrained to the 2D plane, and they will collide with some 3D environmental features.
+• Party leader follows camera/player
+• Members “pop out” around leader
+• Party and Instance Transitions:
+    ◦ When entering an instance (such as a dungeon or explorable area), the game will switch to a 2D view where the party remains in the scene. The player will not be able to return to first-person exploration during this time.
+    ◦ The party will always be displayed as 2D characters when in combat or exploration mode inside an instance.
+    ◦ The 3D landscape and any buildings are part of the geometry, but party models and enemies will always remain 2D.
+    ◦ Collisions and interaction mechanics will still be governed by the same 3D world logic but applied in the 2D instance (i.e., no physical simulation in the 3D world when in instances, but standard 2D interaction applies).
+• Offsets are relative, not simulated
+• NPCs and enemies will be 2D models with simple AI patterns that follow set behaviors, including spawning, patrolling, attacking, and reacting to player presence.
+• Enemy movement will be constrained to the 2D plane, and they will collide with some 3D environmental features.
+
 This is cheap, readable, and portable.
 
 ### 12. Collision System
 
-    • Manual AABB checks
-    • Player vs world
-    • No physics engine
-    • Deterministic
+• Manual AABB checks
+• Player vs world
+• No physics engine
+• Deterministic
+
 This is console-friendly and debuggable.
 
 ### 13. Data Formats
 
 #### 13.1 Map Data (JSON)
 
+```json
 {
   "id": "overworld_01",
   "chunks": [
@@ -480,6 +505,8 @@ This is console-friendly and debuggable.
     }
   ]
 }
+```
+
 Pure data. No logic. Portable forever.
 
 ### 14. Project Structure
@@ -491,17 +518,25 @@ src/
 │  ├─ party.ts
 │  ├─ camera.ts
 │  └─ input.ts
-├─ render/
-│  ├─ Renderer.ts
-│  ├─ Mesh.ts
-│  └─ WebGLRenderer.ts
-├─ platform/
-│  ├─ webInput.ts
-│  └─ webBootstrap.ts
-└─ math/
+├─ services/
+│  ├─ renderer.ts      # Abstract Renderer interface
+│  ├─ input.ts         # Abstract Input service
+│  ├─ clock.ts         # Time service
+│  └─ assetLoader.ts   # Asset loading service
+├─ platforms/
+│  ├─ web/
+│  │  ├─ webBootstrap.ts
+│  │  ├─ webGLRenderer.ts
+│  │  └─ webInput.ts
+│  └─ console/
+│     └─ console.md
+├─ types/
+│  └─ common.d.ts       # Common type definitions
+└─ main.ts              # Entry point
+
 Future:
-render/NativeRenderer.ts
-platform/consoleInput.ts
+platforms/native/
+platforms/console/
 No rewrites. Just additions.
 
 ### 15. What “Snap-On Porting” Actually Means (Honest)
@@ -519,7 +554,7 @@ That’s the win.
 
 ### 16. What You Should Build First (Learning Path)
 
-    1. WebGL renderer (single cube)
+1. WebGL renderer (single cube)
         a. Uses WebGL2
         b. One shader pair
         c. No textures
