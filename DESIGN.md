@@ -511,6 +511,7 @@ Pure data. No logic. Portable forever.
 
 ### 14. Project Structure
 
+```text
 src/
 ├─ core/
 │  ├─ gameLoop.ts
@@ -533,10 +534,13 @@ src/
 ├─ types/
 │  └─ common.d.ts       # Common type definitions
 └─ main.ts              # Entry point
+```
 
 Future:
-platforms/native/
-platforms/console/
+
+- `platforms/native/`
+- `platforms/console/`
+
 No rewrites. Just additions.
 
 ### 15. What “Snap-On Porting” Actually Means (Honest)

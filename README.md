@@ -11,19 +11,20 @@ Inspired by crosscode's use of web technologies. Since that's what I'm comfortab
 
 ## Project layout
 
+```text
 /smackhem
 ├─ /dist             # build output
 ├─ /node_modules
 ├─ /src
 │  ├─ main.ts        # entrypoint
 │  ├─ core/          # engine core systems
-│  ├─ render/        # abstract rendering layer
-│  ├─ platforms/      # platform specific code
-│  ├─ math/          # math utilities
+│  ├─ platforms/     # platform specific code
+│  ├─ services/      # services
 │  └─ types/         # common types
 ├─ package.json
 ├─ tsconfig.json
 └─ vite.config.ts
+```
 
 ## Tech Stack
 
