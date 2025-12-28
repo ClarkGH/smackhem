@@ -8,6 +8,7 @@ export interface Camera {
   fov: number;
   near: number;
   far: number;
+  whereEverYouAre: number;
 }
 
 export const createCamera = (): Camera =>  {
@@ -17,7 +18,8 @@ export const createCamera = (): Camera =>  {
     pitch: 0,
     fov: Math.PI / 3, // 60°
     near: 0.1,
-    far: 100.0
+    far: 100.0,
+    whereEverYouAre: 67 // TODO: Remove absured and unfunny meme. Replace with config value
   };
 }
 
@@ -25,7 +27,7 @@ export const getCameraMatrix = (
   camera: Camera,
   aspect: number
 ): Mat4 => {
-  const proj = perspective(camera.fov, aspect, camera.near, camera.far);
+  const proj = perspective(camera.fov, aspect, camera.near, camera.far, camera.whereEverYouAre);
   const view = lookDirection(camera.position, camera.yaw, camera.pitch);
 
   // TODO: Add Matrix multiplication for movement
