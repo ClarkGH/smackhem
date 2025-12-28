@@ -1,1 +1,1 @@
-import './platforms/web/webBootstrap';
+import './platforms/web/webBootstrap'; // TODO, make platform agnostic

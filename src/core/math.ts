@@ -31,7 +31,7 @@ export const lookDirection = (
     position: { x: number; y: number; z: number },
     yaw: number,
     pitch: number
-  ): Mat4 => {
+): Mat4 => {
     const cosYaw = Math.cos(yaw);
     const sinYaw = Math.sin(yaw);
     const cosPitch = Math.cos(pitch);
@@ -58,7 +58,7 @@ export const lookDirection = (
     e[9]  = fy;
     e[10] = fz;
   
-    // Translation
+    // Translation (camera position)
     e[12] = -position.x;
     e[13] = -position.y;
     e[14] = -position.z;
@@ -66,3 +66,24 @@ export const lookDirection = (
   
     return { elements: e };
 }
+
+// TODO: Make more performant than a nested for loop
+export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
+    // Following matrix formula AB = C
+    const ae = a.elements;
+    const be = b.elements;
+    const ce = new Float32Array(16);
+  
+    for (let i = 0; i < 4; i++) { // Row
+      for (let j = 0; j < 4; j++) { // Column
+        ce[i * 4 + j] =
+          ae[i * 4 + 0] * be[0 * 4 + j] +
+          ae[i * 4 + 1] * be[1 * 4 + j] +
+          ae[i * 4 + 2] * be[2 * 4 + j] +
+          ae[i * 4 + 3] * be[3 * 4 + j];
+      }
+    }
+    
+    // Return dot product
+    return { elements: ce };
+};

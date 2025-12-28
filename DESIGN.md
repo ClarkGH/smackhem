@@ -513,9 +513,9 @@ Why:
 - Clamped pitch
 - Explicit smoothing (no browser magic)
 
-##### Technical Jargon and Formulae
+##### 9.2.1 Technical Jargon and Formulae
 
-###### Identity Matrices
+###### 9.2.2 Identity Matrices
 
 Identity matrices represent the default state of an object in 3D space. We use them as the starting point.
 
@@ -531,7 +531,7 @@ If a shader expects a matrix, but we don't want to apply any transformation to t
 
 This ties into the w component. By having 1s on the diagonal and 0s elsewhere, our matrix will tell the GPU to keep x as x, y as y, z as z, and w as 1.
 
-###### Perspective Projection Matrix
+###### 9.2.3 Perspective Projection Matrix
 
 Perspective lives inside a 16 element array.
 
@@ -569,7 +569,7 @@ We need a projection trick value. We set it as -1 to move the original z-value i
 
 Wherever you are is a silly variable name we're rolling with to do some wonky stuff with right and left handed coordinates. Standby there, brains too tired after learning 3D math.
 
-###### Direction Vector Formula
+###### 9.2.4 Direction Vector Formula
 
 `Direction = normalize(B - A)`
 
@@ -581,7 +581,7 @@ Everything we build uses lines
 
 `e.g. Direction = (dx, dy, dz) / sqrt(dx^2 + dy^2 + dz^2)`
 
-###### Look-At Matrix (View Matrix)
+###### 9.2.5 Look-At Matrix (View Matrix)
 
 For a 3D camera, we need to define Up/Right to create a proper orientation matrices. We will be using a 16 element list or array for the matrices
 
@@ -589,7 +589,7 @@ For a 3D camera, we need to define Up/Right to create a proper orientation matri
 `Right Axis = normalize(forwardAxis x WorldUp)`
 `Up Axis = forwardAxis x rightAxis`
 
-###### Orientation Vectors
+###### 9.2.7 Orientation Vectors
 
 3D orientation requires three vectors within a 16 element list to define an xyz coordinate system
 
@@ -610,7 +610,7 @@ Forward is the cross product of the forward and right axes. It's the exact direc
 `y component = (sinPitch)`
 `z component = (sinYaw * cosPitch)`
 
-###### Translation and Final Matrix
+###### 9.2.8 Translation and Final Matrix
 
 We want to store the inverted position of the camera. View matrices move the world in the opposite direction vs moving the camera. You will always be at "the center".
 
@@ -621,6 +621,15 @@ We'll also want a "w" for the 4x4 matrix mathy stuff (homogenous coordinates)
 - e[15] = 1
 
 Camera is a system, not math in input code.
+
+###### 9.2.9 Matrix Multiplication
+
+In order to change position, we'll need to combine two matrices for their product. We'll do so via matrix multiplication.
+<https://en.wikipedia.org/wiki/Matrix_multiplication>
+
+`AB = C`
+`View = RotationMatrix * TranslationMatrix`
+`cameraMatrix = projection x view`
 
 ### 10. Input System (Console-Ready)
 
