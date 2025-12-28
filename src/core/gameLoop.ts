@@ -30,4 +30,6 @@ export const createGameLoop = (renderer: Renderer): () => void => {
         }
         renderer.endFrame();
     }
-  }
+}
+
+//TODO: We want to get the identity matrix
