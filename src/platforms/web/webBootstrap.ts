@@ -15,7 +15,7 @@ const renderer = new WebGLRenderer(canvas);
 // Wireframe toggle (press 'W' key)
 let wireframeEnabled = false;
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'w' || e.key === 'W') {
+    if (e.key === '\\') {
         wireframeEnabled = !wireframeEnabled;
         renderer.setWireframe(wireframeEnabled);
         console.log(`Wireframe: ${wireframeEnabled ? 'ON' : 'OFF'}`);

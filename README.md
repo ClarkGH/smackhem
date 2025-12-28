@@ -30,8 +30,9 @@ Using issues as tasks for some illegible form of project management for now.
 1. WebGL 2.0/HTML5 - Web-based engine for 3D model rendering.
 2. Typescript - Language of choice.
 3. Vite - Building/Bundling.
-4. ESLint/Prettier - Formatting.
-5. Node.js/pnpm - Package management.
-6. JSON - Map/Chunk/Asset metadata.
-7. Math - Custom Vec2/Vec3/Mat4
-8. Target Platforms - Web -> Desktop -> Console(future).
+4. Vitest - Unit testing
+5. ESLint/Prettier - Formatting.
+6. Node.js/pnpm - Package management.
+7. JSON - Map/Chunk/Asset metadata.
+8. Math - Custom Vec2/Vec3/Mat4
+9. Target Platforms - Web -> Desktop -> Console(future).
