@@ -220,7 +220,7 @@ No:
 
 ### 5. World & Data Rules
 
-RULE W-1: Data Is Pure
+#### RULE W-1: Data Is Pure
 
 World data:
 
@@ -230,7 +230,7 @@ World data:
 
 JSON today, binary later — same structure.
 
-RULE W-2: Chunk Ownership Is Explicit
+#### RULE W-2: Chunk Ownership Is Explicit
 
 Chunks:
 
@@ -242,7 +242,7 @@ No global hidden state.
 
 ### 6. Memory & Performance Rules (Console-Safe)
 
-RULE M-1: No Allocation in Hot Loops
+#### RULE M-1: No Allocation in Hot Loops
 
 Gameplay update loops must not:
 
@@ -252,7 +252,7 @@ Gameplay update loops must not:
 
 Chunk loading is the only allowed allocation boundary.
 
-RULE M-2: Predictable Lifetime
+#### RULE M-2: Predictable Lifetime
 
 All runtime objects must have:
 
@@ -263,7 +263,7 @@ Garbage collection should never be relied upon for correctness.
 
 ### 7. Asset Loading Rules
 
-RULE A-1: Assets Are Requested by ID
+#### RULE A-1: Assets Are Requested by ID
 
 Allowed:
 
@@ -281,7 +281,7 @@ Paths are backend details.
 
 ### 8. Debugging Rules
 
-RULE D-1: Debug Is Optional
+#### RULE D-1: Debug Is Optional
 
 Debug features:
 
@@ -291,7 +291,7 @@ Debug features:
 
 ### 9. Fake Port Validation Rule
 
-RULE P-1: Deletion Test
+#### RULE P-1: Deletion Test
 At any time, it must be possible to:
 
 1. Delete all backend code
@@ -469,8 +469,8 @@ StaticMesh {
 
 - Player position determines active radius
 - Load:
-    ◦ Current chunk
-    ◦ Adjacent chunks
+  - Current chunk
+  - Adjacent chunks
 - Unload far chunks
 
 This works identically on:

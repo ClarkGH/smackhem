@@ -12,5 +12,15 @@ document.body.appendChild(canvas);
 // Create renderer (platform-specific)
 const renderer = new WebGLRenderer(canvas);
 
+// Wireframe toggle (press 'W' key)
+let wireframeEnabled = false;
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'w' || e.key === 'W') {
+        wireframeEnabled = !wireframeEnabled;
+        renderer.setWireframe(wireframeEnabled);
+        console.log(`Wireframe: ${wireframeEnabled ? 'ON' : 'OFF'}`);
+    }
+});
+
 // Start game loop with renderer
 gameLoop(renderer);
