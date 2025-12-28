@@ -12,8 +12,8 @@ document.body.appendChild(canvas);
 // Create renderer (platform-specific)
 const renderer = new WebGLRenderer(canvas);
 
-// Wireframe toggle (press 'W' key)
-let wireframeEnabled = false;
+// Wireframe toggle (press '\' key)
+let wireframeEnabled = false; // TODO: Pull from config
 document.addEventListener('keydown', (e) => {
     if (e.key === '\\') {
         wireframeEnabled = !wireframeEnabled;
