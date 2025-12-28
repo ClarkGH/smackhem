@@ -174,6 +174,7 @@ Lighting must never be:
 ### 3. Input Enforcement Rules
 
 #### RULE I-1: Input Is Intent, Not Hardware
+
 Core systems consume intent, never devices.
 
 Allowed:
@@ -514,9 +515,8 @@ Why:
 
 ##### Technical Jargon and Formulae
 
-- Identity Matrices
+###### Identity Matrices
 
-```text
 Identity matrices represent the default state of an object in 3D space. We use them as the starting point.
 
 When we "clear" an object's rotation or movement, we set its matrix back to Identity.
@@ -530,21 +530,19 @@ If a shader expects a matrix, but we don't want to apply any transformation to t
 - Position = (0,0,0)
 
 This ties into the w component. By having 1s on the diagonal and 0s elsewhere, our matrix will tell the GPU to keep x as x, y as y, z as z, and w as 1.
-```
 
-- Perspective Projection Matrix
+###### Perspective Projection Matrix
 
-```text
-Perspective lives inside a 16 element array
+Perspective lives inside a 16 element array.
 
 The field of view or (fov) is the vertical angle in radians, that the camera can see. Larger means more is visible but objects are smaller.
 
-- f = scaling factor
-- f = 1.0 / tan(fov / 2)
+`f = scaling factor`
+`f = 1.0 / tan(fov / 2)`
 
-The aspect ratio is the viewports width over it's height 
+The aspect ratio is the viewports width over it's height.
 
-- eg. myAspectRatio = 1920 / 1080
+`eg. myAspectRatio = 1920 / 1080`
 
 Near and far are the clipping planes. Anything out of bounds will be invisible.
 
@@ -552,77 +550,68 @@ Near and far are the clipping planes. Anything out of bounds will be invisible.
 
 We want to scale the horizon off of the aspect ratio
 
-- e[0] = x-scale
-- x-scale = f / aspect ratio
+`e[0] = x-scale`
+`x-scale = f / aspect ratio`
 
 We want to scale y by the focal factor
 
-- e[5] = y-scale
-- y-scale = f
+`e[5] = y-scale`
+`y-scale = f`
 
 We want to map the z-coordinates in a non-linear depth-buffer. This gives us more depth precision for objects closer to the camera.
 
-- e[10] = (far + near) * normalizationFactor
-- e[14] = (2 * far * near) * normalizationFactor
+`e[10] = (far + near) * normalizationFactor`
+`e[14] = (2 * far * near) * normalizationFactor`
 
 We need a projection trick value. We set it as -1 to move the original z-value into the "w" scaling factor.
 
-- e[11] = projection trick value. 
+`e[11] = projection trick value`
 
 Wherever you are is a silly variable name we're rolling with to do some wonky stuff with right and left handed coordinates. Standby there, brains too tired after learning 3D math.
-```
 
-- Direction Vector Formula
+###### Direction Vector Formula
 
-```text
-Direction = normalize(B - A)
+`Direction = normalize(B - A)`
 
 Everything we build uses lines
 
-- dx = x_B - x_A
-- dy = y_B - y_A
-- dz = z_B - z_A
+`dx = x_B - x_A`
+`dy = y_B - y_A`
+`dz = z_B - z_A`
 
-e.g. Direction = (dx, dy, dz) / sqrt(dx^2 + dy^2 + dz^2)
-```
+`e.g. Direction = (dx, dy, dz) / sqrt(dx^2 + dy^2 + dz^2)`
 
-- Look-At Matrix (View Matrix)
+###### Look-At Matrix (View Matrix)
 
-```text
-For a 3D camera, we need to define Up/Right to create a proper orientation matrices.
+For a 3D camera, we need to define Up/Right to create a proper orientation matrices. We will be using a 16 element list or array for the matrices
 
-- Will be using a 16 element list or array for the matrices
-- Forward Axis = normalize(Target - EyeLevel)
-- Right Axis = normalize(forwardAxis x WorldUp)
-- Up Axis = forwardAxis x rightAxis
-```
+`Forward Axis = normalize(Target - EyeLevel)`
+`Right Axis = normalize(forwardAxis x WorldUp)`
+`Up Axis = forwardAxis x rightAxis`
 
-- Orientation Vectors
+###### Orientation Vectors
 
-```text
 3D orientation requires three vectors within a 16 element list to define an xyz coordinate system
 
-- e = element list
+`e = element list`
 
 Right is perpendicular to Forward. We calculate it by taking the cross product of the World-Up and Forward vectors. This results in a horizontal vector that points to the right of the camera's perspective.
 
-- Right = e[0] to e[2]
+`Right = e[0] to e[2]`
 
 Up is the cross product of the Forward and Right vectors. It points up from the top of the camera's eye level.
 
-- Up = e[4] to e[6]
+`Up = e[4] to e[6]`
 
 Forward is the cross product of the forward and right axes. It's the exact direction the camera is pointing at.
 
-- Forward = e[8] to e[10]
-- x component = (cosYaw * cosPitch)
-- y component = (sinPitch)
-- z component = (sinYaw * cosPitch)
-```
+`Forward = e[8] to e[10]`
+`x component = (cosYaw * cosPitch)`
+`y component = (sinPitch)`
+`z component = (sinYaw * cosPitch)`
 
-- Translation and Final Matrix
+###### Translation and Final Matrix
 
-```text
 We want to store the inverted position of the camera. View matrices move the world in the opposite direction vs moving the camera. You will always be at "the center".
 
 - e[12] to e[14] store the inverted position of the camera.
@@ -630,8 +619,6 @@ We want to store the inverted position of the camera. View matrices move the wor
 We'll also want a "w" for the 4x4 matrix mathy stuff (homogenous coordinates)
 
 - e[15] = 1
-
-```
 
 Camera is a system, not math in input code.
 

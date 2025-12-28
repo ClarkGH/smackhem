@@ -1,13 +1,11 @@
 import type { Mat4 } from '../types/common';
 
-// Identity matrix
 export const identity = (): Mat4 => {
     const e = new Float32Array(16);
     e[0] = e[5] = e[10] = e[15] = 1;
     return { elements: e };
 }
 
-// Perspective matrix using vector math to find the angle or vector pointing from a camera/eye position to a target point
 export const perspective = (
     fov: number,
     aspect: number,
@@ -20,7 +18,6 @@ export const perspective = (
 
     const e = new Float32Array(16);
 
-    // Mutate state directly
     e[0] = f / aspect; // x-scale
     e[5] = f; // y-scale
     e[10] = (far + near) * normalizationFactor; // depth buffer
