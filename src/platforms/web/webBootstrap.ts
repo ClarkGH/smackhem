@@ -1,4 +1,4 @@
-import { gameLoop } from '../../core/gameLoop';
+import { createGameLoop } from '../../core/gameLoop';
 import { WebGLRenderer } from './webGLRenderer';
 
 console.log("Smackhem bootstrapping...");
@@ -23,4 +23,11 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Start game loop with renderer
-gameLoop(renderer);
+const render = createGameLoop(renderer);
+
+const loop = () => {
+  render();
+  requestAnimationFrame(loop);
+}
+
+loop();
