@@ -1,3 +1,4 @@
+import { perspective, lookDirection } from './math';
 import type { Mat4 } from '../types/common';
 
 export interface Camera {
@@ -9,7 +10,7 @@ export interface Camera {
   far: number;
 }
 
-export function createCamera(): Camera {
+export const createCamera = (): Camera =>  {
   return {
     position: { x: 0, y: 0, z: 2 },
     yaw: 0,
@@ -17,5 +18,18 @@ export function createCamera(): Camera {
     fov: Math.PI / 3, // 60°
     near: 0.1,
     far: 100.0
+  };
+}
+
+export const getCameraMatrix = (
+  camera: Camera,
+  aspect: number
+): Mat4 => {
+  const proj = perspective(camera.fov, aspect, camera.near, camera.far);
+  const view = lookDirection(camera.position, camera.yaw, camera.pitch);
+
+  // TODO: Add Matrix multiplication for movement
+  return {
+    elements: proj.elements
   };
 }

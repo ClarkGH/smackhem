@@ -1,5 +1,7 @@
 import type { Renderer, MeshHandle } from '../services/renderer';
-import type { Mat4, Vec3 } from '../types/common';
+import type { Mat4 } from '../types/common';
+
+import { createCamera, getCameraMatrix } from './camera';
 
 // Helper to create identity matrix
 export const createIdentityMatrix = (): Mat4 => {
@@ -14,22 +16,19 @@ export const createIdentityMatrix = (): Mat4 => {
 }
 
 export const createGameLoop = (renderer: Renderer): () => void => {
-    let triangleMesh: MeshHandle | null = null;
-  
-    if ('createTriangleMesh' in renderer && typeof renderer.createTriangleMesh === 'function') {
-      triangleMesh = (renderer as any).createTriangleMesh('test-triangle');
-    }
-  
-    const transform = createIdentityMatrix();
-    const color: Vec3 = { x: 1, y: 1, z: 1 };
+    const camera = createCamera();
+    const triangleMesh = (renderer as any).createTriangleMesh?.('test-triangle');
   
     return () => {
-        renderer.beginFrame();
-        if (triangleMesh) {
-            renderer.drawMesh(triangleMesh, transform, color);
-        }
-        renderer.endFrame();
-    }
-}
-
-//TODO: We want to get the identity matrix
+      renderer.beginFrame();
+  
+      const aspect = 800 / 600; // TEMP
+      const cameraMatrix = getCameraMatrix(camera, aspect);
+  
+      if (triangleMesh) {
+        renderer.drawMesh(triangleMesh, cameraMatrix, { x: 1, y: 1, z: 1 });
+      }
+  
+      renderer.endFrame();
+    };
+};
