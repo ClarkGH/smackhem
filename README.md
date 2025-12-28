@@ -1,13 +1,12 @@
 # Smackhem
 
-- Just a guy playing with WebGL. Solo project for now.
+Hobby Drakkhen-like game engine running off of a WebGL wrapper.
 
 ## Paradigms and Intent
 
 Inspired by crosscode's use of web technologies. Since that's what I'm comfortable with, I figure it's the best first-step into putting a game I'm proud of up for other people to play. Working with 2D/3D paradigms mainly for fun and learning.
 
-- No PRs while solo, there's no need to show that a single dev can make prs against his own work
-- Using issues as tasks to keep the demo project 100% on github
+Using issues as tasks for some illegible form of project management for now.
 
 ## Project layout
 

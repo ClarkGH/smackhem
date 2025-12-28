@@ -1,12 +1,14 @@
 # Project Codename: Smackhem
 
 - First-Person Geometric Exploration Engine
-- (Web-First, Platform-Agnostic by Design)
+- Web-First, Platform-Agnostic by Design
 
 ## Inspired by
 
 Cross Code was made with spit, grit, and javascript. It was ported to consoles and it’s a great game. Since the lead dev is a javascript dude, he’s going to follow their path and do the same thing. We can use OpenGL like them, and do a 2.5D game, OUR WAY (cool emoji the kid’s relate to here, or not).
-Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most confusing games to pick up! But the lead dev thinks there’s something there. We’re taking inspiration and trying to see what we can do with the old magic:
+Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most confusing games to pick up! But the lead dev thinks there’s something there. We’re taking inspiration and trying to see what we can do with the old magic.
+
+## Shared features
 
 - Dungeons and dragons-esque stat blocks
 - Gear
@@ -16,10 +18,10 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most conf
 - Conversation(s)
 - Random Encounter(s)
 - Explorable instance(s)
-- Shops / Inns / Shrines
+- Shop(s) / Inn(s) / Shrine(s)
 - Quests
 - No bodies of water, disco dragon summons, or tombstone dogs allowed!
-- Illegible Spells!
+- No Illegible Spells!
 
 ## The MVP Vision
 
@@ -34,14 +36,16 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most conf
 - Enter an instance and be shown a 2D scene. If a dunny or explorable place, you can wobble/roll around. Otherwise only the scene.
 - EASIER TO UNDERSTAND UI THAN DRAKKHEN. That game has a terrible UI and we aren’t plagiarizing.
 - Modern, and more intuitive controls.
+- Party character specific loot/gear/equipment.
+- Group loot/money.
 - Keep the demo’s code into the open source wild, put up on itch.io, and try to get funding for a full game, or get hired by a small team of indie game devs?
 
 ### TBD / Next steps
 
  We might transition into doing something more akin to Dragonview? Not sure, that's more complicated and having party AI do their own thing while following the leader seem's like a fine enough plan.
 
-- Character creation
-- A plot
+- Character creation.
+- A plot.
 - Spells: Unlock, fire, ice, light, lightning, invisibility, poison cloud, acid spray, buff, debuff, shield, etc.. If we have time and the spell's not broken, we'll have a good amount!
 - Strengthen/upgrade system involving math formulae (Algebraic! Geometric!).
 - Accessibility options.
@@ -87,7 +91,7 @@ Forbidden:
 - Input devices (keyboard, mouse, gamepad)
 - Asset paths or fetch calls
 
-If code in core/ references a platform concept, it is a violation.
+If code in `core/` references a platform concept, it is a violation.
 
 #### 1.2 Services (Abstract Interfaces)
 
@@ -123,7 +127,7 @@ Backends:
 
 ### 2. Rendering Enforcement Rules
 
-RULE R-1: No GPU Calls Outside the Renderer
+#### RULE R-1: No GPU Calls Outside the Renderer
 
 Allowed:
 
@@ -139,7 +143,7 @@ gl.bindBuffer(...);
 
 If a non-render file mentions a GPU concept, the boundary is broken.
 
-RULE R-2: Rendering Is Declarative
+#### RULE R-2: Rendering Is Declarative
 
 Game code declares intent:
 
@@ -153,7 +157,7 @@ The renderer decides:
 
 Game logic must never adjust lighting values directly.
 
-RULE R-3: Lighting Lives in the Renderer
+#### RULE R-3: Lighting Lives in the Renderer
 
 Lighting:
 
@@ -169,7 +173,7 @@ Lighting must never be:
 
 ### 3. Input Enforcement Rules
 
-RULE I-1: Input Is Intent, Not Hardware
+#### RULE I-1: Input Is Intent, Not Hardware
 Core systems consume intent, never devices.
 
 Allowed:
@@ -186,7 +190,7 @@ keydown
 mouseDelta
 ```
 
-RULE I-2: Controller-First Assumption
+#### RULE I-2: Controller-First Assumption
 
 Every gameplay feature must be usable with:
 
@@ -197,7 +201,7 @@ If it requires a mouse or keyboard, it is invalid by default.
 
 ### 4. Time & Simulation Rules
 
-RULE T-1: Fixed Timestep Only
+#### RULE T-1: Fixed Timestep Only
 
 Simulation must run at a fixed rate.
 
@@ -208,7 +212,7 @@ Forbidden:
 
 Rendering may interpolate, simulation may not.
 
-RULE T-2: No Hidden Time Sources
+#### RULE T-2: No Hidden Time Sources
 
 The only valid time source is the engine clock service.
 
@@ -292,6 +296,7 @@ Debug features:
 ### 9. Fake Port Validation Rule
 
 #### RULE P-1: Deletion Test
+
 At any time, it must be possible to:
 
 1. Delete all backend code
@@ -553,8 +558,8 @@ PartyMember {
 
 #### 11.2 Party/Enemy Behavior
 
-- Party leader follows camera/player
-- Members “pop out” around leader
+- camera moves in 3D sections.
+- Party "pops out" from the center and splays out in a line on input or event.
 - Party and Instance Transitions:
   - When entering an instance (such as a dungeon or explorable area), the game will switch to a 2D view where the party remains in the scene. The player will not be able to return to first-person exploration during this time.
   - The party will always be displayed as 2D characters when in combat or exploration mode inside an instance.
@@ -568,10 +573,10 @@ This is cheap, readable, and portable.
 
 ### 12. Collision System
 
-- Manual AABB checks
-- Player vs world
-- No physics engine
-- Deterministic
+- Manual AABB checks.
+- Player vs world.
+- No physics engine.
+- Deterministic.
 
 This is console-friendly and debuggable.
 
