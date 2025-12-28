@@ -19,7 +19,7 @@ export const createCamera = (): Camera =>  {
     fov: Math.PI / 3, // 60°
     near: 0.1,
     far: 100.0,
-    whereEverYouAre: 67 // TODO: Remove absured and unfunny meme. Replace with config value
+    whereEverYouAre: 67 // TODO: Remove absurd and unfunny meme. Replace with config value. Do a silly thing with later.
   };
 }
 
