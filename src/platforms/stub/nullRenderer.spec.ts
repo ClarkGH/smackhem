@@ -4,18 +4,15 @@ import { NullRenderer } from './nullRenderer';
 import { describe, it, expect } from 'vitest';
 
 describe('Deletion test', () => {
-  it('core compiles and runs with stub renderer', () => {
-    globalThis.requestAnimationFrame = () => 0;
+    it('core compiles and runs with stub renderer', () => {
+        globalThis.requestAnimationFrame = () => 0;
 
-    const renderer = new NullRenderer();
-    const mockInput : InputState = {
-      actions: { Look: true },
-      axes: {
-          lookX: 0,
-          lookY: 0
-      }
-    };
+        const renderer = new NullRenderer();
+        const mockInput : InputState = {
+            actions: { Look: true },
+            axes: { lookX: 0, lookY: 0 }
+        };
 
-    expect(() => createGameLoop(renderer, mockInput)).not.toThrow();
+        expect(() => createGameLoop(renderer, mockInput)).not.toThrow();
   });
 });

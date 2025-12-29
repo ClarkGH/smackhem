@@ -162,7 +162,7 @@ export class WebGLRenderer implements Renderer {
         // Set transform uniform
         const transformLocation = this.gl.getUniformLocation(this.program, 'u_transform');
 
-        this.gl.uniformMatrix4fv(transformLocation, true, transform.elements);
+        this.gl.uniformMatrix4fv(transformLocation, false, transform.elements);
 
         // Set wireframe mode
         if (this.wireframe) {

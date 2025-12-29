@@ -70,18 +70,20 @@ export const lookDirection = (
 
 // TODO: Low-priority -> manually set each C-array value for minor performance boost.
 export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
+    // Variables based on AB = C formula
     const ae = a.elements;
     const be = b.elements;
     const ce = new Float32Array(16);
-
-    for (let row = 0; row < 4; row++) {
-        for (let col = 0; col < 4; col++) {
-            ce[row * 4 + col] =
-                ae[row * 4 + 0] * be[0 * 4 + col] +
-                ae[row * 4 + 1] * be[1 * 4 + col] +
-                ae[row * 4 + 2] * be[2 * 4 + col] +
-                ae[row * 4 + 3] * be[3 * 4 + col];
-        }
+  
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        ce[j * 4 + i] =
+          ae[i] * be[j * 4] +
+          ae[i + 4] * be[j * 4 + 1] +
+          ae[i + 8] * be[j * 4 + 2] +
+          ae[i + 12] * be[j * 4 + 3];
+      }
     }
+  
     return { elements: ce };
-}
+};
