@@ -303,6 +303,7 @@ At any time, it must be possible to:
 1. Delete all backend code
 2. Replace it with stubs
 3. Compile the core
+
 If this fails, portability has already been broken.
 
 ### 10. The Final Sanity Check
@@ -631,7 +632,11 @@ In order to change position, we'll need to combine two matrices for their produc
 `ViewMatrix = RotationMatrix * TranslationMatrix`
 `CameraMatrix = ProjectionMatrix x ViewMatrix`
 
-Row major order is more human readable and easier to manipulate for CPUs. WebGL wants column major order, but it comes with a built in transposition method.
+Row major order is more human readable and easier to manipulate for CPUs. WebGL wants column major order, but it comes with a built in transposition method that doesn't actually work.
+
+- We're forced to use column major order for WebGL
+- Console SDKs, Godot, and GLSL all use Column Major
+- As needed we transpose the matrices, which will swap from Row / Column major
 
 ```text
 Given a 3D array, A[i][j][k]
@@ -714,6 +719,7 @@ This is cheap, readable, and portable.
 ### 12. Collision System
 
 - Manual AABB checks.
+- 3D camera vs world collision.
 - Player vs world.
 - No physics engine.
 - Deterministic.

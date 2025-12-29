@@ -9,8 +9,8 @@ Inspired by crosscode's use of web technologies. Since that's what I'm comfortab
 - Using Github issues as tasks
 - I did and am using AI
   - I've used up my cursor free trial for skeleton and some minor typing without putting in my payment info (I have a family to feed, sorry).
-  - I did use ChatGPT. Used for conversations around planning the design principles and constraints. I did use it for some coding questions, but I found it less helpful there.
-  - Gemini, so good. It's what helped me break down and understand a good chunk of what the formulae did and how to implement them.
+  - I did use ChatGPT. Used for conversations around planning the design principles and constraints, and debugging while tying all of the general 3D components together.
+  - Gemini. While over-opinionated and bullishly wrong at times, it's been amazing with breaking down what the formulae did and how to implement them.
 
 As this is hosted publicly, it's a hobby project.
 
