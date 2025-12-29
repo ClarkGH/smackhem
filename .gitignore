@@ -1,3 +1,8 @@
+#Platform logic I'm keeping to myself ;)
+src/platforms/cpu
+src/platforms/native
+src/platforms/switch
+
 # Node modules
 node_modules/
 

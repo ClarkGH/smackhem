@@ -68,33 +68,29 @@ export const lookDirection = (
     return { elements: e };
 }
 
-// TODO: Make more performant in case someone gets confused.
-// To refactor, we'd need to manually multiply each individual position in the array, 100% not priority.
-// While the o(n) is n^3, we're always iterating through 64 objects per frame.
-// Column-Major Multiplication is standard for WebGL.
+// TODO: Low-priority -> manually set each C-array value for minor performance boost.
 export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
-    // Following AB = C
     const ae = a.elements;
     const be = b.elements;
     const ce = new Float32Array(16);
 
-    for (let col = 0; col < 4; col++) {
-        for (let row = 0; row < 4; row++) {
-            let sum = 0;
-            for (let k = 0; k < 4; k++) {
-                // This index logic ensures Column-Major order
-                sum += ae[k * 4 + row] * be[col * 4 + k];
-            }
-            ce[col * 4 + row] = sum;
+    for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 4; col++) {
+            ce[row * 4 + col] =
+                ae[row * 4 + 0] * be[0 * 4 + col] +
+                ae[row * 4 + 1] * be[1 * 4 + col] +
+                ae[row * 4 + 2] * be[2 * 4 + col] +
+                ae[row * 4 + 3] * be[3 * 4 + col];
         }
     }
     return { elements: ce };
 }
 
-// Transpose (flip) matrix for other engines
+// TODO: Figure out if we need this later. Switch uses OpenGL, and the CPU code uses its own logic.
+// Transpose (flip) matrix for other engines.
 export const transpose = (matrix: Mat4): Mat4 => {
-    const e = matrix.elements;
-    const t = new Float32Array(16);
+    const e = matrix.elements; // Existing matrix element buffer array.
+    const t = new Float32Array(16); // Transposed target matrix.
     
     t[0] = e[0]; t[1] = e[4]; t[2] = e[8];  t[3] = e[12];
     t[4] = e[1]; t[5] = e[5]; t[6] = e[9];  t[7] = e[13];
