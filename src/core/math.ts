@@ -68,7 +68,7 @@ export const lookDirection = (
     return { elements: e };
 }
 
-// TODO: Low-priority -> manually set each C-array value for minor performance boost.
+// TODO: Low-priority -> manually set each C-array value for minor performance boost or swap to quaternion rotation.
 export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
     // Variables based on AB = C formula
     const ae = a.elements;
@@ -76,13 +76,13 @@ export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
     const ce = new Float32Array(16);
   
     for (let i = 0; i < 4; i++) {
-      for (let j = 0; j < 4; j++) {
-        ce[j * 4 + i] =
-          ae[i] * be[j * 4] +
-          ae[i + 4] * be[j * 4 + 1] +
-          ae[i + 8] * be[j * 4 + 2] +
-          ae[i + 12] * be[j * 4 + 3];
-      }
+        for (let j = 0; j < 4; j++) {
+            ce[j * 4 + i] =
+            ae[i] * be[j * 4] +
+            ae[i + 4] * be[j * 4 + 1] +
+            ae[i + 8] * be[j * 4 + 2] +
+            ae[i + 12] * be[j * 4 + 3];
+        }
     }
   
     return { elements: ce };

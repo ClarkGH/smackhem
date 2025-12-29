@@ -29,9 +29,9 @@ document.addEventListener('keydown', (e) => {
 const render = createGameLoop(renderer, inputState);
 
 const loop = () => {
-  syncWebInput(inputState, webInputState);
-  render();
-  requestAnimationFrame(loop);
+    syncWebInput(inputState, webInputState);
+    render();
+    requestAnimationFrame(loop);
 }
 
 loop();

@@ -24,16 +24,16 @@ export const setupWebInput = (
     web: WebInputState
   ) => {
     canvas.addEventListener("mousemove", e => {
-      web.axes.mouseLookX = e.movementX;
-      web.axes.mouseLookY = e.movementY;
+        web.axes.mouseLookX = e.movementX;
+        web.axes.mouseLookY = e.movementY;
     });
   
     canvas.addEventListener("click", () => {
-      canvas.requestPointerLock();
+        canvas.requestPointerLock();
     });
   
     window.addEventListener("gamepadconnected", e => {
-      console.log(`Gamepad connected: ${e.gamepad.id}`);
+        console.log(`Gamepad connected: ${e.gamepad.id}`);
     });
 
     window.addEventListener("gamepadisconnected", e => {

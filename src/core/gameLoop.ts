@@ -23,30 +23,30 @@ export const createGameLoop = (renderer: Renderer, inputState: InputState): () =
     const modelMatrix = createIdentityMatrix();
   
     return () => {
-      // Update Camera
-      const sensitivity = 0.005;
-      camera.yaw += inputState.axes.lookX * sensitivity;
-      camera.pitch -= inputState.axes.lookY * sensitivity;
+        // Update Camera
+        const sensitivity = 0.005;
+        camera.yaw += inputState.axes.lookX * sensitivity;
+        camera.pitch -= inputState.axes.lookY * sensitivity;
 
-      // Clamp pitch to prevent flipping (approx 90 degrees)
-      const limit = Math.PI / 2 - 0.01;
-      camera.pitch = Math.max(-limit, Math.min(limit, camera.pitch));
+        // Clamp pitch to prevent flipping (approx 90 degrees)
+        const limit = Math.PI / 2 - 0.01;
+        camera.pitch = Math.max(-limit, Math.min(limit, camera.pitch));
 
-      // Render
-      renderer.beginFrame();
+        // Render
+        renderer.beginFrame();
 
-      const aspect = 800 / 600; //TODO: Not static
-      const viewProj = getCameraMatrix(camera, aspect);
-      const finalTransform = matrixMultiply(viewProj, modelMatrix);
+        const aspect = 800 / 600; //TODO: Not static
+        const viewProj = getCameraMatrix(camera, aspect);
+        const finalTransform = matrixMultiply(viewProj, modelMatrix);
 
-      if (triangleMesh) {
-          renderer.drawMesh(triangleMesh, finalTransform, { x: 1, y: 1, z: 1 });
-      }
+        if (triangleMesh) {
+            renderer.drawMesh(triangleMesh, finalTransform, { x: 1, y: 1, z: 1 });
+        }
 
-      renderer.endFrame();
+        renderer.endFrame();
 
-      // Reset transient input
-      inputState.axes.lookX = 0;
-      inputState.axes.lookY = 0;
+        // Reset transient input
+        inputState.axes.lookX = 0;
+        inputState.axes.lookY = 0;
   };
 };
