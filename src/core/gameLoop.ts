@@ -19,7 +19,7 @@ export const createIdentityMatrix = (): Mat4 => {
 
 export const createGameLoop = (renderer: Renderer, inputState: InputState): () => void => {
     const camera = createCamera();
-    const triangleMesh = (renderer as any).createTriangleMesh?.('test-triangle');
+    const triangleMesh = (renderer as any).createTriangleMesh?.('test-triangle'); // TODO: Set Triangle Mesh Class
     const modelMatrix = createIdentityMatrix();
   
     return () => {
@@ -35,7 +35,7 @@ export const createGameLoop = (renderer: Renderer, inputState: InputState): () =
       // Render
       renderer.beginFrame();
 
-      const aspect = 800 / 600; 
+      const aspect = 800 / 600; //TODO: Not static
       const viewProj = getCameraMatrix(camera, aspect);
       const finalTransform = matrixMultiply(viewProj, modelMatrix);
 

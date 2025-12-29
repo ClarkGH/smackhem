@@ -671,7 +671,7 @@ interface PlayerIntent {
 }
 ```
 
-#### 10.2 Web Input Backend
+#### 10.2 Bare Web Input Backend
 
 - Keyboard → move
 - Mouse → look

@@ -11,4 +11,9 @@ export const setupWebInput = (canvas: HTMLCanvasElement, state: InputState) => {
     canvas.addEventListener('click', () => {
         canvas.requestPointerLock({ unadjustedMovement: true });
     });
+
+    window.addEventListener("gamepadconnected", (e) => {
+        const gp = e.gamepad;
+        console.log(`Gamepad connected: ${gp.id}`);
+    });
 }
