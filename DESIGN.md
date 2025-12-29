@@ -723,26 +723,27 @@ Pure data. No logic. Portable forever.
 ```text
 src/
 ├─ core/
-│  ├─ gameLoop.ts
-│  ├─ world.ts
-│  ├─ party.ts
-│  ├─ camera.ts
-│  └─ input.ts
+│  ├─ camera.ts           # 3D camera math and logic
+│  ├─ gameLoop.ts         # Game loop logic
+│  ├─ input.ts            # Player input logic
+│  ├─ math.ts             # Shared engine math logic
+│  ├─ party.ts            # Party Logic
+│  └─ world.ts            # World and chunking logic
 ├─ services/
-│  ├─ renderer.ts      # Abstract Renderer interface
-│  ├─ input.ts         # Abstract Input service
-│  ├─ clock.ts         # Time service
-│  └─ assetLoader.ts   # Asset loading service
+│  ├─ renderer.ts         # Abstract Renderer interface
+│  ├─ input.ts            # Abstract Input service
+│  ├─ clock.ts            # Time service
+│  └─ assetLoader.ts      # Asset loading service
 ├─ platforms/
 │  ├─ web/
-│  │  ├─ webBootstrap.ts
-│  │  ├─ webGLRenderer.ts
-│  │  └─ webInput.ts
-│  └─ console/
-│     └─ console.md
+│  │  ├─ webBootstrap.ts    # Bootstraps the webGL game engine
+│  │  ├─ webGLRenderer.ts   # Renderer specifically for webGL
+│  │  └─ webInput.ts        # Input as it relates specifically to webGL
+│  └─ (...unpublished :D)
+│
 ├─ types/
-│  └─ common.d.ts       # Common type definitions
-└─ main.ts              # Entry point
+│  └─ common.d.ts           # Common type definitions
+└─ main.ts                  # Entry point
 ```
 
 Future:
