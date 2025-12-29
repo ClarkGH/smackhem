@@ -1,3 +1,4 @@
+import { InputState, PlayerIntent } from 'src/core/input';
 import { createGameLoop } from '../../core/gameLoop';
 import { NullRenderer } from './nullRenderer';
 import { describe, it, expect } from 'vitest';
@@ -7,7 +8,14 @@ describe('Deletion test', () => {
     globalThis.requestAnimationFrame = () => 0;
 
     const renderer = new NullRenderer();
+    const mockInput : InputState = {
+      actions: { Look: true },
+      axes: {
+          lookX: 0,
+          lookY: 0
+      }
+    };
 
-    expect(() => createGameLoop(renderer)).not.toThrow();
+    expect(() => createGameLoop(renderer, mockInput)).not.toThrow();
   });
 });

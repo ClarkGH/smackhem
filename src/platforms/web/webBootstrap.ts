@@ -1,5 +1,7 @@
 import { createGameLoop } from '../../core/gameLoop';
 import { WebGLRenderer } from './webGLRenderer';
+import { createInputState } from '../../core/input';
+import { setupWebInput } from './webInput';
 
 console.log("Smackhem bootstrapping...");
 
@@ -9,11 +11,12 @@ canvas.width = 800;  // TODO: Variable width
 canvas.height = 600; // TODO: Variable height
 document.body.appendChild(canvas);
 
-// Create renderer (platform-specific)
 const renderer = new WebGLRenderer(canvas);
+const inputState = createInputState();
+setupWebInput(canvas, inputState); 
 
 // Wireframe toggle (press '\' key)
-let wireframeEnabled = false; // TODO: Pull from config
+let wireframeEnabled = false;
 document.addEventListener('keydown', (e) => {
     if (e.key === '\\') {
         wireframeEnabled = !wireframeEnabled;
@@ -22,8 +25,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Start game loop with renderer
-const render = createGameLoop(renderer);
+const render = createGameLoop(renderer, inputState);
 
 const loop = () => {
   render();
