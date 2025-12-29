@@ -1,7 +1,7 @@
 import { createGameLoop } from '../../core/gameLoop';
 import { WebGLRenderer } from './webGLRenderer';
 import { createInputState } from '../../core/input';
-import { setupWebInput } from './webInput';
+import { pollGamepad, setupWebInput } from './webInput';
 
 console.log("Smackhem bootstrapping...");
 
@@ -28,6 +28,7 @@ document.addEventListener('keydown', (e) => {
 const render = createGameLoop(renderer, inputState);
 
 const loop = () => {
+  pollGamepad(inputState);
   render();
   requestAnimationFrame(loop);
 }
