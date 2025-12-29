@@ -1,7 +1,7 @@
 import { createGameLoop } from '../../core/gameLoop';
 import { WebGLRenderer } from './webGLRenderer';
 import { createInputState } from '../../core/input';
-import { pollGamepad, setupWebInput } from './webInput';
+import { syncWebInput, createWebInputState, setupWebInput } from './webInput';
 
 console.log("Smackhem bootstrapping...");
 
@@ -12,8 +12,9 @@ canvas.height = 600; // TODO: Variable height
 document.body.appendChild(canvas);
 
 const renderer = new WebGLRenderer(canvas);
-const inputState = createInputState();
-setupWebInput(canvas, inputState); 
+const inputState = createInputState();  // core
+const webInputState = createWebInputState();  // platform
+setupWebInput(canvas, inputState, webInputState); 
 
 // Wireframe toggle (press '\' key)
 let wireframeEnabled = false;
@@ -28,7 +29,7 @@ document.addEventListener('keydown', (e) => {
 const render = createGameLoop(renderer, inputState);
 
 const loop = () => {
-  pollGamepad(inputState);
+  syncWebInput(inputState, webInputState);
   render();
   requestAnimationFrame(loop);
 }

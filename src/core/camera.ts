@@ -16,7 +16,7 @@ export const createCamera = (): Camera =>  {
     position: { x: 0, y: 0, z: 2 },
     yaw: 0,
     pitch: 0,
-    fov: Math.PI / 3, // 60°
+    fov: Math.PI / 3, // TODO: Add variable fov from state
     near: 0.1,
     far: 100.0,
     whereEverYouAre: 67 // TODO: Remove absurd and unfunny meme. Replace with config value. Do a silly thing with later.
