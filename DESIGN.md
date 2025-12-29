@@ -631,6 +631,29 @@ In order to change position, we'll need to combine two matrices for their produc
 `ViewMatrix = RotationMatrix * TranslationMatrix`
 `CameraMatrix = ProjectionMatrix x ViewMatrix`
 
+Row major order is more human readable and easier to manipulate for CPUs. WebGL wants column major order, but it comes with a built in transposition method.
+
+```text
+Given a 3D array, A[i][j][k]
+  With dimensions, L x M x N
+Given a base memory address, B
+Given a weight, W
+Given a row index, i
+Given a column index, j
+Given the total rows, M
+Given the total columns, N
+Given the lower bound of rows, L_r
+Given the lower bound of columns, L_c
+
+Row major skips full row of size N to reach the correct row, then adds the column offest
+
+- Row Major = B + W * [(i - L_r) * N + (j - L_c)]
+
+Column major skips full columns of size M to reach the correct column then adds the row offset
+
+- Column Major = B + W * [(j - L_c) * M + (j - L_r)]
+```
+
 ### 10. Input System (Console-Ready)
 
 #### 10.1 Input Intent
@@ -661,12 +684,12 @@ Game logic never sees devices.
 #### 11.1 Party Structure
 
 ```typescript
-Party {
+interface Party {
   leaderTransform: Transform;
   members: PartyMember[4];
 }
 
-PartyMember {
+interface PartyMember {
   class: ClassType;
   offset: Vec3;
   mesh: MeshHandle;
