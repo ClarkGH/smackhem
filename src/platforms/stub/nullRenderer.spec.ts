@@ -10,7 +10,14 @@ describe('Deletion test', () => {
         const renderer = new NullRenderer();
         const mockInput : InputState = {
             actions: { Look: true },
-            axes: { lookX: 0, lookY: 0 }
+            axes: {
+                lookX: 0,
+                lookY: 0,
+                mouseLookX: 0,
+                mouseLookY: 0,
+                padLookX: 0,
+                padLookY: 0
+            }
         };
 
         expect(() => createGameLoop(renderer, mockInput)).not.toThrow();
