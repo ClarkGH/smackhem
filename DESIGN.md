@@ -522,7 +522,7 @@ Identity matrices represent the default state of an object in 3D space. We use t
 
 When we "clear" an object's rotation or movement, we set its matrix back to Identity.
 
-When we calculate a complex transformation (e.g., Rotate -> Scale -> Move), we start with an Identity matrix and then multiply our transformation matrices onto it one by one.
+When we calculate a complex transformation (e.g., Rotate -> Scale -> Move), we start with an Identity matrix and then multiply our transformation matrices onto it one by one. Rotation will be translated with euler angles, gimble lock is a consideration to move towards quaternions when necessary.
 
 If a shader expects a matrix, but we don't want to apply any transformation to the vertices, we pass the identity matrix
 
@@ -620,6 +620,35 @@ We want to store the inverted position of the camera. View matrices move the wor
 We'll also want a "w" for the 4x4 matrix mathy stuff (homogenous coordinates)
 
 - e[15] = 1
+
+If we want to change to quaternions from euler angles, we'll want another 4 component object and a conversion formula. WebGL requires a rotation matrix. The trigonometry would be replaced with quaternion multiplication.
+
+- Eg. Yaw would change from a number to a four dimensional vector.
+
+From: `90`
+To: `{x: number, y: number, z: number, w: number}`
+With formula: ``
+
+```typescript
+export const fromQuaternion = (x: number, y: number, z: number, w: number): Mat4 => {
+    const e = new Float32Array(16);
+    // Standard Quaternion to 4x4 Rotation Matrix formula
+    e[0] = 1 - 2 * (y * y + z * z);
+    e[1] = 2 * (x * y + z * w);
+    e[2] = 2 * (x * z - y * w);
+    
+    e[4] = 2 * (x * y - z * w);
+    e[5] = 1 - 2 * (x * x + z * z);
+    e[6] = 2 * (y * z + x * w);
+    
+    e[8] = 2 * (x * z + y * w);
+    e[9] = 2 * (y * z - x * w);
+    e[10] = 1 - 2 * (x * x + y * y);
+    
+    e[15] = 1; // W component
+    return { elements: e };
+};
+```
 
 Camera is a system, not math in input code.
 

@@ -8,7 +8,6 @@ describe('Deletion test', () => {
         globalThis.requestAnimationFrame = () => 0;
 
         const renderer = new NullRenderer();
-
         const mockCoreInput : InputState = {
             actions: { Look: true },
             axes: {
