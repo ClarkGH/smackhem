@@ -58,32 +58,35 @@ export const lookDirection = (
     e[9]  = fy;
     e[10] = fz;
   
-    // Translation (camera position)
-    e[12] = -position.x;
-    e[13] = -position.y;
-    e[14] = -position.z;
-    e[15] = 1;
-  
+    // Translation: The "where is the camera" part
+    // This dots the position with the Right, Up, and Forward vectors
+    e[12] = -(e[0] * position.x + e[4] * position.y + e[8] * position.z);
+    e[13] = -(e[1] * position.x + e[5] * position.y + e[9] * position.z);
+    e[14] = -(e[2] * position.x + e[6] * position.y + e[10] * position.z);
+    e[15] = 1; // w
+
     return { elements: e };
 }
 
-// TODO: Make more performant than a nested for loop
+// TODO: Make more performant in case someone gets confused.
+// To refactor, we'd need to manually multiply each individual position in the array, 100% not priority.
+// While the o(n) is n^3, we're always iterating through 64 objects per frame.
+// Column-Major Multiplication is standard for WebGL.
 export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
-    // Following matrix formula AB = C
+    // Following AB = C
     const ae = a.elements;
     const be = b.elements;
     const ce = new Float32Array(16);
-  
-    for (let i = 0; i < 4; i++) { // Row
-      for (let j = 0; j < 4; j++) { // Column
-        ce[i * 4 + j] =
-          ae[i * 4 + 0] * be[0 * 4 + j] +
-          ae[i * 4 + 1] * be[1 * 4 + j] +
-          ae[i * 4 + 2] * be[2 * 4 + j] +
-          ae[i * 4 + 3] * be[3 * 4 + j];
-      }
+
+    for (let col = 0; col < 4; col++) {
+        for (let row = 0; row < 4; row++) {
+            let sum = 0;
+            for (let k = 0; k < 4; k++) {
+                // This index logic ensures Column-Major order
+                sum += ae[k * 4 + row] * be[col * 4 + k];
+            }
+            ce[col * 4 + row] = sum;
+        }
     }
-    
-    // Return dot product
     return { elements: ce };
-};
+}

@@ -6,7 +6,15 @@ Hobby Drakkhen-like game engine running off of a WebGL wrapper.
 
 Inspired by crosscode's use of web technologies. Since that's what I'm comfortable with, I figure it's the best first-step into putting a game I'm proud of up for other people to play. Working with 2D/3D paradigms mainly for fun and learning.
 
-Using issues as tasks for some illegible form of project management for now.
+- Using Github issues as tasks
+- I did and am using AI
+  - I've used up my cursor free trial for skeleton and some minor typing without putting in my payment info (I have a family to feed, sorry).
+  - I did use ChatGPT. Used for conversations around planning the design principles and constraints. I did use it for some coding questions, but I found it less helpful there.
+  - Gemini, so good. It's what helped me break down and understand a good chunk of what the formulae did and how to implement them.
+
+As this is hosted publicly, it's a hobby project.
+
+It's been years of studying 3D. I still haven't pinned down what a quaternion is.
 
 ## Project layout
 
@@ -26,6 +34,8 @@ Using issues as tasks for some illegible form of project management for now.
 ```
 
 ## Tech Stack
+
+Minimalism is key, following YAGNI principles.
 
 1. WebGL 2.0/HTML5 - Web-based engine for 3D model rendering.
 2. Typescript - Language of choice.

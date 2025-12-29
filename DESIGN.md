@@ -628,8 +628,8 @@ In order to change position, we'll need to combine two matrices for their produc
 <https://en.wikipedia.org/wiki/Matrix_multiplication>
 
 `AB = C`
-`View = RotationMatrix * TranslationMatrix`
-`cameraMatrix = projection x view`
+`ViewMatrix = RotationMatrix * TranslationMatrix`
+`CameraMatrix = ProjectionMatrix x ViewMatrix`
 
 ### 10. Input System (Console-Ready)
 
