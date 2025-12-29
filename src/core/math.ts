@@ -34,8 +34,8 @@ export const lookDirection = (
 ): Mat4 => {
     const cosYaw = Math.cos(yaw);
     const sinYaw = Math.sin(yaw);
-    const cosPitch = Math.cos(pitch);
-    const sinPitch = Math.sin(pitch); // NOT THAT KIND OF SIN! It's a sign!
+    const cosPitch = Math.cos(-pitch); // TODO: Invert option for accessibility
+    const sinPitch = Math.sin(-pitch); // NOT THAT KIND OF SIN! It's a sign!
   
     const fx = cosYaw * cosPitch; // x-direction of view
     const fy = sinPitch; // y-direction of view
