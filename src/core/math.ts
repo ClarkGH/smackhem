@@ -85,17 +85,3 @@ export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
     }
     return { elements: ce };
 }
-
-// TODO: Figure out if we need this later. Switch uses OpenGL, and the CPU code uses its own logic.
-// Transpose (flip) matrix for other engines.
-export const transpose = (matrix: Mat4): Mat4 => {
-    const e = matrix.elements; // Existing matrix element buffer array.
-    const t = new Float32Array(16); // Transposed target matrix.
-    
-    t[0] = e[0]; t[1] = e[4]; t[2] = e[8];  t[3] = e[12];
-    t[4] = e[1]; t[5] = e[5]; t[6] = e[9];  t[7] = e[13];
-    t[8] = e[2]; t[9] = e[6]; t[10] = e[10]; t[11] = e[14];
-    t[12] = e[3]; t[13] = e[7]; t[14] = e[11]; t[15] = e[15];
-
-    return { elements: t };
-}
