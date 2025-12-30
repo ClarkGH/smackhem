@@ -12,6 +12,7 @@ export class WebGLRenderer implements Renderer {
     private program: WebGLProgram | null = null;
     private meshes: Map<string, WebGLMesh> = new Map();
     private wireframe: boolean = false;
+    private meshCache = new Map<string, MeshHandle>();
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -19,6 +20,7 @@ export class WebGLRenderer implements Renderer {
         if (!gl) {
             throw new Error('WebGL2 not supported');
         }
+
         this.gl = gl;
         this.gl.clearColor(38/255, 151/255, 121/255, 1);
   
@@ -100,44 +102,102 @@ export class WebGLRenderer implements Renderer {
         return program;
     }
 
-    createTriangleMesh(id: string): MeshHandle {
-        // Create a simple 3D triangle
-        const vertices = new Float32Array([
-            // x, y, z
-            0.0,  0.5,  0.0,  // Top
-            -0.5, -0.5,  0.0,  // Bottom left
-            0.5, -0.5,  0.0,  // Bottom right
-        ]);
+    private createMesh(vertices: Float32Array): MeshHandle {
+        const gl = this.gl;
 
-        const vao = this.gl.createVertexArray();
-        if (!vao) {
-            throw new Error('Failed to create vertex array object');
-        }
+        const vao = gl.createVertexArray();
+        if (!vao) throw new Error("Failed to create VAO");
 
-        this.gl.bindVertexArray(vao);
+        gl.bindVertexArray(vao);
 
-        const buffer = this.gl.createBuffer();
-        if (!buffer) {
-            throw new Error('Failed to create buffer');
-        }
+        const vbo = gl.createBuffer();
+        if (!vbo) throw new Error("Failed to create VBO");
 
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-        const positionLocation = this.gl.getAttribLocation(this.program!, 'a_position');
-        this.gl.enableVertexAttribArray(positionLocation);
-        this.gl.vertexAttribPointer(positionLocation, 3, this.gl.FLOAT, false, 0, 0);
+        const positionLoc = gl.getAttribLocation(this.program!, "a_position");
+        gl.enableVertexAttribArray(positionLoc);
+        gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 0, 0);
 
-        this.gl.bindVertexArray(null);
+        gl.bindVertexArray(null);
 
-        const mesh: WebGLMesh = {
+        const id = crypto.randomUUID();
+
+        this.meshes.set(id, {
             vao,
-            vertexCount: 3
-        };
-
-        this.meshes.set(id, mesh);
+            vertexCount: vertices.length / 3
+        });
 
         return { id };
+    }
+
+    createPlaneMesh(size: number): MeshHandle {
+        const key = `plane_${size}`;
+        if (this.meshCache.has(key)) {
+            return this.meshCache.get(key)!;
+        }
+
+        const h = size / 2;
+
+        // Two triangles, XZ plane, Y = 0
+        const vertices = new Float32Array([
+            -h, 0, -h,
+             h, 0, -h,
+             h, 0,  h,
+
+            -h, 0, -h,
+             h, 0,  h,
+            -h, 0,  h,
+        ]);
+
+        const mesh = this.createMesh(vertices);
+        this.meshCache.set(key, mesh);
+
+        return mesh;
+    }
+
+    createCubeMesh(size: number): MeshHandle {
+        const key = `cube_${size}`;
+
+        if (this.meshCache.has(key)) {
+            return this.meshCache.get(key)!;
+        }
+
+        const h = size / 2;
+
+        // 6 faces × 2 triangles × 3 vertices
+        const vertices = new Float32Array([
+            // Front
+            -h,-h, h,   h,-h, h,   h, h, h,
+            -h,-h, h,   h, h, h,  -h, h, h,
+
+            // Back
+            -h,-h,-h,  -h, h,-h,   h, h,-h,
+            -h,-h,-h,   h, h,-h,   h,-h,-h,
+
+            // Left
+            -h,-h,-h,  -h,-h, h,  -h, h, h,
+            -h,-h,-h,  -h, h, h,  -h, h,-h,
+    
+            // Right
+             h,-h,-h,   h, h,-h,   h, h, h,
+             h,-h,-h,   h, h, h,   h,-h, h,
+
+            // Top
+            -h, h,-h,  -h, h, h,   h, h, h,
+            -h, h,-h,   h, h, h,   h, h,-h,
+
+            // Bottom
+            -h,-h,-h,   h,-h,-h,   h,-h, h,
+            -h,-h,-h,   h,-h, h,  -h,-h, h,
+        ]);
+
+        const mesh = this.createMesh(vertices);
+
+        this.meshCache.set(key, mesh);
+
+        return mesh;
     }
 
     beginFrame(): void {

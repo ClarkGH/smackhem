@@ -87,3 +87,15 @@ export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
 
     return { elements: ce };
 };
+
+// TODO: Add rotation
+export const createTranslationMatrix = (x: number, y: number, z: number): Mat4 => {
+    const m = new Float32Array(16);
+
+    m[0] = 1; m[5] = 1; m[10] = 1; m[15] = 1;
+    m[12] = x;
+    m[13] = y;
+    m[14] = z;
+
+    return { elements: m };
+};

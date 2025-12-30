@@ -25,7 +25,9 @@ export const createGameLoop = (
     getAspectRatio: () => number
 ): () => void => {
     const camera = createCamera();
-    const triangleMesh = (renderer as any).createTriangleMesh?.('test-triangle'); // TODO: Set Triangle Mesh Class
+    // TODO: Consider typing more strictly
+    const floorMesh = (renderer as any).createPlaneMesh(10);
+    const cubeMesh  = (renderer as any).createCubeMesh(1);
     const modelMatrix = createIdentityMatrix();
 
     return () => {
@@ -43,14 +45,10 @@ export const createGameLoop = (
 
         const aspect = getAspectRatio();
         const viewProj = getCameraMatrix(camera, aspect);
-        const finalTransform = matrixMultiply(viewProj, modelMatrix);
-
-        if (triangleMesh) {
-            renderer.drawMesh(triangleMesh, finalTransform, { x: 1, y: 1, z: 1 });
-        }
 
         for (const sm of world.getVisibleMeshes()) {
-            renderer.drawMesh(sm.mesh, sm.transform, sm.color);
+            const mvp = matrixMultiply(viewProj, sm.transform);
+            renderer.drawMesh(sm.mesh, mvp, sm.color);
         }
 
         renderer.endFrame();

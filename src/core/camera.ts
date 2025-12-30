@@ -11,9 +11,13 @@ export interface Camera {
     whereEverYouAre: number;
 }
 
+export const PLAYER_HEIGHT = 1.6;
+
+
 export const createCamera = (): Camera =>  {
+
     return {
-        position: { x: 0, y: 0, z: 2 },
+        position: { x: 0, y: PLAYER_HEIGHT, z: 2 },
         yaw: 0,
         pitch: 0,
         fov: Math.PI / 3, // TODO: Add variable fov from state
