@@ -1,7 +1,8 @@
-import { InputState } from 'src/core/input';
+import { InputState } from '../../core/input';
 import { createGameLoop } from '../../core/gameLoop';
 import { NullRenderer } from './nullRenderer';
 import { describe, it, expect } from 'vitest';
+import { World } from '../../core/world';
 
 describe('Deletion test', () => {
     it('core compiles and runs with stub renderer', () => {
@@ -15,7 +16,12 @@ describe('Deletion test', () => {
                 lookY: 0
             }
         };
+        const mockWorld : World = new World();
 
-        expect(() => createGameLoop(renderer, mockCoreInput)).not.toThrow();
-  });
+        expect(() => createGameLoop(
+            renderer,
+            mockCoreInput,
+            mockWorld,
+            () => 800 / 600)).not.toThrow();
+    });
 });

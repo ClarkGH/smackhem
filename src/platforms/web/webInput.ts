@@ -1,4 +1,4 @@
-import { InputState } from "src/core/input";
+import { InputState } from "../../core/input";
 
 export interface WebInputState {
     axes : {

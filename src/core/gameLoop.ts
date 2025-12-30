@@ -4,6 +4,7 @@ import type { Mat4 } from '../types/common';
 import { createCamera, getCameraMatrix } from './camera';
 import { InputState } from './input';
 import { matrixMultiply } from './math';
+import { World } from './world';
 
 // Helper to create identity matrix
 export const createIdentityMatrix = (): Mat4 => {
@@ -17,7 +18,12 @@ export const createIdentityMatrix = (): Mat4 => {
     return { elements };
 }
 
-export const createGameLoop = (renderer: Renderer, inputState: InputState): () => void => {
+export const createGameLoop = (
+    renderer: Renderer,
+    inputState: InputState,
+    world: World,
+    getAspectRatio: () => number
+): () => void => {
     const camera = createCamera();
     const triangleMesh = (renderer as any).createTriangleMesh?.('test-triangle'); // TODO: Set Triangle Mesh Class
     const modelMatrix = createIdentityMatrix();
@@ -35,12 +41,16 @@ export const createGameLoop = (renderer: Renderer, inputState: InputState): () =
         // Render
         renderer.beginFrame();
 
-        const aspect = 800 / 600; //TODO: Not static
+        const aspect = getAspectRatio();
         const viewProj = getCameraMatrix(camera, aspect);
         const finalTransform = matrixMultiply(viewProj, modelMatrix);
 
         if (triangleMesh) {
             renderer.drawMesh(triangleMesh, finalTransform, { x: 1, y: 1, z: 1 });
+        }
+
+        for (const sm of world.getVisibleMeshes()) {
+            renderer.drawMesh(sm.mesh, sm.transform, sm.color);
         }
 
         renderer.endFrame();

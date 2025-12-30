@@ -1,5 +1,5 @@
-import { MeshHandle, Renderer } from "src/services/renderer";
-import { Mat4, Vec3 } from "src/types/common";
+import { MeshHandle } from "../services/renderer";
+import { Mat4, Vec3 } from "../types/common";
 
 // TODO: We may want to move this and other typing/interface namespaces to common classes down the line.
 export type ChunkID = string;

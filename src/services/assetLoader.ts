@@ -1,4 +1,4 @@
-import { MapData } from "src/types/common";
+import { MapData } from "../types/common";
 
 export interface AssetLoader {
     loadMap(id: string): Promise<MapData>;

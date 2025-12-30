@@ -2,6 +2,7 @@ import { createGameLoop } from '../../core/gameLoop';
 import { WebGLRenderer } from './webGLRenderer';
 import { createInputState } from '../../core/input';
 import { syncWebInput, createWebInputState, setupWebInput } from './webInput';
+import { World } from '../../core/world';
 
 console.log("Smackhem bootstrapping...");
 
@@ -14,6 +15,7 @@ document.body.appendChild(canvas);
 const renderer = new WebGLRenderer(canvas);
 const inputState = createInputState();  // core
 const webInputState = createWebInputState();  // platform
+const world = new World;
 setupWebInput(canvas, inputState, webInputState); 
 
 // Wireframe toggle (press '\' key)
@@ -26,7 +28,12 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-const render = createGameLoop(renderer, inputState);
+const render = createGameLoop(
+    renderer,
+    inputState,
+    world,
+    () => canvas.width / canvas.height,
+);
 
 const loop = () => {
     syncWebInput(inputState, webInputState);

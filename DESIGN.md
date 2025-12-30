@@ -386,6 +386,17 @@ The game should not know or care what GPU or input device exists.
 └──────────────────────────┘
 ```
 
+- Input systems should:
+  - Translate hardware → intent
+  - Not know about simulation or world state
+
+- OS / Browser events
+  - → platform input (web)
+  - → core input
+  - → simulation / camera update
+  - → render
+  - → reset transient input
+
 ### 5. Core Systems
 
 #### 5.1 Game Loop (Fixed Step)
@@ -513,6 +524,9 @@ Why:
 - No roll
 - Clamped pitch
 - Explicit smoothing (no browser magic)
+- Camera update =/= render
+  - Update simulation via fixed or variable time/steps
+  - interpolate the render
 
 ##### 9.2.1 Technical Jargon and Formulae
 
