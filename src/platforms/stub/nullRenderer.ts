@@ -18,4 +18,3 @@ export class NullRenderer implements Renderer {
         // No-op: stub implementation
     }
 }
-

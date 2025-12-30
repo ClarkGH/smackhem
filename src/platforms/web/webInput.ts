@@ -27,11 +27,11 @@ export const setupWebInput = (
         web.axes.mouseLookX = e.movementX;
         web.axes.mouseLookY = e.movementY;
     });
-  
+
     canvas.addEventListener("click", () => {
         canvas.requestPointerLock();
     });
-  
+
     window.addEventListener("gamepadconnected", e => {
         console.log(`Gamepad connected: ${e.gamepad.id}`);
     });
@@ -44,10 +44,10 @@ export const setupWebInput = (
 
 export const syncWebInput = (coreState: InputState, webState: WebInputState) => {
     const gamepad = navigator.getGamepads()[0];
-  
+
     let finalX = webState.axes.mouseLookX;
     let finalY = webState.axes.mouseLookY; // TODO: Invert accessibility options
-  
+
     if (gamepad) {
         const deadzone = 0.15;
         const dz = (v: number) => Math.abs(v) < deadzone ? 0 : v;

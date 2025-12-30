@@ -21,7 +21,7 @@ export class AABB {
         public min: Vec3 = {x: 0, y : 0, z: 0},
         public max: Vec3 = {x: 0, y : 0, z: 0}
     ) {}
-  
+
     // Check if a point is inside this chunk
     contains(point: Vec3): boolean {
         return (
@@ -34,16 +34,16 @@ export class AABB {
 
 export class World {
     activeChunks: Map<ChunkID, Chunk> = new Map();
-  
+
     // Helper to generate a coordinate-based ID (e.g., "0,0")
     getChunkID(x: number, z: number): ChunkID {
         return `${x},${z}`;
     }
-  
+
     addChunk(chunk: Chunk) {
         this.activeChunks.set(chunk.id, chunk);
     }
-  
+
     getVisibleMeshes(): StaticMesh[] {
         const visibleMesh: StaticMesh[] = [];
 

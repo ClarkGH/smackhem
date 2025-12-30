@@ -21,14 +21,14 @@ export class WebGLRenderer implements Renderer {
         }
         this.gl = gl;
         this.gl.clearColor(38/255, 151/255, 121/255, 1);
-        
+  
         // Set viewport
         this.gl.viewport(0, 0, canvas.width, canvas.height);
-        
+
         // Enable depth testing
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.depthFunc(this.gl.LEQUAL);
-        
+
         this.initShaders();
     }
 
@@ -36,7 +36,7 @@ export class WebGLRenderer implements Renderer {
         const vertexShaderSource = `#version 300 es
             in vec3 a_position;
             uniform mat4 u_transform;
-            
+
             void main() {
                 gl_Position = u_transform * vec4(a_position, 1.0);
             }
@@ -46,7 +46,7 @@ export class WebGLRenderer implements Renderer {
             precision mediump float;
             uniform vec3 u_color;
             out vec4 fragColor;
-            
+
             void main() {
                 fragColor = vec4(u_color, 1.0);
             }

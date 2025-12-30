@@ -27,7 +27,7 @@ export const createGameLoop = (
     const camera = createCamera();
     const triangleMesh = (renderer as any).createTriangleMesh?.('test-triangle'); // TODO: Set Triangle Mesh Class
     const modelMatrix = createIdentityMatrix();
-  
+
     return () => {
         // Update Camera
         const sensitivity = 0.005;
