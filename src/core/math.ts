@@ -11,7 +11,7 @@ export const perspective = (
     aspect: number,
     near: number,
     far: number,
-    whereEverYouAre: number, // TODO: Implement left/right-handed coordinate systems for fun
+    whereEverightYouAre: number, // TODO: Implement left/right-handed coordinate systems for fun
 ): Mat4 => {
     const f = 1.0 / Math.tan(fov / 2);
     const normalizationFactor = 1 / (near - far);
@@ -34,29 +34,51 @@ export const lookDirection = (
 ): Mat4 => {
     const cosYaw = Math.cos(yaw);
     const sinYaw = Math.sin(yaw);
-    const cosPitch = Math.cos(-pitch); // TODO: Invert option for accessibility
-    const sinPitch = Math.sin(-pitch); // NOT THAT KIND OF SIN! It's a sign!
+    const cosPitch = Math.cos(pitch); // TODO: Invert option for accessibility. Move negative to caller.
+    const sinPitch = Math.sin(pitch); // NOT THAT KIND OF SIN! It's a sign! TODO: Move negative to caller.
 
-    const fx = cosYaw * cosPitch; // x-direction of view
-    const fy = sinPitch; // y-direction of view
-    const fz = sinYaw * cosPitch; // z-depth of view
+    // Forward Vector from yaw/pitch
+    const forwardX = cosYaw * cosPitch;
+    const forwardY = sinPitch;
+    const forwardZ = sinYaw * cosPitch;
+
+    // World Up vector (positive Y is up)
+    const worldUpX = 0;
+    const worldUpY = 1;
+    const worldUpZ = 0;
+
+    // Right Vector from cross product of Forward and World Up
+    const rightX = forwardY * worldUpZ - forwardZ * worldUpY;
+    const rightY = forwardZ * worldUpX - forwardX * worldUpZ;
+    const rightZ = forwardX * worldUpY - forwardY * worldUpX;
+
+    // Normalize Right vector
+    const rightLength = Math.sqrt(rightX * rightX + rightY * rightY + rightZ * rightZ);
+    const normalizedRightX = rightLength > 0 ? rightX / rightLength : 1;
+    const normalizedRightY = rightLength > 0 ? rightY / rightLength : 0;
+    const normalizedRightZ = rightLength > 0 ? rightZ / rightLength : 0;
+
+    // Up Vector from cross product of Right and Forward
+    const upX = normalizedRightY * forwardZ - normalizedRightZ * forwardY;
+    const upY = normalizedRightZ * forwardX - normalizedRightX * forwardZ;
+    const upZ = normalizedRightX * forwardY - normalizedRightY * forwardX;
 
     const e = new Float32Array(16);
 
-    // Right
-    e[0] = -sinYaw;
-    e[1] = 0;
-    e[2] = cosYaw;
+    // Right (columns 0-2)
+    e[0] = normalizedRightX;
+    e[1] = normalizedRightY;
+    e[2] = normalizedRightZ;
 
-    // Up
-    e[4] = cosYaw * sinPitch;
-    e[5] = cosPitch;
-    e[6] = sinYaw * sinPitch;
+    // Up (columns 4-6)
+    e[4] = upX;
+    e[5] = upY;
+    e[6] = upZ;
 
-    // Forward
-    e[8]  = fx;
-    e[9]  = fy;
-    e[10] = fz;
+    // Forward (columns 8-10)
+    e[8]  = forwardX;
+    e[9]  = forwardY;
+    e[10] = forwardZ;
 
     // Translation: The "where is the camera" part
     // This dots the position with the Right, Up, and Forward vectors
