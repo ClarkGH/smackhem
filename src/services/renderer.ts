@@ -1,4 +1,4 @@
-import { Mat4, Vec3 } from "src/types/common";
+import { Mat4, Vec3 } from "../types/common";
 
 export interface MeshHandle {
     // Placeholder type for mesh references
