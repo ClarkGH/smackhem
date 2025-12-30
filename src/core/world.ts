@@ -44,11 +44,13 @@ export class World {
         this.activeChunks.set(chunk.id, chunk);
     }
   
-    render(renderer: Renderer) {
+    getVisibleMeshes(): StaticMesh[] {
+        const visibleMesh: StaticMesh[] = [];
+
         for (const chunk of this.activeChunks.values()) {
-            for (const sm of chunk.meshes) {
-            renderer.drawMesh(sm.mesh, sm.transform, sm.color);
-            }
+            visibleMesh.push(...chunk.meshes);
         }
+
+        return visibleMesh;
     }
 }
