@@ -1,4 +1,4 @@
-import type { Mat4 } from '../types/common';
+import type { Mat4, Quaternion, Vec3 } from '../types/common';
 
 export const identity = (): Mat4 => {
     const e = new Float32Array(16);
@@ -32,60 +32,41 @@ export const lookDirection = (
     yaw: number,
     pitch: number
 ): Mat4 => {
-    const cosYaw = Math.cos(yaw);
-    const sinYaw = Math.sin(yaw);
-    const cosPitch = Math.cos(pitch); // TODO: Invert option for accessibility. Move negative to caller.
-    const sinPitch = Math.sin(pitch); // NOT THAT KIND OF SIN! It's a sign! TODO: Move negative to caller.
+    // Create quaternion from yaw/pitch angles
+    const rotation = quaternionFromYawPitch(yaw, pitch);
 
-    // Forward Vector from yaw/pitch
-    const forwardX = cosYaw * cosPitch;
-    const forwardY = sinPitch;
-    const forwardZ = sinYaw * cosPitch;
-
-    // World Up vector (positive Y is up)
-    const worldUpX = 0;
-    const worldUpY = 1;
-    const worldUpZ = 0;
-
-    // Right Vector from cross product of Forward and World Up
-    const rightX = forwardY * worldUpZ - forwardZ * worldUpY;
-    const rightY = forwardZ * worldUpX - forwardX * worldUpZ;
-    const rightZ = forwardX * worldUpY - forwardY * worldUpX;
-
-    // Normalize Right vector
-    const rightLength = Math.sqrt(rightX * rightX + rightY * rightY + rightZ * rightZ);
-    const normalizedRightX = rightLength > 0 ? rightX / rightLength : 1;
-    const normalizedRightY = rightLength > 0 ? rightY / rightLength : 0;
-    const normalizedRightZ = rightLength > 0 ? rightZ / rightLength : 0;
-
-    // Up Vector from cross product of Right and Forward
-    const upX = normalizedRightY * forwardZ - normalizedRightZ * forwardY;
-    const upY = normalizedRightZ * forwardX - normalizedRightX * forwardZ;
-    const upZ = normalizedRightX * forwardY - normalizedRightY * forwardX;
+    // Apply quaternion rotation to standard basis vectors
+    // At yaw=0, pitch=0:
+    // - Forward = (1, 0, 0) pointing along +X
+    // - Right = (0, 0, 1) pointing along +Z
+    // - Up = (0, 1, 0) pointing along +Y
+    // The quaternion rotation preserves orthonormality automatically
+    const forward = quaternionApplyToVector(rotation, { x: 1, y: 0, z: 0 });
+    const right = quaternionApplyToVector(rotation, { x: 0, y: 0, z: 1 });
+    const up = quaternionApplyToVector(rotation, { x: 0, y: 1, z: 0 });
 
     const e = new Float32Array(16);
 
     // Right (columns 0-2)
-    e[0] = normalizedRightX;
-    e[1] = normalizedRightY;
-    e[2] = normalizedRightZ;
+    e[0] = right.x;
+    e[1] = right.y;
+    e[2] = right.z;
 
     // Up (columns 4-6)
-    e[4] = upX;
-    e[5] = upY;
-    e[6] = upZ;
+    e[4] = up.x;
+    e[5] = up.y;
+    e[6] = up.z;
 
     // Forward (columns 8-10)
-    e[8]  = forwardX;
-    e[9]  = forwardY;
-    e[10] = forwardZ;
+    e[8]  = forward.x;
+    e[9]  = forward.y;
+    e[10] = forward.z;
 
-    // Translation: The "where is the camera" part
-    // This dots the position with the Right, Up, and Forward vectors
-    e[12] = -(e[0] * position.x + e[4] * position.y + e[8] * position.z);
-    e[13] = -(e[1] * position.x + e[5] * position.y + e[9] * position.z);
-    e[14] = -(e[2] * position.x + e[6] * position.y + e[10] * position.z);
-    e[15] = 1; // w
+    // Translation: negated position dotted with basis vectors
+    e[12] = -(right.x * position.x + up.x * position.y + forward.x * position.z);
+    e[13] = -(right.y * position.x + up.y * position.y + forward.y * position.z);
+    e[14] = -(right.z * position.x + up.z * position.y + forward.z * position.z);
+    e[15] = 1;
 
     return { elements: e };
 }
@@ -120,4 +101,74 @@ export const createTranslationMatrix = (x: number, y: number, z: number): Mat4 =
     m[14] = z;
 
     return { elements: m };
+};
+
+// Quaternion functions
+export const quaternionIdentity = (): Quaternion => ({ x: 0, y: 0, z: 0, w: 1 });
+
+export const quaternionNormalize = (q: Quaternion): Quaternion => {
+    const len = Math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+    if (len < 0.0001) return quaternionIdentity();
+    return {
+        x: q.x / len,
+        y: q.y / len,
+        z: q.z / len,
+        w: q.w / len
+    };
+};
+
+export const quaternionMultiply = (a: Quaternion, b: Quaternion): Quaternion => {
+    return {
+        x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+        y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+        z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+        w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
+    };
+};
+
+export const quaternionFromAxisAngle = (axis: Vec3, angle: number): Quaternion => {
+    const halfAngle = angle / 2;
+    const s = Math.sin(halfAngle);
+    return quaternionNormalize({
+        x: axis.x * s,
+        y: axis.y * s,
+        z: axis.z * s,
+        w: Math.cos(halfAngle)
+    });
+};
+
+export const quaternionApplyToVector = (q: Quaternion, v: Vec3): Vec3 => {
+    // q * v * q^-1
+    // For unit quaternion, q^-1 is the conjugate
+    const qx = q.x, qy = q.y, qz = q.z, qw = q.w;
+    const vx = v.x, vy = v.y, vz = v.z;
+
+    // q * v (treat v as quaternion with w=0)
+    const tx = qw * vx + qy * vz - qz * vy;
+    const ty = qw * vy + qz * vx - qx * vz;
+    const tz = qw * vz + qx * vy - qy * vx;
+    const tw = -qx * vx - qy * vy - qz * vz;
+
+    // result * q^-1 (conjugate)
+    return {
+        x: tx * qw + tw * -qx + ty * -qz - tz * -qy,
+        y: ty * qw + tw * -qy + tz * -qx - tx * -qz,
+        z: tz * qw + tw * -qz + tx * -qy - ty * -qx
+    };
+};
+
+// Create quaternion from yaw/pitch for FPS camera
+// Yaw rotates around Y axis, pitch rotates around local X axis (after yaw)
+export const quaternionFromYawPitch = (yaw: number, pitch: number): Quaternion => {
+    // First rotate by yaw around Y axis
+    const yawQuat = quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, yaw);
+    
+    // Pitch rotates around local X axis (right vector after yaw rotation)
+    // Get the right vector after yaw: apply yaw to world X axis
+    const rightAxis = quaternionApplyToVector(yawQuat, { x: 1, y: 0, z: 0 });
+    const pitchQuat = quaternionFromAxisAngle(rightAxis, pitch);
+    
+    // Combine: pitchQuat * yawQuat (quaternion multiplication applies right-to-left)
+    // This applies yaw first, then pitch around the rotated X axis
+    return quaternionNormalize(quaternionMultiply(pitchQuat, yawQuat));
 };
