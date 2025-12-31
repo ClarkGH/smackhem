@@ -143,7 +143,6 @@ export const lookDirection = (
     // Column 0
     e[0] = right.x;
     e[1] = up.x;
-    // TODO: Abstract WEBGL specifics from the camera code.
     // We use -forward because WebGL looks down -Z
     e[2] = -forward.x;
     e[3] = 0;
@@ -169,4 +168,12 @@ export const lookDirection = (
     e[15] = 1;
 
     return { elements: e };
+};
+
+export const extractPosition = (matrix: Mat4): Vec3 => {
+    return {
+        x: matrix.elements[12],
+        y: matrix.elements[13],
+        z: matrix.elements[14],
+    };
 };
