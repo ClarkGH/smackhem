@@ -598,11 +598,13 @@ Everything we build uses lines
 
 ###### 9.2.5 Look-At Matrix (View Matrix)
 
-For a 3D camera, we need to define Up/Right to create a proper orientation matrices. We will be using a 16 element list or array for the matrices
+~~For a 3D camera, we need to define Up/Right to create a proper orientation matrices. We will be using a 16 element list or array for the matrices~~
 
-`Forward Axis = normalize(Target - EyeLevel)`
-`Right Axis = normalize(forwardAxis x WorldUp)`
-`Up Axis = forwardAxis x rightAxis`
+~~`Forward Axis = normalize(Target - EyeLevel)`~~
+~~`Right Axis = normalize(forwardAxis x WorldUp)`~~
+~~`Up Axis = forwardAxis x rightAxis`~~
+
+**Note:** This section is obsolete. We now use quaternions to compute camera orientation (see section 9.2.8.1). The view matrix structure remains the same (16-element array), but the rotation vectors are computed via quaternion rotation rather than cross products from a target point.
 
 ###### 9.2.7 Orientation Vectors
 
@@ -610,20 +612,23 @@ For a 3D camera, we need to define Up/Right to create a proper orientation matri
 
 `e = element list`
 
-Right is perpendicular to Forward. We calculate it by taking the cross product of the World-Up and Forward vectors. This results in a horizontal vector that points to the right of the camera's perspective.
+**Matrix Layout:**
 
-`Right = e[0] to e[2]`
+- `Right = e[0] to e[2]` (column 0)
+- `Up = e[4] to e[6]` (column 1)
+- `Forward = e[8] to e[10]` (column 2)
 
-Up is the cross product of the Forward and Right vectors. It points up from the top of the camera's eye level.
+~~Right is perpendicular to Forward. We calculate it by taking the cross product of the World-Up and Forward vectors. This results in a horizontal vector that points to the right of the camera's perspective.~~
 
-`Up = e[4] to e[6]`
+~~Up is the cross product of the Forward and Right vectors. It points up from the top of the camera's eye level.~~
 
-Forward is the cross product of the forward and right axes. It's the exact direction the camera is pointing at.
+~~Forward is the cross product of the forward and right axes. It's the exact direction the camera is pointing at.~~
 
-`Forward = e[8] to e[10]`
-`x component = (cosYaw * cosPitch)`
-`y component = (sinPitch)`
-`z component = (sinYaw * cosPitch)`
+~~`x component = (cosYaw * cosPitch)`~~
+~~`y component = (sinPitch)`~~
+~~`z component = (sinYaw * cosPitch)`~~
+
+**Note:** The Euler angle formulas above are obsolete. We now compute these vectors using quaternion rotation (see section 9.2.8.1). The basis vectors are obtained by applying the camera's quaternion rotation to the initial basis vectors `(1,0,0)`, `(0,1,0)`, and `(0,0,-1)`.
 
 ###### 9.2.8 Translation and Final Matrix
 
@@ -635,34 +640,93 @@ We'll also want a "w" for the 4x4 matrix mathy stuff (homogenous coordinates)
 
 - e[15] = 1
 
-If we want to change to quaternions from euler angles, we'll want another 4 component object and a conversion formula. WebGL requires a rotation matrix. The trigonometry would be replaced with quaternion multiplication.
+###### 9.2.8.1 Quaternion Rotation System
 
-- Eg. Yaw would change from a number to a four dimensional vector.
+We use quaternions to represent 3D rotations, avoiding gimbal lock and providing smooth interpolation. A quaternion is a 4-component vector: `{x, y, z, w}` where `(x, y, z)` is the imaginary part and `w` is the real part.
 
-From: `90`
-To: `{x: number, y: number, z: number, w: number}`
-With formula: ``
+**Quaternion Identity**
+The identity quaternion (no rotation) is:
 
-```typescript
-export const fromQuaternion = (x: number, y: number, z: number, w: number): Mat4 => {
-    const e = new Float32Array(16);
-    // Standard Quaternion to 4x4 Rotation Matrix formula
-    e[0] = 1 - 2 * (y * y + z * z);
-    e[1] = 2 * (x * y + z * w);
-    e[2] = 2 * (x * z - y * w);
-    
-    e[4] = 2 * (x * y - z * w);
-    e[5] = 1 - 2 * (x * x + z * z);
-    e[6] = 2 * (y * z + x * w);
-    
-    e[8] = 2 * (x * z + y * w);
-    e[9] = 2 * (y * z - x * w);
-    e[10] = 1 - 2 * (x * x + y * y);
-    
-    e[15] = 1; // W component
-    return { elements: e };
-};
+```text
+q_identity = {x: 0, y: 0, z: 0, w: 1}
 ```
+
+**Quaternion Normalization**
+Quaternions must be unit quaternions (length = 1) for rotation:
+
+```text
+length = sqrt(x² + y² + z² + w²)
+q_normalized = {x/length, y/length, z/length, w/length}
+```
+
+**Quaternion Multiplication**
+Composing two rotations: `q_result = q_a * q_b`
+
+```text
+x = a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y
+y = a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x
+z = a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w
+w = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
+```
+
+**Quaternion from Axis-Angle**
+Create a rotation quaternion from an axis vector and angle:
+
+```text
+halfAngle = angle / 2
+s = sin(halfAngle)
+q = normalize({
+    x: axis.x * s,
+    y: axis.y * s,
+    z: axis.z * s,
+    w: cos(halfAngle)
+})
+```
+
+**Quaternion Apply to Vector**
+Rotate a 3D vector by a quaternion: `v_rotated = q * v * q^-1`
+For unit quaternions, `q^-1` is the conjugate `{-x, -y, -z, w}`.
+
+The formula expands to:
+
+```text
+// First multiply: q * v (treating v as quaternion with w=0)
+tx = qw * vx + qy * vz - qz * vy
+ty = qw * vy + qz * vx - qx * vz
+tz = qw * vz + qx * vy - qy * vx
+tw = -qx * vx - qy * vy - qz * vz
+
+// Then multiply by conjugate q^-1
+result.x = tx * qw + tw * (-qx) + ty * (-qz) - tz * (-qy)
+result.y = ty * qw + tw * (-qy) + tz * (-qx) - tx * (-qz)
+result.z = tz * qw + tw * (-qz) + tx * (-qy) - ty * (-qx)
+```
+
+**FPS Camera: Yaw and Pitch**
+For first-person camera control:
+
+- Yaw rotates around world Y-axis (up): `yawQuat = axisAngle({0, 1, 0}, -yaw)`
+- Pitch rotates around local X-axis (right): `pitchQuat = axisAngle({1, 0, 0}, pitch)`
+- Combined rotation: `rotation = normalize(yawQuat * pitchQuat)`
+
+The multiplication order `yawQuat * pitchQuat` applies pitch first (in local space), then yaw (in world space), ensuring pitch always rotates up/down relative to the camera's current orientation.
+
+**Camera Basis Vectors**
+The camera's orientation vectors are computed by rotating the initial basis:
+
+- Initial right: `(1, 0, 0)`
+- Initial up: `(0, 1, 0)`
+- Initial forward: `(0, 0, -1)` (WebGL looks down -Z)
+
+After quaternion rotation:
+
+```text
+right = quaternionApplyToVector(rotation, {1, 0, 0})
+up = quaternionApplyToVector(rotation, {0, 1, 0})
+forward = quaternionApplyToVector(rotation, {0, 0, -1})
+```
+
+These form the rotation part of the view matrix (transposed for column-major storage).
 
 Camera is a system, not math in input code.
 

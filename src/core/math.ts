@@ -28,44 +28,40 @@ export const perspective = (
 }
 
 export const lookDirection = (
-    position: { x: number; y: number; z: number },
+    position: Vec3,
     yaw: number,
     pitch: number
 ): Mat4 => {
-    // Create quaternion from yaw/pitch angles
     const rotation = quaternionFromYawPitch(yaw, pitch);
 
-    // Apply quaternion rotation to standard basis vectors
-    // At yaw=0, pitch=0:
-    // - Forward = (1, 0, 0) pointing along +X
-    // - Right = (0, 0, 1) pointing along +Z
-    // - Up = (0, 1, 0) pointing along +Y
-    // The quaternion rotation preserves orthonormality automatically
-    const forward = quaternionApplyToVector(rotation, { x: 1, y: 0, z: 0 });
-    const right = quaternionApplyToVector(rotation, { x: 0, y: 0, z: 1 });
-    const up = quaternionApplyToVector(rotation, { x: 0, y: 1, z: 0 });
-
+    const right   = quaternionApplyToVector(rotation, { x: 1, y: 0, z: 0 });
+    const up      = quaternionApplyToVector(rotation, { x: 0, y: 1, z: 0 });
+    const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
     const e = new Float32Array(16);
 
-    // Right (columns 0-2)
+    // 2. Rotation part (Transpose the camera's orientation)
+    // Column 0
     e[0] = right.x;
-    e[1] = right.y;
-    e[2] = right.z;
+    e[1] = up.x;
+    e[2] = -forward.x; // TODO: Abstract WEBGL specifics from the camera code. We use -forward because WebGL looks down -Z
+    e[3] = 0;
 
-    // Up (columns 4-6)
-    e[4] = up.x;
+    // Column 1
+    e[4] = right.y;
     e[5] = up.y;
-    e[6] = up.z;
+    e[6] = -forward.y;
+    e[7] = 0;
 
-    // Forward (columns 8-10)
-    e[8]  = forward.x;
-    e[9]  = forward.y;
-    e[10] = forward.z;
+    // Column 2
+    e[8] = right.z;
+    e[9] = up.z;
+    e[10] = -forward.z;
+    e[11] = 0;
 
-    // Translation: negated position dotted with basis vectors
-    e[12] = -(right.x * position.x + up.x * position.y + forward.x * position.z);
-    e[13] = -(right.y * position.x + up.y * position.y + forward.y * position.z);
-    e[14] = -(right.z * position.x + up.z * position.y + forward.z * position.z);
+    // Translation
+    e[12] = -(right.x * position.x + right.y * position.y + right.z * position.z);
+    e[13] = -(up.x * position.x + up.y * position.y + up.z * position.z);
+    e[14] = (forward.x * position.x + forward.y * position.y + forward.z * position.z);
     e[15] = 1;
 
     return { elements: e };
@@ -157,18 +153,10 @@ export const quaternionApplyToVector = (q: Quaternion, v: Vec3): Vec3 => {
     };
 };
 
-// Create quaternion from yaw/pitch for FPS camera
-// Yaw rotates around Y axis, pitch rotates around local X axis (after yaw)
 export const quaternionFromYawPitch = (yaw: number, pitch: number): Quaternion => {
-    // First rotate by yaw around Y axis
-    const yawQuat = quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, yaw);
+    const yawQuat = quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, -yaw);
     
-    // Pitch rotates around local X axis (right vector after yaw rotation)
-    // Get the right vector after yaw: apply yaw to world X axis
-    const rightAxis = quaternionApplyToVector(yawQuat, { x: 1, y: 0, z: 0 });
-    const pitchQuat = quaternionFromAxisAngle(rightAxis, pitch);
-    
-    // Combine: pitchQuat * yawQuat (quaternion multiplication applies right-to-left)
-    // This applies yaw first, then pitch around the rotated X axis
-    return quaternionNormalize(quaternionMultiply(pitchQuat, yawQuat));
+    const pitchQuat = quaternionFromAxisAngle({ x: 1, y: 0, z: 0 }, pitch);
+
+    return quaternionNormalize(quaternionMultiply(yawQuat, pitchQuat));
 };
