@@ -22,6 +22,7 @@ describe('Deletion test', () => {
             renderer,
             mockCoreInput,
             mockWorld,
-            () => 800 / 600)).not.toThrow();
+            () => 800 / 600,
+        )).not.toThrow();
     });
 });

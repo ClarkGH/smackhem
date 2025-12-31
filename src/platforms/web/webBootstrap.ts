@@ -4,6 +4,7 @@ import { createInputState } from '../../core/input';
 import { syncWebInput, createWebInputState, setupWebInput } from './webInput';
 import { AABB, World } from '../../core/world';
 import { createTranslationMatrix } from '../../core/math';
+import { WebClock } from './webClock';
 
 console.log("Smackhem bootstrapping...");
 
@@ -31,14 +32,14 @@ world.addChunk({
         { x:  5, y:  5, z:  5 }
     ),
     meshes: [
-        // Floor (greyscale)
+        // Floor (purple)
         {
             mesh: renderer.createPlaneMesh(10),
             transform: floorTransform,
             color: { x: 0.5, y: 0, z: 0.5 }
         },
 
-        // Cube (colored)
+        // Cube (neon green)
         {
             mesh: renderer.createCubeMesh(1),
             transform: cubeTransform,
@@ -57,17 +58,20 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-const render = createGameLoop(
+const clock = new WebClock();
+const gameLoop = createGameLoop(
     renderer,
     inputState,
     world,
-    () => canvas.width / canvas.height,
+    () => canvas.width / canvas.height
 );
 
 const loop = () => {
+    clock.update();
     syncWebInput(inputState, webInputState);
-    render();
+    gameLoop.update(clock.getDeltaTime());
+    gameLoop.render();
     requestAnimationFrame(loop);
-}
+};
 
 loop();

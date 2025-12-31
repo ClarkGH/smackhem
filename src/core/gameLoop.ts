@@ -6,7 +6,6 @@ import { InputState } from './input';
 import { matrixMultiply } from './math';
 import { World } from './world';
 
-// Helper to create identity matrix
 export const createIdentityMatrix = (): Mat4 => {
     const elements = new Float32Array(16);
 
@@ -18,20 +17,24 @@ export const createIdentityMatrix = (): Mat4 => {
     return { elements };
 }
 
+const FIXED_DT = 1 / 60;
+
 export const createGameLoop = (
     renderer: Renderer,
     inputState: InputState,
     world: World,
     getAspectRatio: () => number
-): () => void => {
+) => {
     const camera = createCamera();
     // TODO: Consider typing more strictly
     const floorMesh = (renderer as any).createPlaneMesh(10);
     const cubeMesh  = (renderer as any).createCubeMesh(1);
     const modelMatrix = createIdentityMatrix();
 
-    return () => {
-        // Update Camera
+    let accumulator = 0;
+
+    const updateSimulation = (dt: number) => {
+        // Fixed timestep simulation updates
         const sensitivity = 0.005;
         camera.yaw += inputState.axes.lookX * sensitivity;
         camera.pitch -= inputState.axes.lookY * sensitivity;
@@ -40,7 +43,20 @@ export const createGameLoop = (
         const limit = Math.PI / 2 - 0.01;
         camera.pitch = Math.max(-limit, Math.min(limit, camera.pitch));
 
-        // Render
+        // Reset transient input
+        inputState.axes.lookX = 0;
+        inputState.axes.lookY = 0;
+    };
+
+    const update = (deltaTime: number) => {
+        accumulator += deltaTime;
+        while (accumulator >= FIXED_DT) {
+            updateSimulation(FIXED_DT);
+            accumulator -= FIXED_DT;
+        }
+    };
+
+    const render = () => {
         renderer.beginFrame();
 
         const aspect = getAspectRatio();
@@ -52,9 +68,7 @@ export const createGameLoop = (
         }
 
         renderer.endFrame();
-
-        // Reset transient input
-        inputState.axes.lookX = 0;
-        inputState.axes.lookY = 0;
     };
+
+    return { update, render };
 };
