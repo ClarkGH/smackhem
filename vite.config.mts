@@ -11,5 +11,9 @@ export default defineConfig({
   },
   esbuild: {
     target: 'es2020'
+  },
+  define: {
+    __PLATFORM__ : JSON.stringify(process.env.VARIABLE_NAME),
   }
+
 });
