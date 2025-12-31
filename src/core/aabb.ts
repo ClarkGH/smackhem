@@ -1,6 +1,5 @@
 import { Vec3 } from 'src/types/common';
 
-// TODO: Consider moving this to a separate file.
 export default class AABB {
     min: Vec3;
 
