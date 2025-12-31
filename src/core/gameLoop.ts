@@ -4,9 +4,11 @@ import {
     getCameraMatrix,
     PLAYER_SPEED,
     PLAYER_HEIGHT,
+    PLAYER_RADIUS,
     getCameraForward,
     getCameraRight,
 } from './camera';
+import { resolveCollision } from './collision';
 import { InputState } from './input';
 import { matrixMultiply } from './math/mathHelpers';
 import { World } from './world';
@@ -42,14 +44,25 @@ const createGameLoop = (
             const right = getCameraRight(camera.yaw);
 
             // Combine movement vectors
-            const movement = {
+            const proposedMovement = {
                 x: (forward.x * moveY + right.x * moveX) * PLAYER_SPEED * dt,
                 y: 0,
                 z: (forward.z * moveY + right.z * moveX) * PLAYER_SPEED * dt,
             };
 
-            camera.position.x += movement.x;
-            camera.position.z += movement.z;
+            const worldAABBs = world.getCollidableAABBs();
+
+            // Resolve collision by adjusting movement
+            const resolvedMovement = resolveCollision(
+                camera.position,
+                proposedMovement,
+                worldAABBs,
+                PLAYER_HEIGHT,
+                PLAYER_RADIUS,
+            );
+
+            camera.position.x += resolvedMovement.x;
+            camera.position.z += resolvedMovement.z;
             // Keep player at ground level
             camera.position.y = PLAYER_HEIGHT;
         }

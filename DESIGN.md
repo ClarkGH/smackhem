@@ -903,13 +903,14 @@ Pure data. No logic. Portable forever.
 src/
 ├─ core/
 │  ├─ camera.ts           # 3D camera math and logic
+│  ├─ collision.ts        # Collision logic
 │  ├─ gameLoop.ts         # Game loop logic
 │  ├─ input.ts            # Player input logic
 │  ├─ party.ts            # Party Logic
 │  ├─ world.ts            # World and chunking logic
 │  └─ math/               # Shared engine math logic
-│     ├─ aabb.ts          # axis aligned bounding box
-│     └─ mathHelpers.ts   # matrix/vector/etc math helper methods
+│     ├─ aabb.ts          # Axis aligned bounding box
+│     └─ mathHelpers.ts   # Matrix/vector/etc math helper methods
 ├─ services/
 │  ├─ renderer.ts         # Abstract Renderer interface
 │  ├─ input.ts            # Abstract Input service

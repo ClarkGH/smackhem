@@ -18,6 +18,7 @@ export interface Camera {
 }
 
 export const PLAYER_HEIGHT = 1.6;
+export const PLAYER_RADIUS = 0.3; // Player collision radius (half-width)
 export const PLAYER_SPEED = 10.0; // units per second
 
 export const createCamera = (): Camera => ({

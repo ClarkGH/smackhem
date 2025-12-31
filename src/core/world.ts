@@ -1,7 +1,8 @@
 import { MeshHandle, Renderer } from '../services/renderer';
 import { Mat4, Vec3 } from '../types/common';
 import AABB from './math/aabb';
-import { createTranslationMatrix } from './math/mathHelpers';
+import { createTranslationMatrix, extractPosition } from './math/mathHelpers';
+import { getMeshAABB } from './collision';
 
 // TODO: We may want to move this and other typing/interface namespaces
 // to common classes down the line.
@@ -105,6 +106,27 @@ export class World {
                 },
             ],
         };
+    }
+
+    // TODO: Add other mesh types to the collision system
+    // Get collidable AABBs from active chunks
+    // Filter meshes to only include cubes (not planes/floors)
+    getCollidableAABBs(): AABB[] {
+        const collidableAABBs: AABB[] = [];
+
+        Array.from(this.activeChunks.values()).forEach((chunk) => {
+            chunk.meshes.forEach((mesh) => {
+                // Filter out floor meshes - cubes are at y > 0.1, floors are at y = 0
+                const position = extractPosition(mesh.transform);
+                if (position.y > 0.1) {
+                    // This is a cube mesh (size 1)
+                    const meshAABB = getMeshAABB(mesh, 1);
+                    collidableAABBs.push(meshAABB);
+                }
+            });
+        });
+
+        return collidableAABBs;
     }
 
     // Update active chunks based on player position

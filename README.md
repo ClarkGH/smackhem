@@ -1,6 +1,6 @@
 # Smackhem
 
-Hobby Drakkhen-like game engine running off of a WebGL wrapper.
+Geometric 3D/2D game engine wrapper
 
 ## Paradigms and Intent
 
