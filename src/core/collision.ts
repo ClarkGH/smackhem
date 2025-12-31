@@ -3,6 +3,18 @@ import type { StaticMesh } from './world';
 import AABB from './math/aabb';
 import { extractPosition } from './math/mathHelpers';
 
+export interface CollisionContext {
+    newPos: Vec3;
+    xOnlyPos: Vec3;
+    zOnlyPos: Vec3;
+}
+
+export const createCollisionContext = (): CollisionContext => ({
+    newPos: { x: 0, y: 0, z: 0 },
+    xOnlyPos: { x: 0, y: 0, z: 0 },
+    zOnlyPos: { x: 0, y: 0, z: 0 },
+});
+
 // TODO: review if we want to be cylinder or box
 // Player AABB is a capsule-like box: centered at (position.x, position.y - height/2, position.z)
 // with size (radius*2, height, radius*2)
@@ -52,14 +64,13 @@ export const resolveCollision = (
     worldAABBs: AABB[],
     playerHeight: number,
     playerRadius: number,
+    context: CollisionContext,
 ): Vec3 => {
     // Try full movement first, if collision detected, slide along surfaces or stop
-    const newPos = {
-        x: playerPos.x + movement.x,
-        y: playerPos.y + movement.y,
-        z: playerPos.z + movement.z,
-    };
-    const playerAABB = getPlayerAABB(newPos, playerHeight, playerRadius);
+    context.newPos.x = playerPos.x + movement.x;
+    context.newPos.y = playerPos.y + movement.y;
+    context.newPos.z = playerPos.z + movement.z;
+    const playerAABB = getPlayerAABB(context.newPos, playerHeight, playerRadius);
 
     let hasCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
@@ -74,12 +85,10 @@ export const resolveCollision = (
     }
 
     // Try X-only movement
-    const xOnlyPos = {
-        x: playerPos.x + movement.x,
-        y: playerPos.y,
-        z: playerPos.z,
-    };
-    const xOnlyAABB = getPlayerAABB(xOnlyPos, playerHeight, playerRadius);
+    context.xOnlyPos.x = playerPos.x + movement.x;
+    context.xOnlyPos.y = playerPos.y;
+    context.xOnlyPos.z = playerPos.z;
+    const xOnlyAABB = getPlayerAABB(context.xOnlyPos, playerHeight, playerRadius);
     let xCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
         if (checkCollision(xOnlyAABB, worldAABBs[i])) {
@@ -89,12 +98,10 @@ export const resolveCollision = (
     }
 
     // Try Z-only movement
-    const zOnlyPos = {
-        x: playerPos.x,
-        y: playerPos.y,
-        z: playerPos.z + movement.z,
-    };
-    const zOnlyAABB = getPlayerAABB(zOnlyPos, playerHeight, playerRadius);
+    context.zOnlyPos.x = playerPos.x;
+    context.zOnlyPos.y = playerPos.y;
+    context.zOnlyPos.z = playerPos.z + movement.z;
+    const zOnlyAABB = getPlayerAABB(context.zOnlyPos, playerHeight, playerRadius);
     let zCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
         if (checkCollision(zOnlyAABB, worldAABBs[i])) {

@@ -3,10 +3,15 @@ import type { Clock } from '../../services/clock';
 import type { Input } from '../../services/input';
 import createGameLoop from '../../core/gameLoop';
 import WebGLRenderer from './webGLRenderer';
-import { World } from '../../core/world';
+import {
+    World, type Chunk, CHUNK_SIZE, CHUNK_LOAD_RADIUS,
+} from '../../core/world';
+import AABB from '../../core/math/aabb';
+import { createTranslationMatrix } from '../../core/math/mathHelpers';
 import WebClock from './webClock';
 import { createCamera } from '../../core/camera';
 import { WebInputService } from './webInputService';
+import type { Vec3 } from '../../types/common';
 
 export interface PlatformServices {
     renderer: Renderer;
@@ -14,6 +19,122 @@ export interface PlatformServices {
     input: Input;
     getAspectRatio: () => number;
 }
+
+// Create a chunk procedurally (platform-specific implementation)
+// This will eventually be replaced by asset loading
+export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer): Chunk => {
+    const chunkCenterX = chunkX * CHUNK_SIZE;
+    const chunkCenterZ = chunkZ * CHUNK_SIZE;
+
+    const floorTransform = createTranslationMatrix(chunkCenterX, 0, chunkCenterZ);
+    const floorMesh = renderer.createPlaneMesh(10);
+
+    const meshes: Chunk['meshes'] = [
+        // Floor (grayscale for lighting)
+        {
+            mesh: floorMesh,
+            transform: floorTransform,
+            color: { x: 0.4, y: 0.4, z: 0.4 },
+        },
+    ];
+
+    // Random geometric objects with varying sizes
+    const objectCount = Math.floor(Math.random() * 5) + 2; // 2-6 objects per chunk
+    for (let i = 0; i < objectCount; i += 1) {
+        const offsetX = (Math.random() - 0.5) * 8;
+        const offsetZ = (Math.random() - 0.5) * 8;
+        const type = Math.floor(Math.random() * 4);
+        const size = 0.3 + Math.random() * 1.5; // 0.3 to 1.8
+
+        let mesh;
+        let yPos = size / 2;
+
+        switch (type) {
+            case 0: // Cube
+                mesh = renderer.createCubeMesh(size);
+                break;
+            case 1: // Pyramid
+                mesh = renderer.createPyramidMesh(size);
+                yPos = size * 0.6; // Adjust for pyramid height
+                break;
+            case 2: // Prism
+                mesh = renderer.createPrismMesh(size, size * 1.5, size * 0.8);
+                yPos = (size * 1.5) / 2;
+                break;
+            case 3: // Sphere
+                mesh = renderer.createSphereMesh(size / 2, 12);
+                break;
+            default:
+                mesh = renderer.createCubeMesh(size);
+        }
+
+        const transform = createTranslationMatrix(
+            chunkCenterX + offsetX,
+            yPos,
+            chunkCenterZ + offsetZ,
+        );
+
+        // Grayscale colors (will be lit by lighting system)
+        const gray = 0.3 + Math.random() * 0.4; // 0.3 to 0.7
+        meshes.push({
+            mesh,
+            transform,
+            color: { x: gray, y: gray, z: gray },
+        });
+    }
+
+    const chunkId = World.getChunkID(chunkX, chunkZ);
+
+    return {
+        id: chunkId,
+        bounds: new AABB(
+            { x: chunkCenterX - 5, y: -1, z: chunkCenterZ - 5 },
+            { x: chunkCenterX + 5, y: 5, z: chunkCenterZ + 5 },
+        ),
+        meshes,
+    };
+};
+
+// Update active chunks based on player position (platform-specific chunk management)
+export const updateActiveChunks = (
+    world: World,
+    playerPosition: Vec3,
+    renderer: Renderer,
+): void => {
+    const currentChunk = World.getChunkCoords(playerPosition);
+    const chunksToLoad = World.getChunksInRadius(
+        currentChunk.x,
+        currentChunk.z,
+        CHUNK_LOAD_RADIUS,
+    );
+
+    // Create set of chunk IDs that should be loaded
+    const shouldBeLoaded = new Set<string>();
+    chunksToLoad.forEach((chunk) => {
+        shouldBeLoaded.add(World.getChunkID(chunk.x, chunk.z));
+    });
+
+    // Load missing chunks
+    chunksToLoad.forEach((chunk) => {
+        const chunkId = World.getChunkID(chunk.x, chunk.z);
+        if (!world.activeChunks.has(chunkId)) {
+            const newChunk = createChunk(chunk.x, chunk.z, renderer);
+            world.addChunk(newChunk);
+        }
+    });
+
+    // Unload chunks outside radius
+    const chunksToUnload: string[] = [];
+    Array.from(world.activeChunks.keys()).forEach((chunkId) => {
+        if (!shouldBeLoaded.has(chunkId)) {
+            chunksToUnload.push(chunkId);
+        }
+    });
+
+    chunksToUnload.forEach((chunkId) => {
+        world.removeChunk(chunkId);
+    });
+};
 
 export const createWebPlatform = async (): Promise<PlatformServices> => {
     // DOM setup
@@ -49,7 +170,7 @@ export const bootstrapWeb = (): void => {
     createWebPlatform().then((platform) => {
         const world = new World();
         const initialCamera = createCamera();
-        world.updateActiveChunks(initialCamera.position, platform.renderer);
+        updateActiveChunks(world, initialCamera.position, platform.renderer);
 
         const gameLoop = createGameLoop(
             platform.renderer,
@@ -62,6 +183,11 @@ export const bootstrapWeb = (): void => {
             platform.clock.update();
             platform.input.update();
             gameLoop.update(platform.clock.getDeltaTime());
+
+            // Update chunk loading/unloading based on player position
+            const cameraPosition = gameLoop.getCameraPosition();
+            updateActiveChunks(world, cameraPosition, platform.renderer);
+
             gameLoop.render();
             requestAnimationFrame(loop);
         };

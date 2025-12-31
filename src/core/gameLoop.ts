@@ -9,9 +9,10 @@ import {
     getCameraForward,
     getCameraRight,
 } from './camera';
-import { resolveCollision } from './collision';
+import { resolveCollision, createCollisionContext } from './collision';
 import { matrixMultiply } from './math/mathHelpers';
 import { World } from './world';
+import type { Vec3 } from '../types/common';
 
 const FIXED_DT = 1 / 60;
 
@@ -28,6 +29,9 @@ const createGameLoop = (
     if (renderer.setLightDirection) {
         renderer.setLightDirection(lightDirection);
     }
+
+    // Create collision context once and reuse it
+    const collisionContext = createCollisionContext();
 
     let accumulator = 0;
 
@@ -58,13 +62,14 @@ const createGameLoop = (
 
             const worldAABBs = world.getCollidableAABBs();
 
-            // Resolve collision by adjusting movement
+            // Resolve collision by adjusting movement (worldAABBs is a reused buffer)
             const resolvedMovement = resolveCollision(
                 camera.position,
                 proposedMovement,
                 worldAABBs,
                 PLAYER_HEIGHT,
                 PLAYER_RADIUS,
+                collisionContext,
             );
 
             camera.position.x += resolvedMovement.x;
@@ -72,9 +77,6 @@ const createGameLoop = (
             // Keep player at ground level
             camera.position.y = PLAYER_HEIGHT;
         }
-
-        // Update chunk loading/unloading based on player position
-        world.updateActiveChunks(camera.position, renderer);
     };
 
     const update = (deltaTime: number) => {
@@ -100,7 +102,9 @@ const createGameLoop = (
         renderer.endFrame();
     };
 
-    return { update, render };
+    const getCameraPosition = (): Vec3 => camera.position;
+
+    return { update, render, getCameraPosition };
 };
 
 export default createGameLoop;

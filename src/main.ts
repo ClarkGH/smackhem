@@ -22,9 +22,23 @@ const main = async () => {
     const platform = await createPlatform();
     const world = new World();
 
+    // Import chunk management function (platform-specific)
+    // eslint-disable-next-line no-shadow, no-unused-vars
+    let updateActiveChunks: (w: World, pos: { x: number; y: number; z: number }, r: PlatformServices['renderer']) => void;
+
+    // eslint-disable-next-line no-undef
+    if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
+        // Stub platform doesn't need chunk management for now
+        updateActiveChunks = () => {};
+    } else {
+        // Default to web platform chunk management
+        const { updateActiveChunks: webUpdateActiveChunks } = await import('./platforms/web/webBootstrap');
+        updateActiveChunks = webUpdateActiveChunks;
+    }
+
     // Initialize world with initial camera position
     const initialCamera = createCamera();
-    world.updateActiveChunks(initialCamera.position, platform.renderer);
+    updateActiveChunks(world, initialCamera.position, platform.renderer);
 
     const gameLoop = createGameLoop(
         platform.renderer,
@@ -37,6 +51,11 @@ const main = async () => {
         platform.clock.update();
         platform.input.update();
         gameLoop.update(platform.clock.getDeltaTime());
+
+        // Update chunk loading/unloading based on player position
+        const cameraPosition = gameLoop.getCameraPosition();
+        updateActiveChunks(world, cameraPosition, platform.renderer);
+
         gameLoop.render();
         requestAnimationFrame(loop);
     };
