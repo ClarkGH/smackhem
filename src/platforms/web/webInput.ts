@@ -1,21 +1,39 @@
 import { InputState } from "../../core/input";
 
+export interface KeyMapping {
+    forward: string[];
+    backward: string[];
+    left: string[];
+    right: string[];
+}
+
+export const DEFAULT_KEY_MAPPING: KeyMapping = {
+    forward: ['w', 'W', 'ArrowUp'],
+    backward: ['s', 'S', 'ArrowDown'],
+    left: ['a', 'A', 'ArrowLeft'],
+    right: ['d', 'D', 'ArrowRight'],
+};
+
 export interface WebInputState {
     axes : {
         mouseLookX: number;
         mouseLookY: number;
         padLookX: number;
         padLookY: number;
-    }
+    };
+    pressedKeys: Set<string>;
+    keyMapping: KeyMapping;
 }
 
-export const createWebInputState = (): WebInputState => ({
+export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => ({
     axes: {
         mouseLookX: 0,
         mouseLookY: 0,
         padLookX: 0,
         padLookY: 0
-    }
+    },
+    pressedKeys: new Set<string>(),
+    keyMapping: keyMapping || DEFAULT_KEY_MAPPING
 });
 
 export const setupWebInput = (
@@ -27,6 +45,17 @@ export const setupWebInput = (
         web.axes.mouseLookX = e.movementX;
         web.axes.mouseLookY = e.movementY;
     });
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+        web.pressedKeys.add(e.key);
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+        web.pressedKeys.delete(e.key);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
 
     canvas.addEventListener("click", () => {
         canvas.requestPointerLock();
@@ -45,24 +74,52 @@ export const setupWebInput = (
 export const syncWebInput = (coreState: InputState, webState: WebInputState) => {
     const gamepad = navigator.getGamepads()[0];
 
-    let finalX = webState.axes.mouseLookX;
-    let finalY = webState.axes.mouseLookY; // TODO: Invert accessibility options
+    let finalLookX = webState.axes.mouseLookX;
+    let finalLookY = webState.axes.mouseLookY; // TODO: Invert for accessibility options
+    let finalMoveX = 0;
+    let finalMoveY = 0;
+
+    const mapping = webState.keyMapping;
+    const isKeyPressed = (keys: string[]): boolean => {
+        return keys.some(key => webState.pressedKeys.has(key));
+    };
+
+    if (isKeyPressed(mapping.forward)) finalMoveY += 1;
+    if (isKeyPressed(mapping.backward)) finalMoveY -= 1;
+    if (isKeyPressed(mapping.left)) finalMoveX -= 1;
+    if (isKeyPressed(mapping.right)) finalMoveX += 1;
+
+    // Normalize diagonal movement
+    if (finalMoveX !== 0 && finalMoveY !== 0) {
+        const len = Math.sqrt(finalMoveX * finalMoveX + finalMoveY * finalMoveY);
+        finalMoveX /= len;
+        finalMoveY /= len;
+    }
 
     if (gamepad) {
         const deadzone = 0.15;
         const dz = (v: number) => Math.abs(v) < deadzone ? 0 : v;
-        const padX = dz(gamepad.axes[2]);
-        const padY = dz(gamepad.axes[3]);
+        const padLookX = dz(gamepad.axes[2]);
+        const padLookY = dz(gamepad.axes[3]);
+        const padMoveX = dz(gamepad.axes[0]);
+        const padMoveY = dz(gamepad.axes[1]);
 
-        if (padX !== 0 || padY !== 0) {
-            finalX = padX;
-            finalY = padY;
+        if (padLookX !== 0 || padLookY !== 0) {
+            finalLookX = padLookX;
+            finalLookY = padLookY;
+        }
+
+        if (padMoveX !== 0 || padMoveY !== 0) {
+            finalMoveX = padMoveX;
+            finalMoveY = padMoveY;
         }
     }
 
     // update core
-    coreState.axes.lookX = finalX;
-    coreState.axes.lookY = finalY;
+    coreState.axes.lookX = finalLookX;
+    coreState.axes.lookY = finalLookY;
+    coreState.axes.moveX = finalMoveX;
+    coreState.axes.moveY = finalMoveY;
 
     // Reset mouse deltas or they repeat frames
     webState.axes.mouseLookX = 0;

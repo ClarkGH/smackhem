@@ -1,21 +1,15 @@
-import type { Renderer, MeshHandle } from '../services/renderer';
-import type { Mat4 } from '../types/common';
-
-import { createCamera, getCameraMatrix } from './camera';
+import type { Renderer } from '../services/renderer';
+import { 
+    createCamera,
+    getCameraMatrix,
+    PLAYER_SPEED,
+    PLAYER_HEIGHT,
+    getCameraForward,
+    getCameraRight,
+} from './camera';
 import { InputState } from './input';
 import { matrixMultiply } from './math';
 import { World } from './world';
-
-export const createIdentityMatrix = (): Mat4 => {
-    const elements = new Float32Array(16);
-
-    elements[0] = 1;
-    elements[5] = 1;
-    elements[10] = 1;
-    elements[15] = 1;
-
-    return { elements };
-}
 
 const FIXED_DT = 1 / 60;
 
@@ -26,10 +20,6 @@ export const createGameLoop = (
     getAspectRatio: () => number
 ) => {
     const camera = createCamera();
-    // TODO: Consider typing more strictly
-    const floorMesh = (renderer as any).createPlaneMesh(10);
-    const cubeMesh  = (renderer as any).createCubeMesh(1);
-    const modelMatrix = createIdentityMatrix();
 
     let accumulator = 0;
 
@@ -42,6 +32,30 @@ export const createGameLoop = (
         // Clamp pitch to prevent flipping (approx 90 degrees)
         const limit = Math.PI / 2 - 0.01;
         camera.pitch = Math.max(-limit, Math.min(limit, camera.pitch));
+
+        // Player movement
+        const moveX = inputState.axes.moveX;
+        const moveY = inputState.axes.moveY;
+        
+        if (moveX !== 0 || moveY !== 0) {
+            const forward = getCameraForward(camera.yaw, camera.pitch);
+            const right = getCameraRight(camera.yaw);
+            
+            // Combine movement vectors
+            const movement = {
+                x: (forward.x * moveY + right.x * moveX) * PLAYER_SPEED * dt,
+                y: 0,
+                z: (forward.z * moveY + right.z * moveX) * PLAYER_SPEED * dt
+            };
+            
+            camera.position.x += movement.x;
+            camera.position.z += movement.z;
+            // Keep player at ground level
+            camera.position.y = PLAYER_HEIGHT;
+        }
+
+        // Update chunk loading/unloading based on player position
+        world.updateActiveChunks(camera.position, renderer);
 
         // Reset transient input
         inputState.axes.lookX = 0;

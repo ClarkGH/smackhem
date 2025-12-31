@@ -5,8 +5,8 @@ export interface InputState {
     axes: {
         lookX: number;
         lookY: number;
-        moveX: -1 | 0 | 1;
-        moveY: -1 | 0 | 1;
+        moveX: number;
+        moveY: number;
     }
 }
 
