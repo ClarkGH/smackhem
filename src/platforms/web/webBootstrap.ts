@@ -20,6 +20,19 @@ export interface PlatformServices {
     getAspectRatio: () => number;
 }
 
+// Simple seeded random number generator for deterministic chunk generation
+export const seededRandom = (seed: number): number => {
+    // Simple hash-based PRNG
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+}
+
+// Generate a seed from chunk coordinates
+/* eslint-disable-next-line no-bitwise */
+export const chunkSeed = (chunkX: number, chunkZ: number): number => {
+    return (chunkX * 73856093) ^ (chunkZ * 19349663);
+}
+
 // Create a chunk procedurally (platform-specific implementation)
 // This will eventually be replaced by asset loading
 export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer): Chunk => {
@@ -38,13 +51,18 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
         },
     ];
 
-    // Random geometric objects with varying sizes
-    const objectCount = Math.floor(Math.random() * 5) + 2; // 2-6 objects per chunk
+    // Deterministic generation based on chunk coordinates
+    const seed = chunkSeed(chunkX, chunkZ);
+    const objectCount = Math.floor(seededRandom(seed) * 5) + 2; // 2-6 objects per chunk
     for (let i = 0; i < objectCount; i += 1) {
-        const offsetX = (Math.random() - 0.5) * 8;
-        const offsetZ = (Math.random() - 0.5) * 8;
-        const type = Math.floor(Math.random() * 4);
-        const size = 0.3 + Math.random() * 1.5; // 0.3 to 1.8
+        const itemSeed = chunkSeed(chunkX + i, chunkZ + i * 7);
+        const offsetX = (seededRandom(itemSeed) - 0.5) * 8;
+        const offsetZSeed = chunkSeed(chunkX + i * 3, chunkZ + i * 11);
+        const offsetZ = (seededRandom(offsetZSeed) - 0.5) * 8;
+        const typeSeed = chunkSeed(chunkX + i * 5, chunkZ + i * 13);
+        const type = Math.floor(seededRandom(typeSeed) * 4);
+        const sizeSeed = chunkSeed(chunkX + i * 7, chunkZ + i * 17);
+        const size = 0.3 + seededRandom(sizeSeed) * 1.5; // 0.3 to 1.8
 
         let mesh;
         let yPos = size / 2;
@@ -75,7 +93,8 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
         );
 
         // Grayscale colors (will be lit by lighting system)
-        const gray = 0.3 + Math.random() * 0.4; // 0.3 to 0.7
+        const graySeed = chunkSeed(chunkX + i * 19, chunkZ + i * 23);
+        const gray = 0.3 + seededRandom(graySeed) * 0.4; // 0.3 to 0.7
         meshes.push({
             mesh,
             transform,
