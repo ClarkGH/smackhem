@@ -42,7 +42,7 @@ Minimalism is key, following YAGNI principles.
 2. Typescript - Language of choice.
 3. Vite - Building/Bundling.
 4. Vitest - Unit testing
-5. ESLint/Prettier - Formatting.
+5. ESLint/Prettier/AirBnB - Formatting.
 6. Node.js/pnpm - Package management.
 7. JSON - Map/Chunk/Asset metadata.
 8. Math - Custom Vec2/Vec3/Mat4
