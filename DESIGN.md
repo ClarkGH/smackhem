@@ -3,10 +3,49 @@
 - First-Person Geometric Exploration Engine
 - Web-First, Platform-Agnostic by Design
 
+## Table of Contents
+
+- [Inspired by](#inspired-by)
+- [Shared features](#shared-features)
+- [The MVP Vision](#the-mvp-vision)
+  - [TBD / Next steps](#tbd--next-steps)
+- [Smackhem – Portability Enforcement Rules](#smackhem--portability-enforcement-rules)
+  - [Purpose](#purpose)
+  - [0. The Prime Directive](#0-the-prime-directive)
+  - [1. Layer Boundaries (Hard Rule)](#1-layer-boundaries-hard-rule)
+  - [2. Rendering Enforcement Rules](#2-rendering-enforcement-rules)
+  - [3. Input Enforcement Rules](#3-input-enforcement-rules)
+  - [4. Time & Simulation Rules](#4-time--simulation-rules)
+  - [5. World & Data Rules](#5-world--data-rules)
+  - [6. Memory & Performance Rules (Console-Safe)](#6-memory--performance-rules-console-safe)
+  - [7. Asset Loading Rules](#7-asset-loading-rules)
+  - [8. Debugging Rules](#8-debugging-rules)
+  - [9. Fake Port Validation Rule](#9-fake-port-validation-rule)
+  - [10. The Final Sanity Check](#10-the-final-sanity-check)
+  - [Closing Statement](#closing-statement)
+- ["Smackhem" Design Principles](#smackhem-design-principles)
+  - [1. Core Goal (Re-Stated)](#1-core-goal-re-stated)
+  - [2. Design Principles (Non-Negotiable)](#2-design-principles-non-negotiable)
+  - [3. Platform Strategy (High Level)](#3-platform-strategy-high-level)
+  - [4. High-Level Architecture](#4-high-level-architecture)
+  - [5. Core Systems](#5-core-systems)
+  - [6. Rendering Layer (Portable by Design)](#6-rendering-layer-portable-by-design)
+  - [7. World System](#7-world-system)
+  - [8. Geometry Rules (Intentional Constraints)](#8-geometry-rules-intentional-constraints)
+  - [9. Camera System (First-Person Focus)](#9-camera-system-first-person-focus)
+  - [10. Input System (Console-Ready)](#10-input-system-console-ready)
+  - [11. Party System (Drakkhen-Style)](#11-party-system-drakkhen-style)
+  - [12. Collision System](#12-collision-system)
+  - [13. Data Formats](#13-data-formats)
+  - [14. Project Structure](#14-project-structure)
+  - [15. What "Snap-On Porting" Actually Means (Honest)](#15-what-snap-on-porting-actually-means-honest)
+  - [16. What We Are Building First (Learning Path)](#16-what-we-are-building-first-learning-path)
+  - [17. Final Ground Rule (Most Important)](#17-final-ground-rule-most-important)
+
 ## Inspired by
 
-Cross Code was made with spit, grit, and javascript. It was ported to consoles and it’s a great game. Since the lead dev is a javascript dude, he’s going to follow their path and do the same thing. We can use OpenGL like them, and do a 2.5D game, OUR WAY (cool emoji the kid’s relate to here, or not).
-Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most confusing games to pick up! But the lead dev thinks there’s something there. We’re taking inspiration and trying to see what we can do with the old magic.
+Cross Code was made with spit, grit, and javascript. It was ported to consoles and it's a great game. Since we're javascript developers, we're going to follow their path and do the same thing. We can use OpenGL like them, and do a 2.5D game, OUR WAY (cool emoji the kid's relate to here, or not).
+Remember Drakkhen? On the Amiga? The Super Nintendo? It's one of the most confusing games to pick up! But we think there's something there. We're taking inspiration and trying to see what we can do with the old magic.
 
 ## Shared features
 
@@ -25,7 +64,7 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most conf
 
 ## The MVP Vision
 
-- Since this is the lead (and only) dev’s first venture into 3D game development We’ve decided to go with only geometric shapes and black/white shades. Lead dev’s going to pretend people will enjoy the demo so much that he’s prepping the game with a rendering layer for console porting.
+- Since this is our first venture into 3D game development, we've decided to go with only geometric shapes and black/white shades. We're going to pretend people will enjoy the demo so much that we're prepping the game with a rendering layer for console porting.
 - The whole RPG experience, in geometric form!
 - No plagiarism, only inspiration.
 - The rounds have been cast out of geometromena, the angled ones rule supreme. Will our circles, ovals, spirals, and parabolics be able to end roundism once and for all? Or will the “cycle” continue, as round things tend to do.
@@ -33,7 +72,7 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It’s one of the most conf
 - Cheeky but appropriate humor. Dad jokes, math jokes, we’re going to make it weird.
 - The game is both 3D and 2D, ala Dragonview and Drakkhen. First person exploration in the main map, until combat or events, then party pops out and fights or has a conversation/investigates.
 - NPC/Enemy/Party AI. Different than Drakkhen. Party will follow the hero, follow turn based commands, or follow set tactics in real time. Enemies/NPCs will do their own thing as set by the game logic.
-- Enter an instance and be shown a 2D scene. If a dunny or explorable place, you can wobble/roll around. Otherwise only the scene.
+- Enter an instance and be shown a 2D scene. If a dunny or explorable place, we can wobble/roll around. Otherwise only the scene.
 - EASIER TO UNDERSTAND UI THAN DRAKKHEN. That game has a terrible UI and we aren’t plagiarizing.
 - Modern, and more intuitive controls.
 - Party character specific loot/gear/equipment.
@@ -308,7 +347,7 @@ If this fails, portability has already been broken.
 
 ### 10. The Final Sanity Check
 
-Before adding any feature, ask:
+Before we add any feature, we ask:
 Could this exist unchanged on a console with no browser, no mouse, and no JIT?
 
 If the answer is:
@@ -502,7 +541,7 @@ This works identically on:
 - No Curves or Smooth Surfaces: The game will strictly use geometric shapes such as cubes, pyramids, prisms, and planes. This constraint is intentional to simplify the design and rendering pipeline, making it easier to batch objects and optimize performance.
 - No Textures: The game will only use solid colors or shaders for visual effects, making it more minimalist and geometric in appearance.
 - 3D Spheres/Organic Shapes: While we've added spheres, they'll be used sparingly for specific objects (e.g., environmental details like orbs), and they won't dominate the design language.
-- 2D simulated 'Spheres' and weird shapes will be a thing. Don't expect much from the lighting, but we'll do what we can because we must. If we can get a weird parabolic squiggle as a playable character, that looks gorgeous with the lighting, I've done my job.
+- 2D simulated 'Spheres' and weird shapes will be a thing. Don't expect much from the lighting, but we'll do what we can because we must. If we can get a weird parabolic squiggle as a playable character, that looks gorgeous with the lighting, we've done our job.
 
 Why:
 
@@ -582,7 +621,7 @@ We need a projection trick value. We set it as -1 to move the original z-value i
 
 `e[11] = projection trick value`
 
-Wherever you are is a silly variable name we're rolling with to do some wonky stuff with right and left handed coordinates. Standby there, brains too tired after learning 3D math.
+Wherever we are is a silly variable name we're rolling with to do some wonky stuff with right and left handed coordinates. Standby there, brains too tired after learning 3D math.
 
 ###### 9.2.4 Direction Vector Formula
 
@@ -632,7 +671,7 @@ Everything we build uses lines
 
 ###### 9.2.8 Translation and Final Matrix
 
-We want to store the inverted position of the camera. View matrices move the world in the opposite direction vs moving the camera. You will always be at "the center".
+We want to store the inverted position of the camera. View matrices move the world in the opposite direction vs moving the camera. We will always be at "the center".
 
 - e[12] to e[14] store the inverted position of the camera.
 
@@ -906,7 +945,7 @@ It does not mean:
 
 That's the win.
 
-### 16. What You Should Build First (Learning Path)
+### 16. What We Are Building First (Learning Path)
 
 1. WebGL renderer (single cube)
    - Uses WebGL2
@@ -923,5 +962,5 @@ If it feels clean, it will port.
 
 ### 17. Final Ground Rule (Most Important)
 
-If something feels convenient but makes the engine aware it’s running in a browser — don’t do it.
+If something feels convenient but makes the engine aware it's running in a browser — we don't do it.
 Web is the current backend, not the identity of the engine.
