@@ -1,4 +1,3 @@
-/* eslint-disable max-classes-per-file */
 import { MeshHandle, Renderer } from '../services/renderer';
 import { Mat4, Vec3 } from '../types/common';
 import AABB from './math/aabb';
