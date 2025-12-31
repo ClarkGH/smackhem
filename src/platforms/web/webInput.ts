@@ -111,7 +111,7 @@ export const syncWebInput = (coreState: InputState, webState: WebInputState) => 
 
         if (padMoveX !== 0 || padMoveY !== 0) {
             finalMoveX = padMoveX;
-            finalMoveY = padMoveY;
+            finalMoveY = -padMoveY;
         }
     }
 

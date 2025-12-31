@@ -4,7 +4,10 @@ import type { Input } from '../../services/input';
 import createGameLoop from '../../core/gameLoop';
 import WebGLRenderer from './webGLRenderer';
 import {
-    World, type Chunk, CHUNK_SIZE, CHUNK_LOAD_RADIUS,
+    World,
+    type Chunk,
+    CHUNK_SIZE,
+    CHUNK_LOAD_RADIUS,
 } from '../../core/world';
 import AABB from '../../core/math/aabb';
 import { createTranslationMatrix } from '../../core/math/mathHelpers';
