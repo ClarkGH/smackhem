@@ -1,23 +1,21 @@
-import { createGameLoop } from '../../core/gameLoop';
-import { WebGLRenderer } from './webGLRenderer';
+import createGameLoop from '../../core/gameLoop';
+import WebGLRenderer from './webGLRenderer';
 import { createInputState } from '../../core/input';
 import { syncWebInput, createWebInputState, setupWebInput } from './webInput';
 import { World } from '../../core/world';
-import { WebClock } from './webClock';
-import { createCamera, PLAYER_HEIGHT } from '../../core/camera';
-
-console.log("Smackhem bootstrapping...");
+import WebClock from './webClock';
+import { createCamera } from '../../core/camera';
 
 // DOM setup
 const canvas = document.createElement('canvas');
-canvas.width = 800;  // TODO: Variable width
+canvas.width = 800; // TODO: Variable width
 canvas.height = 600; // TODO: Variable height
 document.body.appendChild(canvas);
 
 const renderer = new WebGLRenderer(canvas);
 const inputState = createInputState();
 const webInputState = createWebInputState();
-const world = new World;
+const world = new World();
 setupWebInput(canvas, inputState, webInputState);
 
 const initialCamera = createCamera();
@@ -38,7 +36,7 @@ const gameLoop = createGameLoop(
     renderer,
     inputState,
     world,
-    () => canvas.width / canvas.height
+    () => canvas.width / canvas.height,
 );
 
 const loop = () => {

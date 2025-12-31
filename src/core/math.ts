@@ -2,16 +2,21 @@ import type { Mat4, Quaternion, Vec3 } from '../types/common';
 
 export const identity = (): Mat4 => {
     const e = new Float32Array(16);
-    e[0] = e[5] = e[10] = e[15] = 1;
+    e[0] = 1;
+    e[5] = 1;
+    e[10] = 1;
+    e[15] = 1;
     return { elements: e };
-}
+};
 
 export const perspective = (
     fov: number,
     aspect: number,
     near: number,
     far: number,
-    whereEverightYouAre: number, // TODO: Implement left/right-handed coordinate systems for fun
+    // TODO: Implement left/right-handed coordinate systems for fun
+    // eslint-disable-next-line no-unused-vars
+    whereEverYouAre: number,
 ): Mat4 => {
     const f = 1.0 / Math.tan(fov / 2);
     const normalizationFactor = 1 / (near - far);
@@ -25,62 +30,21 @@ export const perspective = (
     e[14] = (2 * far * near) * normalizationFactor; // depth buffer
 
     return { elements: e };
-}
+};
 
-export const lookDirection = (
-    position: Vec3,
-    yaw: number,
-    pitch: number
-): Mat4 => {
-    const rotation = quaternionFromYawPitch(yaw, pitch);
-
-    const right   = quaternionApplyToVector(rotation, { x: 1, y: 0, z: 0 });
-    const up      = quaternionApplyToVector(rotation, { x: 0, y: 1, z: 0 });
-    const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
-    const e = new Float32Array(16);
-
-    // 2. Rotation part (Transpose the camera's orientation)
-    // Column 0
-    e[0] = right.x;
-    e[1] = up.x;
-    e[2] = -forward.x; // TODO: Abstract WEBGL specifics from the camera code. We use -forward because WebGL looks down -Z
-    e[3] = 0;
-
-    // Column 1
-    e[4] = right.y;
-    e[5] = up.y;
-    e[6] = -forward.y;
-    e[7] = 0;
-
-    // Column 2
-    e[8] = right.z;
-    e[9] = up.z;
-    e[10] = -forward.z;
-    e[11] = 0;
-
-    // Translation
-    e[12] = -(right.x * position.x + right.y * position.y + right.z * position.z);
-    e[13] = -(up.x * position.x + up.y * position.y + up.z * position.z);
-    e[14] = (forward.x * position.x + forward.y * position.y + forward.z * position.z);
-    e[15] = 1;
-
-    return { elements: e };
-}
-
-// TODO: Low-priority -> manually set each C-array value for minor performance boost or swap to quaternion rotation.
+// TODO: Low-priority -> manually set each C-array value for minor performance boost.
 export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
     // Variables based on AB = C formula
     const ae = a.elements;
     const be = b.elements;
     const ce = new Float32Array(16);
 
-    for (let i = 0; i < 4; i++) {
-        for (let j = 0; j < 4; j++) {
-            ce[j * 4 + i] =
-            ae[i] * be[j * 4] +
-            ae[i + 4] * be[j * 4 + 1] +
-            ae[i + 8] * be[j * 4 + 2] +
-            ae[i + 12] * be[j * 4 + 3];
+    for (let i = 0; i < 4; i += 1) {
+        for (let j = 0; j < 4; j += 1) {
+            ce[j * 4 + i] = ae[i] * be[j * 4]
+            + ae[i + 4] * be[j * 4 + 1]
+            + ae[i + 8] * be[j * 4 + 2]
+            + ae[i + 12] * be[j * 4 + 3];
         }
     }
 
@@ -100,7 +64,9 @@ export const createTranslationMatrix = (x: number, y: number, z: number): Mat4 =
 };
 
 // Quaternion functions
-export const quaternionIdentity = (): Quaternion => ({ x: 0, y: 0, z: 0, w: 1 });
+export const quaternionIdentity = (): Quaternion => ({
+    x: 0, y: 0, z: 0, w: 1,
+});
 
 export const quaternionNormalize = (q: Quaternion): Quaternion => {
     const len = Math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
@@ -109,18 +75,16 @@ export const quaternionNormalize = (q: Quaternion): Quaternion => {
         x: q.x / len,
         y: q.y / len,
         z: q.z / len,
-        w: q.w / len
+        w: q.w / len,
     };
 };
 
-export const quaternionMultiply = (a: Quaternion, b: Quaternion): Quaternion => {
-    return {
-        x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-        y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-        z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
-        w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
-    };
-};
+export const quaternionMultiply = (a: Quaternion, b: Quaternion): Quaternion => ({
+    x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+    y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+    z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+    w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+});
 
 export const quaternionFromAxisAngle = (axis: Vec3, angle: number): Quaternion => {
     const halfAngle = angle / 2;
@@ -129,15 +93,17 @@ export const quaternionFromAxisAngle = (axis: Vec3, angle: number): Quaternion =
         x: axis.x * s,
         y: axis.y * s,
         z: axis.z * s,
-        w: Math.cos(halfAngle)
+        w: Math.cos(halfAngle),
     });
 };
 
 export const quaternionApplyToVector = (q: Quaternion, v: Vec3): Vec3 => {
     // q * v * q^-1
     // For unit quaternion, q^-1 is the conjugate
-    const qx = q.x, qy = q.y, qz = q.z, qw = q.w;
-    const vx = v.x, vy = v.y, vz = v.z;
+    const qx = q.x; const qy = q.y; const qz = q.z; const
+        qw = q.w;
+    const vx = v.x; const vy = v.y; const
+        vz = v.z;
 
     // q * v (treat v as quaternion with w=0)
     const tx = qw * vx + qy * vz - qz * vy;
@@ -149,7 +115,7 @@ export const quaternionApplyToVector = (q: Quaternion, v: Vec3): Vec3 => {
     return {
         x: tx * qw + tw * -qx + ty * -qz - tz * -qy,
         y: ty * qw + tw * -qy + tz * -qx - tx * -qz,
-        z: tz * qw + tw * -qz + tx * -qy - ty * -qx
+        z: tz * qw + tw * -qz + tx * -qy - ty * -qx,
     };
 };
 
@@ -159,4 +125,48 @@ export const quaternionFromYawPitch = (yaw: number, pitch: number): Quaternion =
     const pitchQuat = quaternionFromAxisAngle({ x: 1, y: 0, z: 0 }, pitch);
 
     return quaternionNormalize(quaternionMultiply(yawQuat, pitchQuat));
+};
+
+export const lookDirection = (
+    position: Vec3,
+    yaw: number,
+    pitch: number,
+): Mat4 => {
+    const rotation = quaternionFromYawPitch(yaw, pitch);
+
+    const right = quaternionApplyToVector(rotation, { x: 1, y: 0, z: 0 });
+    const up = quaternionApplyToVector(rotation, { x: 0, y: 1, z: 0 });
+    const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
+    const e = new Float32Array(16);
+
+    // 2. Rotation part (Transpose the camera's orientation)
+    // Column 0
+    e[0] = right.x;
+    e[1] = up.x;
+    // TODO: Abstract WEBGL specifics from the camera code.
+    // We use -forward because WebGL looks down -Z
+    e[2] = -forward.x;
+    e[3] = 0;
+
+    // Column 1
+    e[4] = right.y;
+    e[5] = up.y;
+    e[6] = -forward.y;
+    e[7] = 0;
+
+    // Column 2
+    e[8] = right.z;
+    e[9] = up.z;
+    e[10] = -forward.z;
+    e[11] = 0;
+
+    // Translation
+    e[12] = -(right.x * position.x + right.y * position.y
+        + right.z * position.z);
+    e[13] = -(up.x * position.x + up.y * position.y + up.z * position.z);
+    e[14] = (forward.x * position.x + forward.y * position.y
+        + forward.z * position.z);
+    e[15] = 1;
+
+    return { elements: e };
 };

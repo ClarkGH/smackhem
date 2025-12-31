@@ -1,5 +1,5 @@
 import type { Renderer } from '../services/renderer';
-import { 
+import {
     createCamera,
     getCameraMatrix,
     PLAYER_SPEED,
@@ -13,11 +13,11 @@ import { World } from './world';
 
 const FIXED_DT = 1 / 60;
 
-export const createGameLoop = (
+const createGameLoop = (
     renderer: Renderer,
     inputState: InputState,
     world: World,
-    getAspectRatio: () => number
+    getAspectRatio: () => number,
 ) => {
     const camera = createCamera();
 
@@ -34,20 +34,20 @@ export const createGameLoop = (
         camera.pitch = Math.max(-limit, Math.min(limit, camera.pitch));
 
         // Player movement
-        const moveX = inputState.axes.moveX;
-        const moveY = inputState.axes.moveY;
-        
+        const { moveX } = inputState.axes;
+        const { moveY } = inputState.axes;
+
         if (moveX !== 0 || moveY !== 0) {
             const forward = getCameraForward(camera.yaw, camera.pitch);
             const right = getCameraRight(camera.yaw);
-            
+
             // Combine movement vectors
             const movement = {
                 x: (forward.x * moveY + right.x * moveX) * PLAYER_SPEED * dt,
                 y: 0,
-                z: (forward.z * moveY + right.z * moveX) * PLAYER_SPEED * dt
+                z: (forward.z * moveY + right.z * moveX) * PLAYER_SPEED * dt,
             };
-            
+
             camera.position.x += movement.x;
             camera.position.z += movement.z;
             // Keep player at ground level
@@ -76,13 +76,16 @@ export const createGameLoop = (
         const aspect = getAspectRatio();
         const viewProj = getCameraMatrix(camera, aspect);
 
-        for (const sm of world.getVisibleMeshes()) {
+        const visibleMeshes = world.getVisibleMeshes();
+        visibleMeshes.forEach((sm) => {
             const mvp = matrixMultiply(viewProj, sm.transform);
             renderer.drawMesh(sm.mesh, mvp, sm.color);
-        }
+        });
 
         renderer.endFrame();
     };
 
     return { update, render };
 };
+
+export default createGameLoop;

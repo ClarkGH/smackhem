@@ -1,7 +1,8 @@
-import { InputState } from '../../core/input';
-import { createGameLoop } from '../../core/gameLoop';
-import { NullRenderer } from './nullRenderer';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { describe, it, expect } from 'vitest';
+import { InputState } from '../../core/input';
+import createGameLoop from '../../core/gameLoop';
+import NullRenderer from './nullRenderer';
 import { World } from '../../core/world';
 
 describe('Deletion test', () => {
@@ -13,8 +14,10 @@ describe('Deletion test', () => {
             actions: { Look: true },
             axes: {
                 lookX: 0,
-                lookY: 0
-            }
+                lookY: 0,
+                moveX: 0,
+                moveY: 0,
+            },
         };
         const mockWorld : World = new World();
 

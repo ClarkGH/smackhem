@@ -1,3 +1,5 @@
+import type { Chunk } from '../core/world';
+
 export interface MapData {
     id: string;
     chunks: Chunk[];

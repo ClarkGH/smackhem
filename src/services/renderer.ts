@@ -1,4 +1,4 @@
-import { Mat4, Vec3 } from "../types/common";
+import { Mat4, Vec3 } from '../types/common';
 
 export interface MeshHandle {
     // Placeholder type for mesh references
@@ -7,7 +7,9 @@ export interface MeshHandle {
 
 export interface Renderer {
     beginFrame(): void;
-    drawMesh(mesh: MeshHandle, transform: Mat4, color: Vec3): void;
+    // eslint-disable-next-line no-unused-vars
+    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3): void;
     endFrame(): void;
-    setWireframe(enabled: boolean): void;
+    // eslint-disable-next-line no-unused-vars
+    setWireframe(_enabled: boolean): void;
 }

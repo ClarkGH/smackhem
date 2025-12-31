@@ -1,4 +1,4 @@
-import { InputState } from "../../core/input";
+import { InputState } from '../../core/input';
 
 export interface KeyMapping {
     forward: string[];
@@ -30,42 +30,42 @@ export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => (
         mouseLookX: 0,
         mouseLookY: 0,
         padLookX: 0,
-        padLookY: 0
+        padLookY: 0,
     },
     pressedKeys: new Set<string>(),
-    keyMapping: keyMapping || DEFAULT_KEY_MAPPING
+    keyMapping: keyMapping || DEFAULT_KEY_MAPPING,
 });
 
 export const setupWebInput = (
     canvas: HTMLCanvasElement,
     core: InputState,
-    web: WebInputState
+    webState: WebInputState,
 ) => {
-    canvas.addEventListener("mousemove", e => {
-        web.axes.mouseLookX = e.movementX;
-        web.axes.mouseLookY = e.movementY;
+    canvas.addEventListener('mousemove', (e) => {
+        webState.axes.mouseLookX = e.movementX;
+        webState.axes.mouseLookY = e.movementY;
     });
 
     const handleKeyDown = (e: KeyboardEvent) => {
-        web.pressedKeys.add(e.key);
+        webState.pressedKeys.add(e.key);
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-        web.pressedKeys.delete(e.key);
+        webState.pressedKeys.delete(e.key);
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
-    canvas.addEventListener("click", () => {
+    canvas.addEventListener('click', () => {
         canvas.requestPointerLock();
     });
 
-    window.addEventListener("gamepadconnected", e => {
+    window.addEventListener('gamepadconnected', (e) => {
         console.log(`Gamepad connected: ${e.gamepad.id}`);
     });
 
-    window.addEventListener("gamepadisconnected", e => {
+    window.addEventListener('gamepadisconnected', (e) => {
         const event = e as GamepadEvent;
         console.log(`Gamepad disconnected: ${event.gamepad.id}`);
     });
@@ -80,9 +80,9 @@ export const syncWebInput = (coreState: InputState, webState: WebInputState) => 
     let finalMoveY = 0;
 
     const mapping = webState.keyMapping;
-    const isKeyPressed = (keys: string[]): boolean => {
-        return keys.some(key => webState.pressedKeys.has(key));
-    };
+    const isKeyPressed = (keys: string[]): boolean => keys.some(
+        (key) => webState.pressedKeys.has(key),
+    );
 
     if (isKeyPressed(mapping.forward)) finalMoveY += 1;
     if (isKeyPressed(mapping.backward)) finalMoveY -= 1;
@@ -98,7 +98,7 @@ export const syncWebInput = (coreState: InputState, webState: WebInputState) => 
 
     if (gamepad) {
         const deadzone = 0.15;
-        const dz = (v: number) => Math.abs(v) < deadzone ? 0 : v;
+        const dz = (v: number) => (Math.abs(v) < deadzone ? 0 : v);
         const padLookX = dz(gamepad.axes[2]);
         const padLookY = dz(gamepad.axes[3]);
         const padMoveX = dz(gamepad.axes[0]);

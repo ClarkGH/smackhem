@@ -1,6 +1,7 @@
-import { MapData } from "../types/common";
+import { MapData } from '../types/common';
 
 export interface AssetLoader {
-    loadMap(id: string): Promise<MapData>;
+    // eslint-disable-next-line no-unused-vars
+    loadMap(_id: string): Promise<MapData>;
     // Add other asset loading methods
 }

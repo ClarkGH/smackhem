@@ -7,8 +7,16 @@
   },
   "plugins": ["@typescript-eslint"],
   "extends": [
-    "eslint:recommended"
+    "eslint:recommended",
+    "airbnb-base"
   ],
+  "settings": {
+    "import/resolver": {
+      "typescript": {
+        "alwaysTryTypes": true
+      }
+    }
+  },
   "rules": {
     "no-trailing-spaces": "error",
     "indent": ["error", 4, {
@@ -16,7 +24,12 @@
     }],
     "func-style": ["error", "expression", {
       "allowArrowFunctions": true
-    }]
+    }],
+    "import/extensions": ["error", "ignorePackages", {
+      "ts": "never"
+    }],
+    "no-param-reassign": "off",
+    "no-console": "off"
   },
   "env": {
     "browser": true,

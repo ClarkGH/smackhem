@@ -6,12 +6,17 @@ interface WebGLMesh {
     vertexCount: number;
 }
 
-export class WebGLRenderer implements Renderer {
+export default class WebGLRenderer implements Renderer {
     private gl: WebGL2RenderingContext;
+
     private canvas: HTMLCanvasElement;
+
     private program: WebGLProgram | null = null;
+
     private meshes: Map<string, WebGLMesh> = new Map();
+
     private wireframe: boolean = false;
+
     private meshCache = new Map<string, MeshHandle>();
 
     constructor(canvas: HTMLCanvasElement) {
@@ -22,7 +27,7 @@ export class WebGLRenderer implements Renderer {
         }
 
         this.gl = gl;
-        this.gl.clearColor(38/255, 151/255, 121/255, 1);
+        this.gl.clearColor(160 / 255, 160 / 255, 160 / 255, 1);
 
         // Set viewport
         this.gl.viewport(0, 0, canvas.width, canvas.height);
@@ -84,7 +89,10 @@ export class WebGLRenderer implements Renderer {
         return shader;
     }
 
-    private createProgram(vertexShader: WebGLShader, fragmentShader: WebGLShader): WebGLProgram | null {
+    private createProgram(
+        vertexShader: WebGLShader,
+        fragmentShader: WebGLShader,
+    ): WebGLProgram | null {
         const program = this.gl.createProgram();
         if (!program) return null;
 
@@ -103,20 +111,20 @@ export class WebGLRenderer implements Renderer {
     }
 
     private createMesh(vertices: Float32Array): MeshHandle {
-        const gl = this.gl;
+        const { gl } = this;
 
         const vao = gl.createVertexArray();
-        if (!vao) throw new Error("Failed to create VAO");
+        if (!vao) throw new Error('Failed to create VAO');
 
         gl.bindVertexArray(vao);
 
         const vbo = gl.createBuffer();
-        if (!vbo) throw new Error("Failed to create VBO");
+        if (!vbo) throw new Error('Failed to create VBO');
 
         gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
         gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-        const positionLoc = gl.getAttribLocation(this.program!, "a_position");
+        const positionLoc = gl.getAttribLocation(this.program!, 'a_position');
         gl.enableVertexAttribArray(positionLoc);
         gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 0, 0);
 
@@ -126,7 +134,7 @@ export class WebGLRenderer implements Renderer {
 
         this.meshes.set(id, {
             vao,
-            vertexCount: vertices.length / 3
+            vertexCount: vertices.length / 3,
         });
 
         return { id };
@@ -144,11 +152,11 @@ export class WebGLRenderer implements Renderer {
         const vertices = new Float32Array([
             -h, 0, -h,
             h, 0, -h,
-            h, 0,  h,
+            h, 0, h,
 
             -h, 0, -h,
-            h, 0,  h,
-            -h, 0,  h,
+            h, 0, h,
+            -h, 0, h,
         ]);
 
         const mesh = this.createMesh(vertices);
@@ -169,28 +177,28 @@ export class WebGLRenderer implements Renderer {
         // 6 faces × 2 triangles × 3 vertices
         const vertices = new Float32Array([
             // Front
-            -h,-h, h,   h,-h, h,   h, h, h,
-            -h,-h, h,   h, h, h,  -h, h, h,
+            -h, -h, h, h, -h, h, h, h, h,
+            -h, -h, h, h, h, h, -h, h, h,
 
             // Back
-            -h,-h,-h,  -h, h,-h,   h, h,-h,
-            -h,-h,-h,   h, h,-h,   h,-h,-h,
+            -h, -h, -h, -h, h, -h, h, h, -h,
+            -h, -h, -h, h, h, -h, h, -h, -h,
 
             // Left
-            -h,-h,-h,  -h,-h, h,  -h, h, h,
-            -h,-h,-h,  -h, h, h,  -h, h,-h,
+            -h, -h, -h, -h, -h, h, -h, h, h,
+            -h, -h, -h, -h, h, h, -h, h, -h,
 
             // Right
-            h,-h,-h,   h, h,-h,   h, h, h,
-            h,-h,-h,   h, h, h,   h,-h, h,
+            h, -h, -h, h, h, -h, h, h, h,
+            h, -h, -h, h, h, h, h, -h, h,
 
             // Top
-            -h, h,-h,  -h, h, h,   h, h, h,
-            -h, h,-h,   h, h, h,   h, h,-h,
+            -h, h, -h, -h, h, h, h, h, h,
+            -h, h, -h, h, h, h, h, h, -h,
 
             // Bottom
-            -h,-h,-h,   h,-h,-h,   h,-h, h,
-            -h,-h,-h,   h,-h, h,  -h,-h, h,
+            -h, -h, -h, h, -h, -h, h, -h, h,
+            -h, -h, -h, h, -h, h, -h, -h, h,
         ]);
 
         const mesh = this.createMesh(vertices);
@@ -203,6 +211,7 @@ export class WebGLRenderer implements Renderer {
     beginFrame(): void {
         // Update viewport in case canvas was resized
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        // eslint-disable-next-line no-bitwise
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     }
 
@@ -235,6 +244,7 @@ export class WebGLRenderer implements Renderer {
         this.gl.bindVertexArray(null);
     }
 
+    // eslint-disable-next-line class-methods-use-this
     endFrame(): void {
         // Present frame (WebGL handles this automatically)
     }

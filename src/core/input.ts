@@ -16,6 +16,6 @@ export const createInputState = (): InputState => ({
         lookX: 0,
         lookY: 0,
         moveX: 0,
-        moveY: 0
-    }
+        moveY: 0,
+    },
 });

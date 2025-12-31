@@ -1,8 +1,10 @@
 import type { Clock } from '../../services/clock';
 
-export class WebClock implements Clock {
+export default class WebClock implements Clock {
     private currentTime: number = 0;
+
     private lastTime: number = 0;
+
     private deltaTime: number = 0;
 
     constructor() {

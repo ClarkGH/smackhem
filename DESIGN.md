@@ -912,14 +912,26 @@ src/
 ├─ platforms/
 │  ├─ web/
 │  │  ├─ webBootstrap.ts    # Bootstraps the webGL game engine
+│  │  ├─ webClock.ts        # Web platform clock implementation
 │  │  ├─ webGLRenderer.ts   # Renderer specifically for webGL
 │  │  └─ webInput.ts        # Input as it relates specifically to webGL
-│  └─ (...unpublished :D)
+│  └─ stub/
+│     ├─ nullRenderer.ts    # Stub renderer for testing/validation
+│     └─ nullRenderer.spec.ts # Tests for stub renderer
 │
 ├─ types/
 │  └─ common.d.ts           # Common type definitions
+├─ index.html               # HTML entry point for web platform
 └─ main.ts                  # Entry point
 ```
+
+Root level configuration:
+- `package.json` - Project dependencies and scripts
+- `pnpm-lock.yaml` - Dependency lock file
+- `tsconfig.json` - TypeScript configuration
+- `vite.config.mts` - Vite build configuration
+- `LICENSE` - Project license
+- `README.md` - Project documentation
 
 Future:
 
