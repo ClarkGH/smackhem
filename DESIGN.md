@@ -855,7 +855,7 @@ interface PartyMember {
   - When entering an instance (such as a dungeon or explorable area), the game will switch to a 2D view where the party remains in the scene. The player will not be able to return to first-person exploration during this time.
   - The party will always be displayed as 2D characters when in combat or exploration mode inside an instance.
   - The 3D landscape and any buildings are part of the geometry, but party models and enemies will always remain 2D.
-  - Collisions and interaction mechanics will still be governed by the same 3D world logic but applied in the 2D instance (i.e., no physical simulation in the 3D world when in instances, but standard 2D interaction applies).
+  - Collisions and interaction mechanAABBics will still be governed by the same 3D world logic but applied in the 2D instance (i.e., no physical simulation in the 3D world when in instances, but standard 2D interaction applies).
 - Offsets are relative, not simulated
 - NPCs and enemies will be 2D models with simple AI patterns that follow set behaviors, including spawning, patrolling, attacking, and reacting to player presence.
 - Enemy movement will be constrained to the 2D plane, and they will collide with some 3D environmental features.
@@ -864,7 +864,7 @@ This is cheap, readable, and portable.
 
 ### 12. Collision System
 
-- Manual AABB checks.
+- Manual (Axis-Aligned Bounding Box) checks.
 - 3D camera vs world collision.
 - Player vs world.
 - No physics engine.
@@ -926,6 +926,7 @@ src/
 ```
 
 Root level configuration:
+
 - `package.json` - Project dependencies and scripts
 - `pnpm-lock.yaml` - Dependency lock file
 - `tsconfig.json` - TypeScript configuration
