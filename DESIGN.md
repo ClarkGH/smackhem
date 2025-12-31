@@ -903,7 +903,6 @@ Pure data. No logic. Portable forever.
 src/
 ├─ core/
 │  ├─ camera.ts           # 3D camera math and logic
-│  ├─ collision.ts        # AABB logic
 │  ├─ gameLoop.ts         # Game loop logic
 │  ├─ input.ts            # Player input logic
 │  ├─ party.ts            # Party Logic
