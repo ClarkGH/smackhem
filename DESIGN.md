@@ -899,6 +899,7 @@ Pure data. No logic. Portable forever.
 src/
 ├─ core/
 │  ├─ camera.ts           # 3D camera math and logic
+│  ├─ collision.ts        # AABB logic
 │  ├─ gameLoop.ts         # Game loop logic
 │  ├─ input.ts            # Player input logic
 │  ├─ math.ts             # Shared engine math logic
