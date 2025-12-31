@@ -895,6 +895,10 @@ Pure data. No logic. Portable forever.
 
 ### 14. Project Structure
 
+- TS files use camel case
+- Every TS file will have a unique name. Vite has some issues with files that share names.
+- Core files get "dibs on" generic naming
+
 ```text
 src/
 ├─ core/
@@ -902,9 +906,11 @@ src/
 │  ├─ collision.ts        # AABB logic
 │  ├─ gameLoop.ts         # Game loop logic
 │  ├─ input.ts            # Player input logic
-│  ├─ math.ts             # Shared engine math logic
 │  ├─ party.ts            # Party Logic
-│  └─ world.ts            # World and chunking logic
+│  ├─ world.ts            # World and chunking logic
+│  └─ math/               # Shared engine math logic
+│     ├─ aabb.ts          # axis aligned bounding box
+│     └─ mathHelpers.ts   # matrix/vector/etc math helper methods
 ├─ services/
 │  ├─ renderer.ts         # Abstract Renderer interface
 │  ├─ input.ts            # Abstract Input service

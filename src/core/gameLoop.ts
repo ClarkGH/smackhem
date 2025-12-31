@@ -8,7 +8,7 @@ import {
     getCameraRight,
 } from './camera';
 import { InputState } from './input';
-import { matrixMultiply } from './math';
+import { matrixMultiply } from './math/mathHelpers';
 import { World } from './world';
 
 const FIXED_DT = 1 / 60;

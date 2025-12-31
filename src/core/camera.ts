@@ -4,7 +4,7 @@ import {
     matrixMultiply,
     quaternionFromYawPitch,
     quaternionApplyToVector,
-} from './math';
+} from './math/mathHelpers';
 import type { Mat4, Vec3 } from '../types/common';
 
 export interface Camera {

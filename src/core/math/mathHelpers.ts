@@ -1,4 +1,4 @@
-import type { Mat4, Quaternion, Vec3 } from '../types/common';
+import type { Mat4, Quaternion, Vec3 } from '../../types/common';
 
 export const identity = (): Mat4 => {
     const e = new Float32Array(16);

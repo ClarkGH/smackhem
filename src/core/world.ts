@@ -1,8 +1,8 @@
 /* eslint-disable max-classes-per-file */
 import { MeshHandle, Renderer } from '../services/renderer';
 import { Mat4, Vec3 } from '../types/common';
-import AABB from './aabb';
-import { createTranslationMatrix } from './math';
+import AABB from './math/aabb';
+import { createTranslationMatrix } from './math/mathHelpers';
 
 // TODO: We may want to move this and other typing/interface namespaces
 // to common classes down the line.
