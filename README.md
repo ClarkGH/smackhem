@@ -15,7 +15,7 @@ Inspired by crosscode's use of web technologies. Since that's what I'm comfortab
 
 As this is hosted publicly, it's a hobby project.
 
-It's been years of studying 3D. I still haven't pinned down what a quaternion is.
+It's been 5 years of studying 3D. I can now say I've "put a pin" on quaternions.
 
 ## Project layout
 
