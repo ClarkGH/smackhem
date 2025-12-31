@@ -22,7 +22,7 @@ export const setupWebInput = (
     canvas: HTMLCanvasElement,
     core: InputState,
     web: WebInputState
-  ) => {
+) => {
     canvas.addEventListener("mousemove", e => {
         web.axes.mouseLookX = e.movementX;
         web.axes.mouseLookY = e.movementY;

@@ -155,7 +155,7 @@ export const quaternionApplyToVector = (q: Quaternion, v: Vec3): Vec3 => {
 
 export const quaternionFromYawPitch = (yaw: number, pitch: number): Quaternion => {
     const yawQuat = quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, -yaw);
-    
+
     const pitchQuat = quaternionFromAxisAngle({ x: 1, y: 0, z: 0 }, pitch);
 
     return quaternionNormalize(quaternionMultiply(yawQuat, pitchQuat));

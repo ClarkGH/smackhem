@@ -17,7 +17,7 @@ const renderer = new WebGLRenderer(canvas);
 const inputState = createInputState();  // core
 const webInputState = createWebInputState();  // platform
 const world = new World;
-setupWebInput(canvas, inputState, webInputState); 
+setupWebInput(canvas, inputState, webInputState);
 
 // Temporary world chunk data
 const chunkId = world.getChunkID(0, 0);

@@ -56,5 +56,5 @@ export const createGameLoop = (
         // Reset transient input
         inputState.axes.lookX = 0;
         inputState.axes.lookY = 0;
-  };
+    };
 };

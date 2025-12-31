@@ -23,7 +23,7 @@ export class WebGLRenderer implements Renderer {
 
         this.gl = gl;
         this.gl.clearColor(38/255, 151/255, 121/255, 1);
-  
+
         // Set viewport
         this.gl.viewport(0, 0, canvas.width, canvas.height);
 
@@ -143,11 +143,11 @@ export class WebGLRenderer implements Renderer {
         // Two triangles, XZ plane, Y = 0
         const vertices = new Float32Array([
             -h, 0, -h,
-             h, 0, -h,
-             h, 0,  h,
+            h, 0, -h,
+            h, 0,  h,
 
             -h, 0, -h,
-             h, 0,  h,
+            h, 0,  h,
             -h, 0,  h,
         ]);
 
@@ -179,10 +179,10 @@ export class WebGLRenderer implements Renderer {
             // Left
             -h,-h,-h,  -h,-h, h,  -h, h, h,
             -h,-h,-h,  -h, h, h,  -h, h,-h,
-    
+
             // Right
-             h,-h,-h,   h, h,-h,   h, h, h,
-             h,-h,-h,   h, h, h,   h,-h, h,
+            h,-h,-h,   h, h,-h,   h, h, h,
+            h,-h,-h,   h, h, h,   h,-h, h,
 
             // Top
             -h, h,-h,  -h, h, h,   h, h, h,
