@@ -41,9 +41,10 @@ export const getMeshAABB = (mesh: StaticMesh, meshSize: number): AABB => {
     );
 };
 
-export const checkCollision = (playerAABB: AABB, worldAABB: AABB): boolean => {
-    return playerAABB.intersects(worldAABB);
-};
+export const checkCollision = (
+    playerAABB: AABB,
+    worldAABB: AABB,
+): boolean => playerAABB.intersects(worldAABB);
 
 export const resolveCollision = (
     playerPos: Vec3,
@@ -61,8 +62,8 @@ export const resolveCollision = (
     const playerAABB = getPlayerAABB(newPos, playerHeight, playerRadius);
 
     let hasCollision = false;
-    for (const worldAABB of worldAABBs) {
-        if (checkCollision(playerAABB, worldAABB)) {
+    for (let i = 0; i < worldAABBs.length; i += 1) {
+        if (checkCollision(playerAABB, worldAABBs[i])) {
             hasCollision = true;
             break;
         }
@@ -80,8 +81,8 @@ export const resolveCollision = (
     };
     const xOnlyAABB = getPlayerAABB(xOnlyPos, playerHeight, playerRadius);
     let xCollision = false;
-    for (const worldAABB of worldAABBs) {
-        if (checkCollision(xOnlyAABB, worldAABB)) {
+    for (let i = 0; i < worldAABBs.length; i += 1) {
+        if (checkCollision(xOnlyAABB, worldAABBs[i])) {
             xCollision = true;
             break;
         }
@@ -95,8 +96,8 @@ export const resolveCollision = (
     };
     const zOnlyAABB = getPlayerAABB(zOnlyPos, playerHeight, playerRadius);
     let zCollision = false;
-    for (const worldAABB of worldAABBs) {
-        if (checkCollision(zOnlyAABB, worldAABB)) {
+    for (let i = 0; i < worldAABBs.length; i += 1) {
+        if (checkCollision(zOnlyAABB, worldAABBs[i])) {
             zCollision = true;
             break;
         }

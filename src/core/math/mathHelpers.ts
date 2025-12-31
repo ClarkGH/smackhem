@@ -175,3 +175,47 @@ export const extractPosition = (matrix: Mat4): Vec3 => ({
     y: matrix.elements[13],
     z: matrix.elements[14],
 });
+
+// Matrix transpose
+export const matrixTranspose = (m: Mat4): Mat4 => {
+    const e = m.elements;
+    const result = new Float32Array(16);
+
+    for (let i = 0; i < 4; i += 1) {
+        for (let j = 0; j < 4; j += 1) {
+            result[i * 4 + j] = e[j * 4 + i];
+        }
+    }
+
+    return { elements: result };
+};
+
+// Matrix inverse (for 4x4 matrices, simplified for translation + rotation)
+export const matrixInverse = (m: Mat4): Mat4 => {
+    const e = m.elements;
+    const result = new Float32Array(16);
+
+    // Extract rotation part (3x3 upper-left)
+    const r00 = e[0]; const r01 = e[4]; const r02 = e[8];
+    const r10 = e[1]; const r11 = e[5]; const r12 = e[9];
+    const r20 = e[2]; const r21 = e[6]; const r22 = e[10];
+
+    // Extract translation
+    const tx = e[12];
+    const ty = e[13];
+    const tz = e[14];
+
+    // Transpose rotation (inverse of rotation matrix)
+    result[0] = r00; result[4] = r01; result[8] = r02;
+    result[1] = r10; result[5] = r11; result[9] = r12;
+    result[2] = r20; result[6] = r21; result[10] = r22;
+    result[3] = 0; result[7] = 0; result[11] = 0;
+
+    // Inverse translation: -R^T * t
+    result[12] = -(r00 * tx + r01 * ty + r02 * tz);
+    result[13] = -(r10 * tx + r11 * ty + r12 * tz);
+    result[14] = -(r20 * tx + r21 * ty + r22 * tz);
+    result[15] = 1;
+
+    return { elements: result };
+};

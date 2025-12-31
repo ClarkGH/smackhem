@@ -21,8 +21,10 @@ export const PLAYER_HEIGHT = 1.6;
 export const PLAYER_RADIUS = 0.3; // Player collision radius (half-width)
 export const PLAYER_SPEED = 10.0; // units per second
 
+export const INITIAL_PLAYER_POSITION: Vec3 = { x: 0, y: PLAYER_HEIGHT, z: 2 };
+
 export const createCamera = (): Camera => ({
-    position: { x: 0, y: PLAYER_HEIGHT, z: 2 },
+    position: { ...INITIAL_PLAYER_POSITION },
     yaw: 0,
     pitch: 0,
     fov: Math.PI / 3, // TODO: Add variable fov from state

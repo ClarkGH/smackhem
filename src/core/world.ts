@@ -77,11 +77,61 @@ export class World {
         const chunkCenterZ = chunkZ * CHUNK_SIZE;
 
         const floorTransform = createTranslationMatrix(chunkCenterX, 0, chunkCenterZ);
-        const cubeTransform = createTranslationMatrix(chunkCenterX, 0.5, chunkCenterZ);
+        const floorMesh = renderer.createPlaneMesh(10);
 
-        // TODO: Consider typing more strictly
-        const floorMesh = (renderer as any).createPlaneMesh(10);
-        const cubeMesh = (renderer as any).createCubeMesh(1);
+        const meshes: StaticMesh[] = [
+            // Floor (grayscale for lighting)
+            {
+                mesh: floorMesh,
+                transform: floorTransform,
+                color: { x: 0.4, y: 0.4, z: 0.4 },
+            },
+        ];
+
+        // Random geometric objects with varying sizes
+        const objectCount = Math.floor(Math.random() * 5) + 2; // 2-6 objects per chunk
+        for (let i = 0; i < objectCount; i += 1) {
+            const offsetX = (Math.random() - 0.5) * 8;
+            const offsetZ = (Math.random() - 0.5) * 8;
+            const type = Math.floor(Math.random() * 4);
+            const size = 0.3 + Math.random() * 1.5; // 0.3 to 1.8
+
+            let mesh: MeshHandle;
+            let yPos = size / 2;
+
+            switch (type) {
+                case 0: // Cube
+                    mesh = renderer.createCubeMesh(size);
+                    break;
+                case 1: // Pyramid
+                    mesh = renderer.createPyramidMesh(size);
+                    yPos = size * 0.6; // Adjust for pyramid height
+                    break;
+                case 2: // Prism
+                    mesh = renderer.createPrismMesh(size, size * 1.5, size * 0.8);
+                    yPos = (size * 1.5) / 2;
+                    break;
+                case 3: // Sphere
+                    mesh = renderer.createSphereMesh(size / 2, 12);
+                    break;
+                default:
+                    mesh = renderer.createCubeMesh(size);
+            }
+
+            const transform = createTranslationMatrix(
+                chunkCenterX + offsetX,
+                yPos,
+                chunkCenterZ + offsetZ,
+            );
+
+            // Grayscale colors (will be lit by lighting system)
+            const gray = 0.3 + Math.random() * 0.4; // 0.3 to 0.7
+            meshes.push({
+                mesh,
+                transform,
+                color: { x: gray, y: gray, z: gray },
+            });
+        }
 
         const chunkId = World.getChunkID(chunkX, chunkZ);
 
@@ -91,20 +141,7 @@ export class World {
                 { x: chunkCenterX - 5, y: -1, z: chunkCenterZ - 5 },
                 { x: chunkCenterX + 5, y: 5, z: chunkCenterZ + 5 },
             ),
-            meshes: [
-                // Floor (purple)
-                {
-                    mesh: floorMesh,
-                    transform: floorTransform,
-                    color: { x: 0.5, y: 0, z: 0.5 },
-                },
-                // Cube (neon green)
-                {
-                    mesh: cubeMesh,
-                    transform: cubeTransform,
-                    color: { x: 0.2, y: 0.8, z: 0.3 },
-                },
-            ],
+            meshes,
         };
     }
 

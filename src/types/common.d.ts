@@ -1,5 +1,11 @@
 import type { Chunk } from '../core/world';
 
+// Global defined by vite config via define
+declare global {
+    // eslint-disable-next-line no-var, no-underscore-dangle, vars-on-top, no-unused-vars
+    var __PLATFORM__: string | undefined;
+}
+
 export interface MapData {
     id: string;
     chunks: Chunk[];

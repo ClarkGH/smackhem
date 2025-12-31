@@ -479,7 +479,7 @@ interface Renderer {
 - Uses WebGL2
 - One shader pair
 - No textures
-- No lighting
+- **Grayscale directional lighting** (ambient + diffuse)
 - Depth test only
 
 #### 6.3 Future Native Renderer
@@ -803,6 +803,91 @@ Row major skips full row of size N to reach the correct row, then adds the colum
 Column major skips full columns of size M to reach the correct column then adds the row offset
 
 - Column Major = B + W * [(j - L_c) * M + (j - L_r)]
+```
+
+###### 9.2.10 Lighting System (Grayscale)
+
+**Directional Light Direction**
+Light direction is a normalized 3D vector pointing from the light source toward the scene.
+For a sun in the east casting light westward:
+```
+lightDirection = normalize({x: -1, y: 0.2, z: 0})
+```
+
+**Lambertian Diffuse Lighting**
+Diffuse lighting calculation:
+```
+dotProduct = dot(surfaceNormal, -lightDirection)
+diffuse = max(dotProduct, 0.0)
+```
+
+**Final Lighting Calculation**
+Combines ambient and diffuse lighting:
+```
+lighting = ambientIntensity + diffuse * (1.0 - ambientIntensity)
+finalColor = baseColor * lightColor * lighting
+```
+
+Where:
+- `ambientIntensity` = 0.3 (30% ambient light)
+- `lightColor` = {1, 1, 1} (white light, grayscale)
+- `baseColor` = mesh color (grayscale values)
+
+**Normal Transformation**
+Surface normals must be transformed by the inverse transpose of the model matrix:
+```
+normalMatrix = transpose(inverse(modelMatrix))
+transformedNormal = normalize(normalMatrix * normal)
+```
+
+**Normal Calculation from Triangle**
+For a triangle with vertices v0, v1, v2:
+```
+edge1 = v1 - v0
+edge2 = v2 - v0
+normal = normalize(cross(edge1, edge2))
+```
+
+###### 9.2.11 Geometric Mesh Generation
+
+**Cube Mesh**
+For a cube of size `s`, centered at origin:
+```
+half = s / 2
+vertices = [
+    // 6 faces × 2 triangles × 3 vertices = 36 vertices
+    // Each face: two triangles forming a square
+]
+```
+
+**Pyramid Mesh**
+For a pyramid of base size `s` and height `h`:
+```
+half = s / 2
+apex = h
+// Base: square (2 triangles)
+// 4 faces: triangles from base corners to apex
+```
+
+**Sphere Mesh (UV Sphere)**
+For a sphere of radius `r` with `segments` divisions:
+```
+for lat = 0 to segments:
+    theta = (lat * π) / segments
+    for lon = 0 to segments:
+        phi = (lon * 2π) / segments
+        x = r * cos(phi) * sin(theta)
+        y = r * cos(theta)
+        z = r * sin(phi) * sin(theta)
+```
+
+**Prism Mesh**
+For a rectangular prism of width `w`, height `h`, depth `d`:
+```
+halfW = w / 2
+halfH = h / 2
+halfD = d / 2
+// 6 rectangular faces, each as 2 triangles
 ```
 
 ### 10. Input System (Console-Ready)

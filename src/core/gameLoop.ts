@@ -1,4 +1,5 @@
 import type { Renderer } from '../services/renderer';
+import type { Input } from '../services/input';
 import {
     createCamera,
     getCameraMatrix,
@@ -9,7 +10,6 @@ import {
     getCameraRight,
 } from './camera';
 import { resolveCollision } from './collision';
-import { InputState } from './input';
 import { matrixMultiply } from './math/mathHelpers';
 import { World } from './world';
 
@@ -17,27 +17,33 @@ const FIXED_DT = 1 / 60;
 
 const createGameLoop = (
     renderer: Renderer,
-    inputState: InputState,
+    input: Input,
     world: World,
     getAspectRatio: () => number,
 ) => {
     const camera = createCamera();
 
+    // Set light direction from east (westward with slight upward angle)
+    const lightDirection = { x: -1, y: 0.2, z: 0 };
+    if (renderer.setLightDirection) {
+        renderer.setLightDirection(lightDirection);
+    }
+
     let accumulator = 0;
 
     const updateSimulation = (dt: number) => {
         // Fixed timestep simulation updates
+        const intent = input.getIntent();
         const sensitivity = 0.005;
-        camera.yaw += inputState.axes.lookX * sensitivity;
-        camera.pitch -= inputState.axes.lookY * sensitivity;
+        camera.yaw += intent.look.yaw * sensitivity;
+        camera.pitch -= intent.look.pitch * sensitivity;
 
         // Clamp pitch to prevent flipping (approx 90 degrees)
         const limit = Math.PI / 2 - 0.01;
         camera.pitch = Math.max(-limit, Math.min(limit, camera.pitch));
 
         // Player movement
-        const { moveX } = inputState.axes;
-        const { moveY } = inputState.axes;
+        const { x: moveX, y: moveY } = intent.move;
 
         if (moveX !== 0 || moveY !== 0) {
             const forward = getCameraForward(camera.yaw, camera.pitch);
@@ -69,10 +75,6 @@ const createGameLoop = (
 
         // Update chunk loading/unloading based on player position
         world.updateActiveChunks(camera.position, renderer);
-
-        // Reset transient input
-        inputState.axes.lookX = 0;
-        inputState.axes.lookY = 0;
     };
 
     const update = (deltaTime: number) => {

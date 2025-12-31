@@ -1,10 +1,14 @@
 {
   "name": "smackhem",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "vite",
+    "dev:web": "PLATFORM=web vite",
+    "dev:stub": "PLATFORM=stub vite",
     "build": "tsc && vite build",
+    "build:web": "PLATFORM=web tsc && vite build",
+    "build:stub": "PLATFORM=stub tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint --ext .ts src",
     "test": "vitest run",

@@ -21,4 +21,29 @@ export default class NullRenderer implements Renderer {
     setWireframe(_enabled: boolean): void {
         // No-op: stub implementation
     }
+
+    // eslint-disable-next-line class-methods-use-this, no-unused-vars
+    createPlaneMesh(_size: number): MeshHandle {
+        return { id: 'stub-plane' };
+    }
+
+    // eslint-disable-next-line class-methods-use-this, no-unused-vars
+    createCubeMesh(_size: number): MeshHandle {
+        return { id: 'stub-cube' };
+    }
+
+    // eslint-disable-next-line class-methods-use-this, no-unused-vars
+    createPyramidMesh(_size: number): MeshHandle {
+        return { id: 'stub-pyramid' };
+    }
+
+    // eslint-disable-next-line class-methods-use-this, no-unused-vars
+    createPrismMesh(_width: number, _height: number, _depth: number): MeshHandle {
+        return { id: 'stub-prism' };
+    }
+
+    // eslint-disable-next-line class-methods-use-this, no-unused-vars
+    createSphereMesh(_radius: number, _segments: number): MeshHandle {
+        return { id: 'stub-sphere' };
+    }
 }
