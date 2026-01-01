@@ -28,13 +28,11 @@ export const seededRandom = (seed: number): number => {
     // Simple hash-based PRNG
     const x = Math.sin(seed) * 10000;
     return x - Math.floor(x);
-}
+};
 
 // Generate a seed from chunk coordinates
 /* eslint-disable-next-line no-bitwise */
-export const chunkSeed = (chunkX: number, chunkZ: number): number => {
-    return (chunkX * 73856093) ^ (chunkZ * 19349663);
-}
+export const chunkSeed = (chunkX: number, chunkZ: number): number => (chunkX * 73856093) ^ (chunkZ * 19349663);
 
 // Create a chunk procedurally (platform-specific implementation)
 // This will eventually be replaced by asset loading

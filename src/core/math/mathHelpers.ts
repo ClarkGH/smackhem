@@ -219,3 +219,35 @@ export const matrixInverse = (m: Mat4): Mat4 => {
 
     return { elements: result };
 };
+
+// Extract normal matrix from view matrix (upper-left 3x3 rotation part)
+// For translation-only model matrices, normal matrix = view rotation
+export const extractNormalMatrix = (viewMatrix: Mat4): Mat4 => {
+    const e = viewMatrix.elements;
+    const result = new Float32Array(16);
+
+    // Extract upper-left 3x3 (rotation part)
+    result[0] = e[0]; result[4] = e[4]; result[8] = e[8]; result[12] = 0;
+    result[1] = e[1]; result[5] = e[5]; result[9] = e[9]; result[13] = 0;
+    result[2] = e[2]; result[6] = e[6]; result[10] = e[10]; result[14] = 0;
+    result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
+
+    return { elements: result };
+};
+
+// Normalize a direction vector
+export const normalizeVec3 = (v: Vec3): Vec3 => {
+    const len = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    if (len < 0.0001) return { x: 0, y: 0, z: 0 };
+    return { x: v.x / len, y: v.y / len, z: v.z / len };
+};
+
+// Transform a direction vector (Vec3) by a matrix (using upper-left 3x3 rotation)
+export const transformDirection = (matrix: Mat4, direction: Vec3): Vec3 => {
+    const e = matrix.elements;
+    return {
+        x: e[0] * direction.x + e[4] * direction.y + e[8] * direction.z,
+        y: e[1] * direction.x + e[5] * direction.y + e[9] * direction.z,
+        z: e[2] * direction.x + e[6] * direction.y + e[10] * direction.z,
+    };
+};

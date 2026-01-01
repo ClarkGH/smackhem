@@ -10,7 +10,7 @@ import {
     getCameraRight,
 } from './camera';
 import { resolveCollision, createCollisionContext } from './collision';
-import { matrixMultiply } from './math/mathHelpers';
+import { matrixMultiply, normalizeVec3 } from './math/mathHelpers';
 import { World } from './world';
 import type { Vec3 } from '../types/common';
 
@@ -23,12 +23,6 @@ const createGameLoop = (
     getAspectRatio: () => number,
 ) => {
     const camera = createCamera();
-
-    // Set light direction from east (westward with slight upward angle)
-    const lightDirection = { x: -1, y: 0.2, z: 0 };
-    if (renderer.setLightDirection) {
-        renderer.setLightDirection(lightDirection);
-    }
 
     // Create collision context once and reuse it
     const collisionContext = createCollisionContext();
@@ -92,6 +86,12 @@ const createGameLoop = (
 
         const aspect = getAspectRatio();
         const viewProj = getCameraMatrix(camera, aspect);
+        // Keep everything in world space (model transforms are translation-only)
+        // Using a more angled direction to make lighting direction more obvious
+        const lightDirection = normalizeVec3({ x: -0.707, y: 0.5, z: -0.5 });
+        if (renderer.setLightDirection) {
+            renderer.setLightDirection(lightDirection);
+        }
 
         const visibleMeshes = world.getVisibleMeshes();
         visibleMeshes.forEach((sm) => {

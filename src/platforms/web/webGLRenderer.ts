@@ -432,7 +432,16 @@ export default class WebGLRenderer implements Renderer {
             );
         }
 
-        const mesh = this.createMesh(new Float32Array(triangleVertices));
+        // Negate normals for spheres to fix lighting direction (invert column-wise)
+        const verticesArray = new Float32Array(triangleVertices);
+        const calculatedNormals = this.calculateNormals(verticesArray);
+        for (let i = 0; i < calculatedNormals.length; i += 3) {
+            calculatedNormals[i] *= -1;
+            calculatedNormals[i + 1] *= -1;
+            calculatedNormals[i + 2] *= -1;
+        }
+
+        const mesh = this.createMesh(verticesArray, calculatedNormals);
         this.meshCache.set(key, mesh);
         return mesh;
     }
@@ -461,15 +470,12 @@ export default class WebGLRenderer implements Renderer {
         const transformLocation = this.gl.getUniformLocation(this.program, 'u_transform');
         this.gl.uniformMatrix4fv(transformLocation, false, transform.elements);
 
-        // Calculate and set normal matrix
-        // For translation-only model matrices, normal matrix is just the upper-left 3x3
-        // of the view matrix. Since we receive MVP, we'll use a simplified identity-based approach.
-        // TODO: Pass model-view separately for proper normal matrix calculation
-        const normalMatrix = identity();
+        // Use identity normal matrix (keep normals in world space since model transforms are translation-only)
         const normalMatrixLocation = this.gl.getUniformLocation(this.program, 'u_normalMatrix');
-        this.gl.uniformMatrix4fv(normalMatrixLocation, false, normalMatrix.elements);
+        const identityMatrix = identity();
+        this.gl.uniformMatrix4fv(normalMatrixLocation, false, identityMatrix.elements);
 
-        // Set lighting uniforms
+        // Set lighting uniforms (light direction is in world space, matching normals)
         const lightDirLocation = this.gl.getUniformLocation(this.program, 'u_lightDirection');
         this.gl.uniform3f(
             lightDirLocation,

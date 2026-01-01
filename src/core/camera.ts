@@ -45,6 +45,9 @@ export const getCameraMatrix = (
     return matrixMultiply(proj, view);
 };
 
+// Get view matrix only (for normal matrix computation)
+export const getViewMatrix = (camera: Camera): Mat4 => lookDirection(camera.position, camera.yaw, camera.pitch);
+
 // Forward vector for movement
 export const getCameraForward = (yaw: number, pitch: number): Vec3 => {
     const rotation = quaternionFromYawPitch(yaw, pitch);
