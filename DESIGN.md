@@ -26,8 +26,9 @@
 - ["Smackhem" Design Principles](#smackhem-design-principles)
   - [1. Core Goal (Re-Stated)](#1-core-goal-re-stated)
   - [2. Design Principles (Non-Negotiable)](#2-design-principles-non-negotiable)
-  - [3. Platform Strategy (High Level)](#3-platform-strategy-high-level)
-  - [4. High-Level Architecture](#4-high-level-architecture)
+- [3. Platform Strategy (High Level)](#3-platform-strategy-high-level)
+  - [3.1 Desktop & Console Porting Strategy](#31-desktop--console-porting-strategy)
+- [4. High-Level Architecture](#4-high-level-architecture)
   - [5. Core Systems](#5-core-systems)
   - [6. Rendering Layer (Portable by Design)](#6-rendering-layer-portable-by-design)
   - [7. World System](#7-world-system)
@@ -429,6 +430,100 @@ Tomorrow (Optional):
 
 Rule:
 The game should not know or care what GPU or input device exists.
+
+### 3.1 Desktop & Console Porting Strategy
+
+**Approach: TypeScript Game Logic DSL + Native Renderer**
+We will port to desktop and console using a hybrid approach:
+
+- **Game logic stays in TypeScript** — all code in `core/` remains unchanged
+- **Renderer becomes native** — `platforms/native/` will implement the `Renderer` interface in C++
+- **Services bridge the gap** — clean interfaces allow TS ↔ C++ communication
+
+This strategy balances performance (native rendering) with development speed (TypeScript logic).
+
+#### Porting Constraints
+
+**CONSTRAINT P-1: Renderer Interface Must Be FFI-Friendly**
+The `Renderer` interface must be designed for foreign function interface (FFI) calls:
+
+- Methods accept only primitive types or simple structs (numbers, arrays, objects with known structure)
+- No callbacks or complex closures in the interface
+- Return values are simple (void, primitives, or handles)
+- Mesh handles are opaque identifiers, not objects with methods
+
+If a renderer method cannot be called from C++ via FFI, the interface must be redesigned.
+
+**CONSTRAINT P-2: Data Structures Must Be Serializable**
+All data passed between TypeScript and native code must be serializable:
+
+- Matrices are arrays of 16 numbers (never objects with methods)
+- Vectors are objects with `x`, `y`, `z` properties (or arrays)
+- Colors are objects with `x`, `y`, `z` properties (grayscale RGB)
+- No functions, closures, or class instances cross the boundary
+
+This ensures data can be marshalled between languages without complex conversion logic.
+
+**CONSTRAINT P-3: Core Must Never Know About Native Code**
+The `core/` directory must remain completely unaware of native implementations:
+
+- No `#ifdef` or platform-specific conditionals in core
+- No imports from `platforms/native/` in core files
+- Core code should work identically whether renderer is WebGL or native
+
+If core needs to know about native code, the design is wrong.
+
+**CONSTRAINT P-4: Mesh Creation Is Backend-Responsibility**
+Mesh generation (cube, sphere, pyramid, etc.) happens in the renderer backend:
+
+- Core requests meshes via `renderer.createCubeMesh(size)`
+- Renderer creates and caches the mesh, returns an opaque handle
+- Core never sees vertex data or GPU buffers
+
+This allows native renderer to use native mesh generation while keeping core clean.
+
+**CONSTRAINT P-5: No Direct Memory Access Assumptions**
+Core code must not assume:
+
+- Memory layout of arrays
+- Pointer arithmetic
+- Direct buffer manipulation
+- Shared memory between TS and native code
+
+All data transfer is explicit and copy-based (or handled by the FFI layer).
+
+**CONSTRAINT P-6: Renderer State Is Encapsulated**
+The renderer manages its own state:
+
+- Shader compilation
+- Buffer management
+- GPU resource lifetime
+- Mesh caching
+
+Core never directly manages renderer state. If core needs to affect renderer state, it uses interface methods.
+
+**Why These Constraints Matter:**
+
+- **FFI-Friendly Interfaces**: Makes it possible to call C++ from TypeScript without complex bindings
+- **Serializable Data**: Ensures data can cross language boundaries safely
+- **Core Isolation**: Protects portability — core works on any platform
+- **Backend Mesh Creation**: Allows native optimizations (e.g., instancing, batching) without core changes
+- **No Memory Assumptions**: Works with garbage-collected TypeScript and manual C++ memory
+- **Encapsulated State**: Prevents core from depending on renderer implementation details
+
+**Native Renderer Structure:**
+*TBD*
+
+```text
+platforms/native/
+├─ nativeRenderer.cpp      # C++ OpenGL/Vulkan renderer
+├─ nativeRenderer.h        # Renderer interface (C-compatible)
+├─ nativeBootstrap.cpp     # Platform initialization
+├─ ffiBridge.ts            # TypeScript ↔ C++ bridge
+└─ nativeInput.cpp         # Native input handling (future)
+```
+
+The native renderer implements the same `Renderer` interface as WebGL, but using native OpenGL or Vulkan calls. Game logic in `core/` remains unchanged.
 
 ### 4. High-Level Architecture
 
