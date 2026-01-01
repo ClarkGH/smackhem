@@ -1,6 +1,5 @@
 import type { Chunk } from '../core/world';
 
-// Global defined by vite config via define
 declare global {
     // 'var' is required for global declarations in TypeScript .d.ts files
     // vars-on-top doesn't apply to type declaration files
@@ -11,11 +10,9 @@ declare global {
 export interface MapData {
     id: string;
     chunks: Chunk[];
-    // ... other map properties
 }
 
 export interface Mat4 {
-    // Placeholder 4x4 matrix type
     elements: Float32Array;
 }
 
