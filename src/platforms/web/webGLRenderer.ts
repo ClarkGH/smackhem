@@ -449,7 +449,6 @@ export default class WebGLRenderer implements Renderer {
     beginFrame(): void {
         // Update viewport in case canvas was resized
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        // eslint-disable-next-line no-bitwise
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     }
 

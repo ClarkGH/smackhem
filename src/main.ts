@@ -7,6 +7,7 @@ import type { PlatformServices } from './platforms/web/webBootstrap';
 // Platform factory - will be replaced at build time
 const createPlatform = async (): Promise<PlatformServices> => {
     // This will be tree-shaken based on build config
+    // __PLATFORM__ is a build-time define from Vite, not available at ESLint parse time
     // eslint-disable-next-line no-undef
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
         const createStubPlatform = (await import('./platforms/stub/stubBootstrap')).default;
@@ -23,9 +24,11 @@ const main = async () => {
     const world = new World();
 
     // Import chunk management function (platform-specific)
+    // TODO: Refactor to avoid variable shadowing
     // eslint-disable-next-line no-shadow, no-unused-vars
     let updateActiveChunks: (w: World, pos: { x: number; y: number; z: number }, r: PlatformServices['renderer']) => void;
 
+    // __PLATFORM__ is a build-time define from Vite, not available at ESLint parse time
     // eslint-disable-next-line no-undef
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
         // Stub platform doesn't need chunk management for now

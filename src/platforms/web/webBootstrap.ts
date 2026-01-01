@@ -31,7 +31,6 @@ export const seededRandom = (seed: number): number => {
 };
 
 // Generate a seed from chunk coordinates
-/* eslint-disable-next-line no-bitwise */
 export const chunkSeed = (chunkX: number, chunkZ: number): number => (chunkX * 73856093) ^ (chunkZ * 19349663);
 
 // Create a chunk procedurally (platform-specific implementation)

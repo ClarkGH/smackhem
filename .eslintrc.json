@@ -28,11 +28,16 @@
     "import/extensions": ["error", "ignorePackages", {
       "ts": "never"
     }],
+    "import/no-extraneous-dependencies": ["error", {
+      "devDependencies": true
+    }],
     "no-param-reassign": "off",
     "no-console": "off",
     "no-underscore-dangle": "off",
     "prefer-destructuring": "off",
-    "max-len": "off"
+    "max-len": "off",
+    "no-bitwise": "off",
+    "class-methods-use-this": "off"
   },
   "env": {
     "browser": true,

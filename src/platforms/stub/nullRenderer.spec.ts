@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { describe, it, expect } from 'vitest';
 import type { Input } from '../../services/input';
 import createGameLoop from '../../core/gameLoop';
