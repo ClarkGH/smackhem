@@ -210,6 +210,16 @@ Lighting must never be:
 - A world system
 - A camera concern
 
+**Exception: Deterministic Time-Based Lighting**
+Lighting parameters (direction, color, ambient intensity) may be computed deterministically in core as pure functions of simulation time. These calculations must:
+
+- Be based solely on accumulated simulation time (fixed timestep)
+- Not depend on platform-specific timing
+- Not affect game simulation logic
+- Be passed to the renderer via service interface methods
+
+This allows for deterministic day/night cycles while keeping rendering implementation details in the renderer layer.
+
 ### 3. Input Enforcement Rules
 
 #### RULE I-1: Input Is Intent, Not Hardware
@@ -261,6 +271,17 @@ No:
 - `Date.now()`
 - `performance.now()`
 - Implicit timing
+
+#### RULE T-3: Time-Based Effects Must Be Deterministic
+
+Any effect that varies over time (lighting cycles, animations, etc.) must:
+
+- Use accumulated simulation time (from fixed timesteps)
+- Produce identical results given the same simulation time
+- Be reproducible across platforms
+- Not depend on real-world time or frame rate
+
+Simulation time is the single source of truth for time-based effects.
 
 ### 5. World & Data Rules
 
@@ -487,6 +508,60 @@ interface Renderer {
 - Same interface
 - Different implementation
 - Game code unchanged
+
+#### 6.4 Day/Night Lighting Cycle
+
+The lighting system supports a deterministic sun/moon cycle that rotates light direction, changes color, and adjusts ambient intensity based on simulation time.
+
+**Architecture:**
+
+- Lighting parameters are computed in core as pure functions of simulation time
+- Core tracks accumulated simulation time (fixed timestep)
+- Parameters are passed to renderer via optional service interface methods
+- Renderer implementation applies these values in shaders
+
+**Lighting Parameters:**
+
+1. **Light Direction**: Rotates around the Y axis (sun/moon arc across sky)
+   - Computed from time of day (0-1 cycle)
+   - Normalized 3D vector in world space
+   - Sun at top (noon), moon at bottom (midnight)
+
+2. **Light Color**: Warm (day) to cool (night) transition
+   - Grayscale RGB values
+   - Warmer tones during day, cooler tones during night
+   - Smooth interpolation via sinusoidal functions
+
+3. **Ambient Intensity**: Brightness variation
+   - Lower during night (darker), higher during day (brighter)
+   - Smoothly transitions between day and night
+
+**Renderer Interface Extension:**
+
+```typescript
+interface Renderer {
+    // ... existing methods ...
+    setLightDirection?(_direction: Vec3): void;
+    setLightColor?(_color: Vec3): void;
+    setAmbientIntensity?(_intensity: number): void;
+}
+```
+
+**Constraints:**
+
+- All calculations must be deterministic (based on simulation time only)
+- No platform-specific timing dependencies
+- Lighting computation does not affect simulation logic
+- Day length is configurable via constant (currently ~2 minutes per cycle)
+- Calculations occur in render function (deterministic, no simulation side effects)
+
+**Implementation Notes:**
+
+- Simulation time accumulates in game loop via fixed timestep
+- Time of day is computed as `(simulationTime % dayLength) / dayLength`
+- Sun direction uses trigonometric functions of time of day
+- Color and intensity use smooth interpolation (sinusoidal) for natural transitions
+- All values are computed fresh each frame (no caching needed, pure functions)
 
 #### Key Rule: gl.* never leaks upward
 
@@ -810,39 +885,64 @@ Column major skips full columns of size M to reach the correct column then adds 
 **Directional Light Direction**
 Light direction is a normalized 3D vector pointing from the light source toward the scene.
 For a sun in the east casting light westward:
-```
+
+```typescript
 lightDirection = normalize({x: -1, y: 0.2, z: 0})
 ```
 
 **Lambertian Diffuse Lighting**
 Diffuse lighting calculation:
-```
+
+```typescript
 dotProduct = dot(surfaceNormal, -lightDirection)
 diffuse = max(dotProduct, 0.0)
 ```
 
 **Final Lighting Calculation**
 Combines ambient and diffuse lighting:
-```
+
+```typescript
 lighting = ambientIntensity + diffuse * (1.0 - ambientIntensity)
 finalColor = baseColor * lightColor * lighting
 ```
 
 Where:
-- `ambientIntensity` = 0.3 (30% ambient light)
-- `lightColor` = {1, 1, 1} (white light, grayscale)
+
+- `ambientIntensity` = varies with time of day (0.2-0.5, dark night to bright day)
+- `lightColor` = varies with time of day (cool moon tones to warm sun tones, grayscale)
 - `baseColor` = mesh color (grayscale values)
+
+**Day/Night Cycle**
+The lighting system implements a deterministic sun/moon cycle:
+
+- **Light Direction**: Rotates around Y axis based on simulation time
+  - Sun arc: from horizon (east) → overhead (noon) → horizon (west) → below horizon (night)
+  - Moon arc: opposite phase (visible during night)
+  - Direction computed as: `{x: cos(angle), y: sin(angle), z: 0}` where angle = `timeOfDay * 2π`
+
+- **Light Color**: Interpolates between cool (night) and warm (day)
+  - Uses sinusoidal interpolation for smooth transitions
+  - Day: warmer tones (slightly higher RGB values)
+  - Night: cooler tones (slightly lower, more neutral RGB values)
+
+- **Ambient Intensity**: Varies from dark (night) to bright (day)
+  - Range: 0.2 (night) to 0.5 (day)
+  - Smoothly transitions via sinusoidal interpolation
+
+All lighting parameters are computed deterministically from accumulated simulation time, ensuring reproducibility across platforms and game sessions.
 
 **Normal Transformation**
 Surface normals must be transformed by the inverse transpose of the model matrix:
-```
+
+```typescript
 normalMatrix = transpose(inverse(modelMatrix))
 transformedNormal = normalize(normalMatrix * normal)
 ```
 
 **Normal Calculation from Triangle**
 For a triangle with vertices v0, v1, v2:
-```
+
+```typescript
 edge1 = v1 - v0
 edge2 = v2 - v0
 normal = normalize(cross(edge1, edge2))
@@ -852,7 +952,8 @@ normal = normalize(cross(edge1, edge2))
 
 **Cube Mesh**
 For a cube of size `s`, centered at origin:
-```
+
+```typescript
 half = s / 2
 vertices = [
     // 6 faces × 2 triangles × 3 vertices = 36 vertices
@@ -862,7 +963,8 @@ vertices = [
 
 **Pyramid Mesh**
 For a pyramid of base size `s` and height `h`:
-```
+
+```typescript
 half = s / 2
 apex = h
 // Base: square (2 triangles)
@@ -870,8 +972,10 @@ apex = h
 ```
 
 **Sphere Mesh (UV Sphere)**
+TODO: Revisit this. Can we add performance?
 For a sphere of radius `r` with `segments` divisions:
-```
+
+```typescript
 for lat = 0 to segments:
     theta = (lat * π) / segments
     for lon = 0 to segments:
@@ -883,7 +987,8 @@ for lat = 0 to segments:
 
 **Prism Mesh**
 For a rectangular prism of width `w`, height `h`, depth `d`:
-```
+
+```typescript
 halfW = w / 2
 halfH = h / 2
 halfD = d / 2
