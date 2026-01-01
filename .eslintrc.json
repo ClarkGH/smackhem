@@ -31,7 +31,10 @@
     "import/no-extraneous-dependencies": ["error", {
       "devDependencies": true
     }],
-    "no-param-reassign": "off",
+    "no-param-reassign": ["error", {
+      "props": true,
+      "ignorePropertyModificationsFor": ["state", "coreState", "webState", "context"]
+    }],
     "no-console": "off",
     "no-underscore-dangle": "off",
     "prefer-destructuring": "off",
