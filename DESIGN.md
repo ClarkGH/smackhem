@@ -28,6 +28,7 @@
   - [2. Design Principles (Non-Negotiable)](#2-design-principles-non-negotiable)
 - [3. Platform Strategy (High Level)](#3-platform-strategy-high-level)
   - [3.1 Desktop & Console Porting Strategy](#31-desktop--console-porting-strategy)
+  - [3.2 Performance & Authority Constraints](#32-performance--authority-constraints)
 - [4. High-Level Architecture](#4-high-level-architecture)
   - [5. Core Systems](#5-core-systems)
   - [6. Rendering Layer (Portable by Design)](#6-rendering-layer-portable-by-design)
@@ -502,6 +503,85 @@ The renderer manages its own state:
 
 Core never directly manages renderer state. If core needs to affect renderer state, it uses interface methods.
 
+#### CONSTRAINT P-7: FFI Is an Implementation Detail, Not a Requirement
+
+The TypeScript ↔ Native boundary must be designed so that:
+
+1. **FFI is preferred but not required**
+   - Desktop: Use FFI (TypeScript calls C++ via FFI)
+   - Console with JS runtime: Use FFI (same as desktop, if JS runtime is embedded)
+   - Console without JS runtime: Port core to C++, call interfaces directly (no FFI needed)
+
+2. **Interfaces are language-agnostic**
+   - Renderer interface can be called from TypeScript OR C++
+   - Same interface signature works in both languages
+   - No TypeScript-specific features in service interfaces
+   - Interfaces use only primitives, arrays, and simple structs
+
+3. **Core logic is portable**
+   - Core logic in TypeScript today
+   - Core logic can be ported to C++ if needed
+   - Porting is feasible because interfaces are clean and data structures are serializable
+   - No architectural changes required for porting
+
+**The Test:**
+
+If a console doesn't support JavaScript or FFI, can we:
+
+1. Port `core/` logic to C++ (straightforward port, no architectural changes)
+2. Call the same `Renderer` interface from C++ core (direct C++ calls, no FFI)
+3. Keep all the same interfaces and data structures
+
+If the answer is "no", the design has a dependency on FFI that must be removed.
+
+**Why This Matters:**
+
+- **Desktop**: Use FFI (fastest development path, keep all TS code)
+- **Console with JS**: Use FFI (same as desktop, if JS runtime is available/embedded)
+- **Console without JS**: Port core to C++ (fallback path, more work but architecturally sound)
+- All three paths use the same interfaces and data structures
+- Modern consoles (PS5, Xbox Series X/S, Nintendo Switch) do not natively support FFI or JavaScript runtimes
+- Console ports will likely require porting core logic to C++ and calling interfaces directly
+
+#### Development & Porting Timeline
+
+##### Learning-First Approach: Gradual Transition to C++
+
+Since this is a learning project, we will transition gradually into native code:
+
+1. **Phase 1: TypeScript Core + WebGL (Current)**
+   - Develop and validate architecture in TypeScript
+   - Fast iteration and learning
+   - Web-first development
+
+2. **Phase 2: FFI Bridge + Native Renderer (Desktop)**
+   - Implement FFI bridge for desktop
+   - Native C++ renderer with TypeScript core
+   - Learn FFI patterns and native rendering
+   - Validate that interfaces work across language boundary
+
+3. **Phase 3: Console Porting (Future)**
+   - Console porting is a future consideration, not immediate priority
+   - Will convert core to C++ when console porting becomes necessary
+   - By this point, architecture is validated and interfaces are proven
+   - Porting should be straightforward due to clean interfaces and constraints
+
+4. **Phase 4: Full C++ Conversion (Long-term)**
+   - Eventually convert to 100% C++ codebase
+   - Single codebase for all platforms (desktop + console)
+   - Eliminates FFI overhead and JS runtime dependency
+   - Happens after learning and validation phases are complete
+
+**Why This Timeline:**
+
+- **Learning**: Gradual transition allows learning each piece (TS → FFI → C++) incrementally
+- **Validation**: FFI bridge validates that interfaces work correctly before committing to C++ port
+- **Risk Mitigation**: Architecture is proven before investing in full C++ conversion
+- **Flexibility**: Can ship desktop with FFI while console port is still future work
+
+**The Key Point:**
+Console porting is explicitly a **future consideration**, not a requirement for the FFI bridge phase. The FFI bridge is for desktop learning and validation. Full C++ conversion happens later, after the architecture is proven and console porting becomes a priority.
+
 **Why These Constraints Matter:**
 
 - **FFI-Friendly Interfaces**: Makes it possible to call C++ from TypeScript without complex bindings
@@ -524,6 +604,147 @@ platforms/native/
 ```
 
 The native renderer implements the same `Renderer` interface as WebGL, but using native OpenGL or Vulkan calls. Game logic in `core/` remains unchanged.
+
+### 3.2 Performance & Authority Constraints
+
+**The Real Risk: Scripting Layer Becoming the Engine**
+The greatest danger with the TypeScript + Native hybrid approach is letting the scripting layer quietly become the engine again. This happens when TypeScript starts doing work that should be native.
+
+#### Common Failure Modes
+
+These patterns indicate the boundary has been violated:
+
+- **TS starts doing collision checks** — collision should be native
+- **TS starts iterating entity arrays every frame** — entity management should be native
+- **TS starts managing transforms directly** — transform updates should be native
+- **TS owns too much temporal logic** — animation/physics should be native
+
+If TypeScript is doing these things, performance will suffer and the architecture has regressed.
+
+#### Authority Model: TS Requests, Native Decides, TS Reacts
+
+**The Rule:**
+
+- **TypeScript requests** — "Move this entity", "Play this animation", "Check this collision"
+- **Native decides** — Native code performs the work, manages state, handles optimization
+- **TypeScript reacts** — TS receives results/events and makes gameplay decisions
+
+TypeScript is the decision-maker, not the executor. Native is the executor, not the decision-maker.
+
+#### Boundary Call Costs & Mitigations
+
+**The Problem:**
+Every call across the TypeScript ↔ Native boundary has a cost:
+
+- `player.move(vec)` crossing into native code incurs marshalling overhead
+- Chatty APIs (many small calls) are expensive
+- Per-frame allocations at the boundary cause GC pressure
+
+**Mitigations:**
+
+1. **Batch Calls**
+   - Group multiple operations into single boundary calls
+   - Pass arrays of commands, not individual operations
+   - Example: `renderer.drawMeshes(meshArray)` not `meshArray.forEach(m => renderer.drawMesh(m))`
+
+2. **Pass Structs, Not Scalars**
+   - Bundle related data into objects/structs
+   - Single boundary call with structured data is cheaper than many calls with primitives
+   - Example: `renderer.setLighting({direction, color, ambient})` not three separate calls
+
+3. **Avoid Chatty APIs**
+   - Design interfaces for bulk operations
+   - Minimize back-and-forth communication
+   - Prefer "set state, then execute" over "query, decide, execute, query again"
+
+#### Update Rate Separation
+
+**The Problem:**
+
+Calling TypeScript every frame for everything is unnecessary and expensive. Different systems have different update rate requirements.
+
+##### Separate Update Rates
+
+- **Rendering**: 60–120 Hz (native, no TS calls per frame)
+- **Gameplay logic**: 30–60 Hz (TS decision-making)
+- **AI / systems**: 10–20 Hz (TS high-level decisions)
+- **Event-driven scripting**: On-demand (TS reacts to events)
+
+**Implementation:**
+
+- Native renderer runs at display refresh rate independently
+- TypeScript game loop runs at fixed timestep (30–60 Hz)
+- AI systems tick at lower rates (10–20 Hz)
+- Events trigger TS callbacks as needed, not every frame
+
+#### Allocation Pressure
+
+**The Problem:**
+JavaScript engines are fast, but garbage collection still exists. Per-frame allocations cause GC pauses and frame drops.
+
+**Mitigations:**
+
+1. **Avoid Per-Frame Allocations**
+   - Reuse objects and arrays across frames
+   - Pre-allocate buffers for boundary data
+   - No `new` or object literals in hot paths
+
+2. **Pool Objects**
+   - Maintain object pools for frequently created/destroyed objects
+   - Reuse vectors, matrices, and command structures
+   - Return objects to pool instead of discarding
+
+3. **Prefer Numeric IDs Over Object Graphs**
+   - Entities referenced by ID, not object references
+   - Reduces GC pressure from object relationships
+   - Easier to serialize and pass across boundaries
+
+4. **Keep Hot Paths Allocation-Free**
+   - Game loop update functions must not allocate
+   - Rendering paths must not allocate
+   - Only chunk loading and initialization may allocate
+
+#### Responsibility Division
+
+**TypeScript Responsibilities (Safe):**
+
+- State machines
+- AI decisions
+- Quest logic
+- Combat rules
+- Animation state selection (which animation, not how to play it)
+- Input interpretation (hardware → intent)
+- Event orchestration
+
+**Native Responsibilities (Must):**
+
+- Rendering (all GPU work)
+- Physics (if added)
+- Collision detection and resolution
+- Pathfinding (if added)
+- Animation evaluation (bone transforms, interpolation)
+- Audio mixing
+- Asset streaming
+
+**The Test:**
+If a TypeScript function is called thousands of times per second, it probably belongs in native code. If it makes high-level decisions occasionally, it can stay in TypeScript.
+
+#### Boundary Design Rules
+
+**RULE B-1: Batch Operations**
+Interfaces must support bulk operations. If you find yourself calling a native function in a loop, the interface is wrong.
+
+**RULE B-2: Event-Driven Over Polling**
+TypeScript should react to events, not poll native state every frame. Native pushes events/state changes to TS.
+
+**RULE B-3: Native Owns Hot Data**
+Frequently accessed data (transforms, velocities, collision shapes) lives in native memory. TypeScript accesses via handles/IDs, not direct references.
+
+**RULE B-4: TS Owns Cold Data**
+Infrequently accessed data (quest state, dialogue trees, AI behavior trees) can live in TypeScript. This data is accessed occasionally, not every frame.
+
+**RULE B-5: Authority Is Explicit**
+Every system must have a clear owner. If ownership is ambiguous, the boundary has been violated.
 
 ### 4. High-Level Architecture
 
