@@ -1,7 +1,7 @@
 #Platform logic I'm keeping to myself ;)
 src/platforms/cpu
 src/platforms/native
-src/platforms/switch
+src/platforms/console
 
 # Node modules
 node_modules/
