@@ -33,7 +33,7 @@
     }],
     "no-param-reassign": ["error", {
       "props": true,
-      "ignorePropertyModificationsFor": ["state", "coreState", "webState", "context"]
+      "ignorePropertyModificationsFor": ["state", "webState", "context", "coreState", "out"]
     }],
     "no-console": "off",
     "no-underscore-dangle": "off",

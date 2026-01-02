@@ -61,7 +61,7 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It's one of the most confus
 - Explorable instance(s)
 - Shop(s) / Inn(s) / Shrine(s)
 - Quests
-- No bodies of water, disco dragon summons, or tombstone dogs allowed!
+- No walking into and drowning in bodies of water, disco dragon summons, or tombstone dogs allowed!
 - No Illegible Spells!
 
 ## The MVP Vision
@@ -836,6 +836,20 @@ The lighting system supports a deterministic sun/moon cycle that rotates light d
 - Parameters are passed to renderer via optional service interface methods
 - Renderer implementation applies these values in shaders
 
+**Physical Sun/Moon Rules:**
+
+- **Sun Arc**: from horizon (east) → overhead (noon) → horizon (west) → below horizon (night)
+  - Rises in the east (horizon) at dawn (timeOfDay ≈ 0.25)
+  - Reaches zenith (overhead) at noon (timeOfDay = 0.5)
+  - Sets in the west (horizon) at dusk (timeOfDay ≈ 0.75)
+  - Goes below horizon at night (timeOfDay 0.0-0.25, 0.75-1.0)
+- **Moon Arc**: opposite phase (visible during night)
+  - Visible during night (timeOfDay 0.0-0.25, 0.75-1.0)
+  - Follows opposite path across sky
+- **Coordinate System**: Y-up world space, normalized vectors
+  - Light direction points FROM light source TOWARD scene
+  - Rotation around Y-axis in XZ plane
+
 **Lighting Parameters:**
 
 1. **Light Direction**: Rotates around the Y axis (sun/moon arc across sky)
@@ -863,20 +877,61 @@ interface Renderer {
 }
 ```
 
+**Exact Formulas:**
+
+**Time of Day Calculation:**
+
+```typescript
+const DAY_LENGTH_SECONDS = 120; // 2 minutes per full cycle (configurable)
+const timeOfDay = (simulationTime % DAY_LENGTH_SECONDS) / DAY_LENGTH_SECONDS;
+```
+
+**Sun Direction:**
+
+```typescript
+const angle = timeOfDay * Math.PI * 2; // Full rotation (0 to 2π)
+const sunHeight = Math.sin(angle); // -1 (midnight) to 1 (noon)
+const sunRotation = Math.cos(angle); // Horizontal component (1 at midnight, -1 at noon)
+// Normalize: out = { x: sunRotation / len, y: sunHeight / len, z: 0 }
+```
+
+**Light Color:**
+
+```typescript
+const sunFactor = Math.sin(timeOfDay * Math.PI); // 0 at midnight, 1 at noon
+const factor = 0.7 + 0.3 * sunFactor; // Range: 0.7 (night) to 1.0 (day)
+lightColor = { x: factor, y: factor, z: 0.8 + 0.2 * sunFactor };
+```
+
+**Ambient Intensity:**
+
+```typescript
+const sunFactor = Math.sin(timeOfDay * Math.PI);
+ambientIntensity = 0.2 + 0.3 * sunFactor; // Range: 0.2 (night) to 0.5 (day)
+```
+
+**Time Mapping:**
+
+- Time 0 = midnight (moon visible)
+- Time 0.25 = dawn (sun rising in east)
+- Time 0.5 = noon (sun overhead)
+- Time 0.75 = dusk (sun setting in west)
+
 **Constraints:**
 
 - All calculations must be deterministic (based on simulation time only)
 - No platform-specific timing dependencies
 - Lighting computation does not affect simulation logic
-- Day length is configurable via constant (currently ~2 minutes per cycle)
+- Day length is configurable via constant (currently 120 seconds per cycle)
 - Calculations occur in render function (deterministic, no simulation side effects)
 
-**Implementation Notes:**
+**Implementation Details:**
 
-- Simulation time accumulates in game loop via fixed timestep
-- Time of day is computed as `(simulationTime % dayLength) / dayLength`
-- Sun direction uses trigonometric functions of time of day
-- Color and intensity use smooth interpolation (sinusoidal) for natural transitions
+- Simulation time is tracked separately from frame accumulator
+- Simulation time accumulates in game loop via fixed timestep (`simulationTime += dt`)
+- All functions are pure (no side effects, deterministic)
+- **Zero-allocation design**: Pre-allocated Vec3 objects are reused every frame, functions write into existing objects instead of creating new ones (complies with RULE M-1)
+- Inline normalization avoids calling `normalizeVec3()` which would allocate
 - All values are computed fresh each frame (no caching needed, pure functions)
 
 #### Key Rule: gl.* never leaks upward

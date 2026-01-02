@@ -17,4 +17,6 @@ export interface Renderer {
     createPrismMesh(_width: number, _height: number, _depth: number): MeshHandle;
     createSphereMesh(_radius: number, _segments: number): MeshHandle;
     setLightDirection?(_direction: Vec3): void;
+    setLightColor?(_color: Vec3): void;
+    setAmbientIntensity?(_intensity: number): void;
 }
