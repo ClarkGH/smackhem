@@ -3,6 +3,9 @@ src/platforms/cpu
 src/platforms/native
 src/platforms/console
 
+# Cursor AI
+.cursor/
+
 # Node modules
 node_modules/
 
