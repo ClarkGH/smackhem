@@ -25,6 +25,7 @@ const createGameLoop = (
     const camera = createCamera();
     const collisionContext = createCollisionContext();
 
+    // PERFORMANCE: Pre-allocate objects once in gameLoop closure    
     let simulationTime = 0;
     let accumulator = 0;
 
