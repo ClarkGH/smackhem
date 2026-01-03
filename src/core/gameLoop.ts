@@ -23,10 +23,9 @@ const createGameLoop = (
     getAspectRatio: () => number,
 ) => {
     const camera = createCamera();
-
-    // Create collision context once and reuse it
     const collisionContext = createCollisionContext();
 
+    let simulationTime = 0;
     let accumulator = 0;
 
     const updateSimulation = (dt: number) => {
@@ -77,6 +76,7 @@ const createGameLoop = (
         accumulator += deltaTime;
         while (accumulator >= FIXED_DT) {
             updateSimulation(FIXED_DT);
+            simulationTime += FIXED_DT;
             accumulator -= FIXED_DT;
         }
     };
