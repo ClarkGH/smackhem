@@ -28,6 +28,8 @@ const createGameLoop = (
     // PERFORMANCE: Pre-allocate objects once in gameLoop closure    
     let simulationTime = 0;
     let accumulator = 0;
+    const DAY_LENGTH_SECONDS = 120; // Seconds
+    const HORIZON_THRESHOLD = 0.0; // Elevation threshold for horizon (radians)
 
     const updateSimulation = (dt: number) => {
         // Fixed timestep simulation updates
