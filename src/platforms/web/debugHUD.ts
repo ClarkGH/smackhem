@@ -27,6 +27,7 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): DebugHUD => {
     overlay.height = canvas.height;
 
     if (canvas.style.position !== 'relative') {
+        // eslint-disable-next-line no-param-reassign
         canvas.style.position = 'relative';
     }
 
