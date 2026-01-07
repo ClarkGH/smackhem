@@ -26,8 +26,10 @@ const createGameLoop = (
     const collisionContext = createCollisionContext();
 
     // PERFORMANCE: Pre-allocate objects once in gameLoop closure
+    // eslint-disable-next-line
     let simulationTime = 0;
     let accumulator = 0;
+    // eslint-disable-next-line
     const DAY_LENGTH_SECONDS = 120; // Seconds
     const HORIZON_THRESHOLD = 0.0; // Elevation threshold for horizon (radians)
     // eslint-disable-next-line
