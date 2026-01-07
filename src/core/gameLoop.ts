@@ -30,7 +30,7 @@ const createGameLoop = (
     let accumulator = 0;
     const DAY_LENGTH_SECONDS = 120; // Seconds
     const HORIZON_THRESHOLD = 0.0; // Elevation threshold for horizon (radians)
-    // eslint-disable-next-line
+    // eslint-disable-next-linex 
     const DECLINATION_OFFSET = 0.0; // Seasonal tilt offset (future)
 
     const updateSimulation = (dt: number) => {
