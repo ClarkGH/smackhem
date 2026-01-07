@@ -3,6 +3,7 @@ import { World } from './core/world';
 import createGameLoop from './core/gameLoop';
 import { createCamera } from './core/camera';
 import type { PlatformServices } from './platforms/web/webBootstrap';
+import { createDebugHUD } from './platforms/web/debugHUD';
 
 // Platform factory - will be replaced at build time
 const createPlatform = async (): Promise<PlatformServices> => {
@@ -43,11 +44,26 @@ const main = async () => {
     const initialCamera = createCamera();
     updateActiveChunks(world, initialCamera.position, platform.renderer);
 
+    // Create debug HUD (only for web platform)
+    let debugHUD: { render: (info: {
+        cameraPosition: { x: number; y: number; z: number };
+        cameraForward: { x: number; y: number; z: number };
+        sunPosition?: { x: number; y: number; z: number };
+        moonPosition?: { x: number; y: number; z: number };
+        timeOfDay?: number;
+    }) => void; toggle: () => void; isVisible: () => boolean } | undefined;
+    
+    // Check if platform has canvas property (web platform only)
+    if ('canvas' in platform && platform.canvas instanceof HTMLCanvasElement) {
+        debugHUD = createDebugHUD(platform.canvas as HTMLCanvasElement);
+    }
+
     const gameLoop = createGameLoop(
         platform.renderer,
         platform.input,
         world,
         platform.getAspectRatio,
+        debugHUD,
     );
 
     const loop = () => {

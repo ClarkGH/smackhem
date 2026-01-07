@@ -517,4 +517,12 @@ export default class WebGLRenderer implements Renderer {
     setLightDirection(direction: Vec3): void {
         this.lightDirection = direction;
     }
+
+    setLightColor(color: Vec3): void {
+        this.lightColor = color;
+    }
+
+    setAmbientIntensity(intensity: number): void {
+        this.ambientIntensity = intensity;
+    }
 }

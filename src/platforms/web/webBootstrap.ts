@@ -14,6 +14,7 @@ import { createTranslationMatrix } from '../../core/math/mathHelpers';
 import WebClock from './webClock';
 import { createCamera } from '../../core/camera';
 import { WebInputService } from './webInputService';
+import { createDebugHUD } from './debugHUD';
 import type { Vec3 } from '../../types/common';
 
 export interface PlatformServices {
@@ -155,7 +156,7 @@ export const updateActiveChunks = (
     });
 };
 
-export const createWebPlatform = async (): Promise<PlatformServices> => {
+export const createWebPlatform = async (): Promise<PlatformServices & { canvas: HTMLCanvasElement }> => {
     // DOM setup
     const canvas = document.createElement('canvas');
     canvas.width = 800; // TODO: Variable width
@@ -180,6 +181,7 @@ export const createWebPlatform = async (): Promise<PlatformServices> => {
         renderer,
         clock,
         input,
+        canvas,
         getAspectRatio: () => canvas.width / canvas.height,
     };
 };
@@ -191,11 +193,15 @@ export const bootstrapWeb = (): void => {
         const initialCamera = createCamera();
         updateActiveChunks(world, initialCamera.position, platform.renderer);
 
+        // Create debug HUD
+        const debugHUD = createDebugHUD(platform.canvas);
+
         const gameLoop = createGameLoop(
             platform.renderer,
             platform.input,
             world,
             platform.getAspectRatio,
+            debugHUD,
         );
 
         const loop = () => {
