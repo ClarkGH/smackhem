@@ -11,7 +11,7 @@ import {
 } from './camera';
 import { resolveCollision, createCollisionContext } from './collision';
 import {
-    matrixMultiply,
+    matrixMultiplyInto,
     identity,
     quaternionFromYawPitch,
     quaternionApplyToVector,
@@ -81,6 +81,11 @@ const createGameLoop = (
     // Pre-allocate color objects for celestial rendering
     const sunColorWithVisibility = { x: 0, y: 0, z: 0 };
     const moonColorWithVisibility = { x: 0, y: 0, z: 0 };
+
+    // Pre-allocate MVP matrices (zero allocations per frame)
+    const sunMVP = identity();
+    const moonMVP = identity();
+    const meshMVP = identity();
 
     // Debug HUD state
     let debugHUDVisible = false;
@@ -434,8 +439,8 @@ const createGameLoop = (
             sunColorWithVisibility.y = SUN_COLOR.y * sunVisibility;
             sunColorWithVisibility.z = SUN_COLOR.z * sunVisibility;
 
-            // Calculate MVP matrix (model * view * projection)
-            const sunMVP = matrixMultiply(viewProj, sunTransform);
+            // Calculate MVP matrix (model * view * projection) - write into pre-allocated matrix
+            matrixMultiplyInto(viewProj, sunTransform, sunMVP);
 
             // Draw sun mesh
             renderer.drawMesh(sunMesh, sunMVP, sunColorWithVisibility);
@@ -448,8 +453,8 @@ const createGameLoop = (
             moonColorWithVisibility.y = MOON_COLOR.y * moonVisibility;
             moonColorWithVisibility.z = MOON_COLOR.z * moonVisibility;
 
-            // Calculate MVP matrix (model * view * projection)
-            const moonMVP = matrixMultiply(viewProj, moonTransform);
+            // Calculate MVP matrix (model * view * projection) - write into pre-allocated matrix
+            matrixMultiplyInto(viewProj, moonTransform, moonMVP);
 
             // Draw moon mesh
             renderer.drawMesh(moonMesh, moonMVP, moonColorWithVisibility);
@@ -458,19 +463,22 @@ const createGameLoop = (
         // Render world meshes
         const visibleMeshes = world.getVisibleMeshes();
         visibleMeshes.forEach((sm) => {
-            const mvp = matrixMultiply(viewProj, sm.transform);
-            renderer.drawMesh(sm.mesh, mvp, sm.color);
+            // Calculate MVP matrix - write into pre-allocated matrix (zero allocation)
+            matrixMultiplyInto(viewProj, sm.transform, meshMVP);
+            renderer.drawMesh(sm.mesh, meshMVP, sm.color);
         });
 
         // Render debug HUD (if enabled)
+        // Note: Debug HUD creates some allocations (quaternion/Vec3), but this is acceptable
+        // since debug features are optional and not in the hot path
         if (debugHUD && debugHUDVisible) {
             // Get full camera forward vector (including pitch) for viewing direction
             const rotation = quaternionFromYawPitch(camera.yaw, camera.pitch);
-            const cameraForward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
+            const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
 
             debugHUD.render({
                 cameraPosition: camera.position,
-                cameraForward,
+                cameraForward: forward,
                 sunPosition,
                 moonPosition,
                 timeOfDay,

@@ -51,6 +51,23 @@ export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
     return { elements: ce };
 };
 
+// Performance optimization: Write result into existing matrix (zero allocation)
+export const matrixMultiplyInto = (a: Mat4, b: Mat4, out: Mat4): void => {
+    // Variables based on AB = C formula
+    const ae = a.elements;
+    const be = b.elements;
+    const ce = out.elements;
+
+    for (let i = 0; i < 4; i += 1) {
+        for (let j = 0; j < 4; j += 1) {
+            ce[j * 4 + i] = ae[i] * be[j * 4]
+            + ae[i + 4] * be[j * 4 + 1]
+            + ae[i + 8] * be[j * 4 + 2]
+            + ae[i + 12] * be[j * 4 + 3];
+        }
+    }
+};
+
 // TODO: Add rotation
 export const createTranslationMatrix = (x: number, y: number, z: number): Mat4 => {
     const m = new Float32Array(16);

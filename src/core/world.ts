@@ -47,7 +47,8 @@ export class World {
         // Clear buffer and reuse
         this._visibleMeshesBuffer.length = 0;
 
-        Array.from(this.activeChunks.values()).forEach((chunk) => {
+        // Use forEach instead of for...of to avoid regenerator-runtime dependency (RULE M-3)
+        this.activeChunks.forEach((chunk) => {
             this._visibleMeshesBuffer.push(...chunk.meshes);
         });
 
@@ -84,7 +85,8 @@ export class World {
         // Clear buffer and reuse
         this._collidableAABBsBuffer.length = 0;
 
-        Array.from(this.activeChunks.values()).forEach((chunk) => {
+        // Use forEach instead of for...of to avoid regenerator-runtime dependency (RULE M-3)
+        this.activeChunks.forEach((chunk) => {
             chunk.meshes.forEach((mesh) => {
                 // Filter out floor meshes - cubes are at y > 0.1, floors are at y = 0
                 const position = extractPosition(mesh.transform);

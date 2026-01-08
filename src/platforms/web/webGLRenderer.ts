@@ -26,6 +26,24 @@ export default class WebGLRenderer implements Renderer {
 
     private ambientIntensity: number = 0.3;
 
+    private uniformLocations: {
+        color: WebGLUniformLocation | null;
+        transform: WebGLUniformLocation | null;
+        normalMatrix: WebGLUniformLocation | null;
+        lightDirection: WebGLUniformLocation | null;
+        lightColor: WebGLUniformLocation | null;
+        ambientIntensity: WebGLUniformLocation | null;
+    } = {
+            color: null,
+            transform: null,
+            normalMatrix: null,
+            lightDirection: null,
+            lightColor: null,
+            ambientIntensity: null,
+        };
+
+    private identityMatrix: Mat4;
+
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
         const gl = canvas.getContext('webgl2');
@@ -42,6 +60,9 @@ export default class WebGLRenderer implements Renderer {
         // Enable depth testing
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.depthFunc(this.gl.LEQUAL);
+
+        // Pre-allocate identity matrix (reused every frame)
+        this.identityMatrix = identity();
 
         this.initShaders();
     }
@@ -107,6 +128,16 @@ export default class WebGLRenderer implements Renderer {
         if (!this.program) {
             throw new Error('Failed to create shader program');
         }
+
+        // Cache uniform locations (lookup once, reuse every frame)
+        this.uniformLocations = {
+            color: this.gl.getUniformLocation(this.program, 'u_color'),
+            transform: this.gl.getUniformLocation(this.program, 'u_transform'),
+            normalMatrix: this.gl.getUniformLocation(this.program, 'u_normalMatrix'),
+            lightDirection: this.gl.getUniformLocation(this.program, 'u_lightDirection'),
+            lightColor: this.gl.getUniformLocation(this.program, 'u_lightColor'),
+            ambientIntensity: this.gl.getUniformLocation(this.program, 'u_ambientIntensity'),
+        };
     }
 
     private compileShader(type: number, source: string): WebGLShader | null {
@@ -462,38 +493,45 @@ export default class WebGLRenderer implements Renderer {
         this.gl.useProgram(this.program);
         this.gl.bindVertexArray(webglMesh.vao);
 
-        // Set color uniform
-        const colorLocation = this.gl.getUniformLocation(this.program, 'u_color');
-        this.gl.uniform3f(colorLocation, color.x, color.y, color.z);
+        // Set color uniform (using cached location)
+        if (this.uniformLocations.color) {
+            this.gl.uniform3f(this.uniformLocations.color, color.x, color.y, color.z);
+        }
 
-        // Set transform uniform
-        const transformLocation = this.gl.getUniformLocation(this.program, 'u_transform');
-        this.gl.uniformMatrix4fv(transformLocation, false, transform.elements);
+        // Set transform uniform (using cached location)
+        if (this.uniformLocations.transform) {
+            this.gl.uniformMatrix4fv(this.uniformLocations.transform, false, transform.elements);
+        }
 
         // Use identity normal matrix (keep normals in world space since model transforms are translation-only)
-        const normalMatrixLocation = this.gl.getUniformLocation(this.program, 'u_normalMatrix');
-        const identityMatrix = identity();
-        this.gl.uniformMatrix4fv(normalMatrixLocation, false, identityMatrix.elements);
+        // Reuse pre-allocated identity matrix
+        if (this.uniformLocations.normalMatrix) {
+            this.gl.uniformMatrix4fv(this.uniformLocations.normalMatrix, false, this.identityMatrix.elements);
+        }
 
         // Set lighting uniforms (light direction is in world space, matching normals)
-        const lightDirLocation = this.gl.getUniformLocation(this.program, 'u_lightDirection');
-        this.gl.uniform3f(
-            lightDirLocation,
-            this.lightDirection.x,
-            this.lightDirection.y,
-            this.lightDirection.z,
-        );
+        // Using cached locations
+        if (this.uniformLocations.lightDirection) {
+            this.gl.uniform3f(
+                this.uniformLocations.lightDirection,
+                this.lightDirection.x,
+                this.lightDirection.y,
+                this.lightDirection.z,
+            );
+        }
 
-        const lightColorLocation = this.gl.getUniformLocation(this.program, 'u_lightColor');
-        this.gl.uniform3f(
-            lightColorLocation,
-            this.lightColor.x,
-            this.lightColor.y,
-            this.lightColor.z,
-        );
+        if (this.uniformLocations.lightColor) {
+            this.gl.uniform3f(
+                this.uniformLocations.lightColor,
+                this.lightColor.x,
+                this.lightColor.y,
+                this.lightColor.z,
+            );
+        }
 
-        const ambientLocation = this.gl.getUniformLocation(this.program, 'u_ambientIntensity');
-        this.gl.uniform1f(ambientLocation, this.ambientIntensity);
+        if (this.uniformLocations.ambientIntensity) {
+            this.gl.uniform1f(this.uniformLocations.ambientIntensity, this.ambientIntensity);
+        }
 
         // Set wireframe mode
         if (this.wireframe) {
