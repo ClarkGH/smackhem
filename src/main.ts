@@ -45,14 +45,18 @@ const main = async () => {
     updateActiveChunks(world, initialCamera.position, platform.renderer);
 
     // Create debug HUD (only for web platform)
-    let debugHUD: { render: (info: {
-        cameraPosition: { x: number; y: number; z: number };
-        cameraForward: { x: number; y: number; z: number };
-        sunPosition?: { x: number; y: number; z: number };
-        moonPosition?: { x: number; y: number; z: number };
-        timeOfDay?: number;
-    }) => void; toggle: () => void; isVisible: () => boolean } | undefined;
-    
+    let debugHUD: {
+        render: (_info: {
+            cameraPosition: { x: number; y: number; z: number };
+            cameraForward: { x: number; y: number; z: number };
+            sunPosition?: { x: number; y: number; z: number };
+            moonPosition?: { x: number; y: number; z: number };
+            timeOfDay?: number;
+        }) => void;
+        toggle: () => void;
+        isVisible: () => boolean;
+    } | undefined;
+
     // Check if platform has canvas property (web platform only)
     if ('canvas' in platform && platform.canvas instanceof HTMLCanvasElement) {
         debugHUD = createDebugHUD(platform.canvas as HTMLCanvasElement);

@@ -1,4 +1,4 @@
-import type { Renderer, MeshHandle } from '../services/renderer';
+import type { Renderer } from '../services/renderer';
 import type { Input } from '../services/input';
 import {
     createCamera,
@@ -10,7 +10,12 @@ import {
     getCameraRight,
 } from './camera';
 import { resolveCollision, createCollisionContext } from './collision';
-import { matrixMultiply, identity, quaternionFromYawPitch, quaternionApplyToVector } from './math/mathHelpers';
+import {
+    matrixMultiply,
+    identity,
+    quaternionFromYawPitch,
+    quaternionApplyToVector,
+} from './math/mathHelpers';
 import { World } from './world';
 import type { Vec3, Mat4 } from '../types/common';
 
@@ -21,13 +26,17 @@ const createGameLoop = (
     input: Input,
     world: World,
     getAspectRatio: () => number,
-    debugHUD?: { render: (info: {
-        cameraPosition: Vec3;
-        cameraForward: Vec3;
-        sunPosition?: Vec3;
-        moonPosition?: Vec3;
-        timeOfDay?: number;
-    }) => void; toggle: () => void; isVisible: () => boolean },
+    debugHUD?: {
+        render: (_info: {
+            cameraPosition: Vec3;
+            cameraForward: Vec3;
+            sunPosition?: Vec3;
+            moonPosition?: Vec3;
+            timeOfDay?: number;
+        }) => void;
+        toggle: () => void;
+        isVisible: () => boolean;
+    },
 ) => {
     const camera = createCamera();
     const collisionContext = createCollisionContext();
@@ -64,6 +73,8 @@ const createGameLoop = (
     const sunTransform = identity(); // 4x4 matrix
     const moonTransform = identity(); // 4x4 matrix
     const moonLightDirection = { x: 0, y: 0, z: 0 }; // For moon (opposite of sun)
+    const sunDirectionForPosition = { x: 0, y: 0, z: 0 }; // Negated light direction for sun positioning
+    const moonDirectionForPosition = { x: 0, y: 0, z: 0 }; // Negated moon direction for moon positioning
     const sunAzimuth = { value: 0 }; // For spherical coordinate calculations
     const sunElevation = { value: 0 }; // For spherical coordinate calculations
 
@@ -83,9 +94,7 @@ const createGameLoop = (
 
     // Convert simulation time to time of day (0-1 cycle)
     // 0.0 = midnight, 0.25 = dawn, 0.5 = noon, 0.75 = dusk, 1.0 = next midnight
-    const getTimeOfDay = (simTime: number): number => {
-        return (simTime % DAY_LENGTH_SECONDS) / DAY_LENGTH_SECONDS;
-    };
+    const getTimeOfDay = (simTime: number): number => (simTime % DAY_LENGTH_SECONDS) / DAY_LENGTH_SECONDS;
 
     // Compute sun azimuth and elevation using spherical coordinates
     // Azimuth: 0 = north, π/2 = east, π = south, 3π/2 = west (compass direction)
@@ -102,7 +111,7 @@ const createGameLoop = (
 
         // Elevation: sin curve from -1 (midnight) to 1 (noon) to -1 (next midnight)
         // Add declination offset for seasonal variation (future use)
-        let elevation = Math.sin(angle) + DECLINATION_OFFSET;
+        const elevation = Math.sin(angle) + DECLINATION_OFFSET;
 
         // Azimuth: cos curve, adjusted for east-west arc
         // At noon (0.5), azimuth = π (south)
@@ -110,7 +119,9 @@ const createGameLoop = (
         // At dusk (0.75), azimuth = 3π/2 (west)
         const azimuth = Math.PI / 2 + angle; // Start at east (π/2), rotate clockwise
 
+        // eslint-disable-next-line no-param-reassign
         outAzimuth.value = azimuth;
+        // eslint-disable-next-line no-param-reassign
         outElevation.value = elevation;
     };
 
@@ -142,7 +153,7 @@ const createGameLoop = (
 
     // Compute sun direction using spherical coordinates
     // Physical behavior: east → overhead → west → below horizon
-    // Coordinate system: Y-up world space, light direction points FROM light source TOWARD scene
+    // Coordinate system: Y-up world space, light direction points TOWARD the light source (standard graphics convention)
     // PERFORMANCE: Writes into existing object to avoid allocation
     const computeSunDirection = (timeOfDay: number, out: Vec3): void => {
         const azimuth = { value: 0 };
@@ -193,7 +204,14 @@ const createGameLoop = (
             // Use smoothstep for smooth transition
             const t = normalizedElev;
             // Safety check: ensure smoothstep bounds are valid (t should be 0-1)
-            const smoothT = (t <= 0) ? 0 : (t >= 1) ? 1 : t * t * (3 - 2 * t); // Smoothstep function
+            let smoothT = 0;
+            if (t <= 0) {
+                smoothT = 0;
+            } else if (t >= 1) {
+                smoothT = 1;
+            } else {
+                smoothT = t * t * (3 - 2 * t); // Smoothstep function
+            }
 
             // White at zenith, red/orange at horizon
             out.x = 0.8 + 0.2 * smoothT; // Red component: 1.0 at zenith, 0.8 at horizon
@@ -215,7 +233,7 @@ const createGameLoop = (
 
         // Use high-power cosine for sharp drop near horizon
         // cos^4 curve: drops sharply near 0, stays high near 1
-        const cosElev = Math.cos(normalizedElev * Math.PI / 2);
+        const cosElev = Math.cos((normalizedElev * Math.PI) / 2);
         const intensity = cosElev * cosElev * cosElev * cosElev; // cos^4
 
         // Map to ambient range: 0.1 (horizon) to 0.5 (zenith)
@@ -235,24 +253,22 @@ const createGameLoop = (
     // Compute moon visibility (0-1, smooth transition)
     // Moon visible during night (opposite of sun)
     // PERFORMANCE: Pure function, no allocations
-    const computeMoonVisibility = (timeOfDay: number): number => {
-        return 1 - computeSunVisibility(timeOfDay);
-    };
+    const computeMoonVisibility = (timeOfDay: number): number => 1 - computeSunVisibility(timeOfDay);
 
     // Compute sun/moon position in world space (along light direction, at fixed distance from player)
     // PERFORMANCE: Writes into existing object to avoid allocation (complies with RULE M-1)
     // LEARNING: Vector math: position = start + direction * distance
     const computeCelestialPosition = (
-        lightDirection: Vec3,  // Normalized direction vector (points FROM light TOWARD scene)
-        distance: number,       // Distance from player to celestial object
-        playerPosition: Vec3,  // Player/camera position in world space
-        out: Vec3,             // Output: celestial object position
+        dirVec: Vec3, // Normalized direction vector (points TOWARD the celestial object from the scene)
+        distance: number, // Distance from player to celestial object
+        playerPosition: Vec3, // Player/camera position in world space
+        out: Vec3, // Output: celestial object position
     ): void => {
-        // Position = player position + (light direction * distance)
-        // Note: lightDirection points TOWARD scene, so we use it directly
-        out.x = playerPosition.x + lightDirection.x * distance;
-        out.y = playerPosition.y + lightDirection.y * distance;
-        out.z = playerPosition.z + lightDirection.z * distance;
+        // Position = player position + (direction * distance)
+        // dirVec points TOWARD the celestial object, so we use it directly
+        out.x = playerPosition.x + dirVec.x * distance;
+        out.y = playerPosition.y + dirVec.y * distance;
+        out.z = playerPosition.z + dirVec.z * distance;
     };
 
     // Compute transform matrix for celestial object (sphere/orb)
@@ -260,9 +276,9 @@ const createGameLoop = (
     // PERFORMANCE: Writes into existing matrix to avoid allocation
     // LEARNING: 4x4 transformation matrix layout (column-major order)
     const computeCelestialTransform = (
-        position: Vec3,        // World position of celestial object
-        size: number,          // Size scaling factor (sphere radius)
-        out: Mat4,            // Output: 4x4 transformation matrix
+        position: Vec3, // World position of celestial object
+        size: number, // Size scaling factor (sphere radius)
+        out: Mat4, // Output: 4x4 transformation matrix
     ): void => {
         const o = out.elements;
 
@@ -281,7 +297,7 @@ const createGameLoop = (
         // Fixed timestep simulation updates
         simulationTime += dt;
         const intent = input.getIntent();
-        
+
         // Handle debug HUD toggle
         if (intent.toggleDebugHUD) {
             if (debugHUD) {
@@ -362,9 +378,24 @@ const createGameLoop = (
         // Compute ambient intensity using sigmoid curve (sharp drop near horizon)
         const ambientIntensity = computeAmbientIntensity(sunElevation.value);
 
+        // Compute moon spherical coordinates (opposite phase) - needed for light direction selection
+        const moonAzimuth = { value: sunAzimuth.value + Math.PI };
+        const moonElevation = { value: -sunElevation.value };
+
+        // Convert moon spherical to direction
+        sphericalToDirection(moonAzimuth.value, moonElevation.value, moonLightDirection);
+
+        // Calculate visibility to determine which light source to use
+        const sunVisibility = computeSunVisibility(timeOfDay);
+        const moonVisibility = computeMoonVisibility(timeOfDay);
+
+        // Use light direction from whichever celestial body is more visible
+        // At night (moon more visible), use moon's light direction; at day (sun more visible), use sun's
+        const activeLightDirection = moonVisibility > sunVisibility ? moonLightDirection : lightDirection;
+
         // Set lighting parameters via renderer interface
         if (renderer.setLightDirection) {
-            renderer.setLightDirection(lightDirection);
+            renderer.setLightDirection(activeLightDirection);
         }
         if (renderer.setLightColor) {
             renderer.setLightColor(lightColor);
@@ -373,26 +404,28 @@ const createGameLoop = (
             renderer.setAmbientIntensity(ambientIntensity);
         }
 
-        // Compute moon spherical coordinates (opposite phase)
-        // Moon azimuth = sun azimuth + π (opposite direction)
-        // Moon elevation = -sun elevation (opposite elevation)
-        const moonAzimuth = { value: sunAzimuth.value + Math.PI };
-        const moonElevation = { value: -sunElevation.value };
-
-        // Convert moon spherical to direction
-        sphericalToDirection(moonAzimuth.value, moonElevation.value, moonLightDirection);
-
         // Compute celestial positions (at infinite distance)
-        computeCelestialPosition(lightDirection, CELESTIAL_DISTANCE, camera.position, sunPosition);
-        computeCelestialPosition(moonLightDirection, CELESTIAL_DISTANCE, camera.position, moonPosition);
+        // lightDirection points TOWARD the light source (from spherical coordinates),
+        // so use it directly to position the celestial object
+        sunDirectionForPosition.x = lightDirection.x;
+        sunDirectionForPosition.y = lightDirection.y;
+        sunDirectionForPosition.z = lightDirection.z;
+
+        computeCelestialPosition(sunDirectionForPosition, CELESTIAL_DISTANCE, camera.position, sunPosition);
+
+        // moonLightDirection points TOWARD the moon (from spherical coordinates),
+        // so use it directly to position the celestial object
+        moonDirectionForPosition.x = moonLightDirection.x;
+        moonDirectionForPosition.y = moonLightDirection.y;
+        moonDirectionForPosition.z = moonLightDirection.z;
+
+        computeCelestialPosition(moonDirectionForPosition, CELESTIAL_DISTANCE, camera.position, moonPosition);
 
         // Compute transforms (simple translation + scaling for spheres)
         computeCelestialTransform(sunPosition, SUN_SIZE, sunTransform);
         computeCelestialTransform(moonPosition, MOON_SIZE, moonTransform);
 
-        // Calculate visibility (0-1, smooth fade)
-        const sunVisibility = computeSunVisibility(timeOfDay);
-        const moonVisibility = computeMoonVisibility(timeOfDay);
+        // Visibility already computed above for light direction selection, reuse values
 
         // Render sun (if visible)
         if (sunVisibility > 0) {
@@ -434,13 +467,13 @@ const createGameLoop = (
             // Get full camera forward vector (including pitch) for viewing direction
             const rotation = quaternionFromYawPitch(camera.yaw, camera.pitch);
             const cameraForward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
-            
+
             debugHUD.render({
                 cameraPosition: camera.position,
-                cameraForward: cameraForward,
-                sunPosition: sunPosition,
-                moonPosition: moonPosition,
-                timeOfDay: timeOfDay,
+                cameraForward,
+                sunPosition,
+                moonPosition,
+                timeOfDay,
             });
         }
 
@@ -450,11 +483,14 @@ const createGameLoop = (
     const getCameraPosition = (): Vec3 => camera.position;
 
     // Exported getTimeOfDay for external use (takes simulationTime as parameter)
-    const getTimeOfDayExported = (): number => {
-        return getTimeOfDay(simulationTime);
-    };
+    const getTimeOfDayExported = (): number => getTimeOfDay(simulationTime);
 
-    return { update, render, getCameraPosition, getTimeOfDay: getTimeOfDayExported };
+    return {
+        update,
+        render,
+        getCameraPosition,
+        getTimeOfDay: getTimeOfDayExported,
+    };
 };
 
 export default createGameLoop;

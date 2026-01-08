@@ -80,7 +80,8 @@ export default class WebGLRenderer implements Renderer {
             
             void main() {
                 // Normalize light direction (should be normalized on CPU, but safety check)
-                vec3 lightDir = normalize(-u_lightDirection);
+                // u_lightDirection points FROM light source TOWARD scene, which is what we need for Lambertian lighting
+                vec3 lightDir = normalize(u_lightDirection);
                 
                 // Calculate diffuse lighting (Lambertian)
                 float diff = max(dot(v_normal, lightDir), 0.0);

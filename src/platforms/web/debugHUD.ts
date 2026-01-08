@@ -9,13 +9,13 @@ export interface DebugInfo {
 }
 
 export const createDebugHUD = (canvas: HTMLCanvasElement): {
-    render: (info: DebugInfo) => void;
+    render: (_info: DebugInfo) => void;
     toggle: () => void;
     isVisible: () => boolean;
 } => {
     // Create 2D canvas overlay positioned on top of WebGL canvas
     const overlay = document.createElement('canvas');
-    
+
     // Position overlay to match canvas
     const updateOverlaySize = () => {
         const rect = canvas.getBoundingClientRect();
@@ -27,14 +27,14 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         overlay.width = canvas.width;
         overlay.height = canvas.height;
     };
-    
+
     updateOverlaySize();
     overlay.style.pointerEvents = 'none'; // Don't block mouse input
     overlay.style.zIndex = '1000'; // Ensure it's on top
     overlay.style.position = 'absolute';
     overlay.style.backgroundColor = 'transparent';
     document.body.appendChild(overlay);
-    
+
     // Update overlay size when window resizes
     window.addEventListener('resize', updateOverlaySize);
 
@@ -45,9 +45,7 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
 
     let visible = false;
 
-    const formatVec3 = (v: Vec3): string => {
-        return `(${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)})`;
-    };
+    const formatVec3 = (v: Vec3): string => `(${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)})`;
 
     const formatTime = (timeOfDay: number): string => {
         // Convert timeOfDay (0-1) to hours:minutes format
@@ -69,7 +67,7 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         // Set font and color with stroke for visibility
         ctx.font = '14px monospace';
         ctx.textBaseline = 'top';
-        
+
         // Helper function to draw text with outline for visibility
         const drawText = (text: string, x: number, y: number) => {
             ctx.strokeStyle = 'black';
