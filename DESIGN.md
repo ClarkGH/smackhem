@@ -328,6 +328,24 @@ All runtime objects must have:
 
 Garbage collection should never be relied upon for correctness.
 
+#### RULE M-3: No Iterator/Generator Syntax
+
+Forbidden:
+
+- `for...of` loops (requires regenerator-runtime)
+- Generator functions (`function*`, `yield`)
+- Iterator protocols
+
+Allowed:
+
+- `Array.forEach()`
+- `Map.forEach()`
+- `Set.forEach()`
+- Traditional `for` loops with indices
+- `while` loops
+
+Reason: Iterator/generator syntax requires regenerator-runtime polyfill, which adds overhead and complexity. Console ports may not support this runtime, and it violates the "no hidden dependencies" principle.
+
 ### 7. Asset Loading Rules
 
 #### RULE A-1: Assets Are Requested by ID
@@ -877,7 +895,7 @@ interface Renderer {
 }
 ```
 
-**Exact Formulas:**
+**Implementation:**
 
 **Time of Day Calculation:**
 
@@ -886,29 +904,100 @@ const DAY_LENGTH_SECONDS = 120; // 2 minutes per full cycle (configurable)
 const timeOfDay = (simulationTime % DAY_LENGTH_SECONDS) / DAY_LENGTH_SECONDS;
 ```
 
-**Sun Direction:**
+**Spherical Coordinate System:**
+
+The implementation uses spherical coordinates (azimuth + elevation) for physically accurate 3D positioning:
+
+- **Azimuth** (compass direction): 0 = north, π/2 = east, π = south, 3π/2 = west
+- **Elevation** (height above horizon): -1 (below horizon) to +1 (zenith/overhead)
 
 ```typescript
+// Compute sun azimuth and elevation
 const angle = timeOfDay * Math.PI * 2; // Full rotation (0 to 2π)
-const sunHeight = Math.sin(angle); // -1 (midnight) to 1 (noon)
-const sunRotation = Math.cos(angle); // Horizontal component (1 at midnight, -1 at noon)
-// Normalize: out = { x: sunRotation / len, y: sunHeight / len, z: 0 }
+const elevation = Math.sin(angle) + DECLINATION_OFFSET; // -1 (midnight) to 1 (noon)
+const azimuth = Math.PI / 2 + angle; // Starts at east (π/2), rotates clockwise
+
+// Convert spherical to Cartesian direction vector
+const cosElev = Math.cos(elevation);
+out.x = cosElev * Math.sin(azimuth);  // East-west component
+out.y = Math.sin(elevation);          // Up-down component
+out.z = cosElev * Math.cos(azimuth);  // North-south component
+// Normalize for unit vector
 ```
 
-**Light Color:**
+**Moon Calculation:**
+
+Moon follows opposite phase from sun:
+
+- Azimuth: `sunAzimuth + π` (opposite direction)
+- Elevation: `-sunElevation` (opposite height)
+
+**Light Direction Selection (Visibility-Based):**
+
+The system dynamically selects which light source to use based on visibility:
 
 ```typescript
-const sunFactor = Math.sin(timeOfDay * Math.PI); // 0 at midnight, 1 at noon
-const factor = 0.7 + 0.3 * sunFactor; // Range: 0.7 (night) to 1.0 (day)
-lightColor = { x: factor, y: factor, z: 0.8 + 0.2 * sunFactor };
+const sunVisibility = computeSunVisibility(timeOfDay); // 1.0 at noon, 0.0 at night
+const moonVisibility = 1.0 - sunVisibility; // Inverse of sun visibility
+const activeLightDirection = moonVisibility > sunVisibility ? moonLightDirection : lightDirection;
 ```
 
-**Ambient Intensity:**
+**Light Color (Elevation-Based Gradient):**
+
+Color transitions simulate atmospheric scattering (Rayleigh scattering):
 
 ```typescript
-const sunFactor = Math.sin(timeOfDay * Math.PI);
-ambientIntensity = 0.2 + 0.3 * sunFactor; // Range: 0.2 (night) to 0.5 (day)
+// Normalize elevation to 0-1 range (horizon to zenith)
+const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
+
+if (elevation < HORIZON_THRESHOLD) {
+    // Below horizon: cool night color
+    lightColor = { x: 0.3, y: 0.4, z: 0.6 }; // Cool blue
+} else {
+    // Above horizon: gradient from white (zenith) to red/orange (horizon)
+    const t = normalizedElev;
+    const smoothT = t * t * (3 - 2 * t); // Smoothstep function
+    lightColor = {
+        x: 0.8 + 0.2 * smoothT, // 1.0 at zenith, 0.8 at horizon
+        y: 0.7 + 0.3 * smoothT, // 1.0 at zenith, 0.7 at horizon
+        z: 0.5 + 0.5 * smoothT  // 1.0 at zenith, 0.5 at horizon (warmer)
+    };
+}
 ```
+
+**Ambient Intensity (Cosine Power Curve):**
+
+Uses high-power cosine for sharp transition near horizon:
+
+```typescript
+if (elevation < HORIZON_THRESHOLD) {
+    return 0.1; // Dark night ambient
+}
+const normalizedElev = (elevation + 1) / 2; // 0 (horizon) to 1 (zenith)
+const cosElev = Math.cos((normalizedElev * Math.PI) / 2);
+const intensity = cosElev * cosElev * cosElev * cosElev; // cos^4 curve
+return 0.1 + 0.4 * intensity; // Range: 0.1 (horizon) to 0.5 (zenith)
+```
+
+**Visual Celestial Objects:**
+
+The sun and moon are rendered as visible spheres in the sky:
+
+- **Positioning**: Placed at infinite distance along their light direction vectors
+  - Distance: `CELESTIAL_DISTANCE = camera.far - 1.0` (ensures visibility)
+  - Position: `camera.position + (lightDirection * CELESTIAL_DISTANCE)`
+
+- **Size Constants**:
+  - `SUN_SIZE = 0.5` (radius of sun sphere)
+  - `MOON_SIZE = 0.4` (radius of moon sphere)
+
+- **Colors**:
+  - Sun: `{ x: 1.0, y: 0.85, z: 0.2 }` (golden yellow)
+  - Moon: `{ x: 0.4, y: 0.6, z: 0.9 }` (cool blue)
+
+- **Visibility**: Colors are multiplied by visibility factor (0-1) for smooth fade in/out
+  - Sun fades in at dawn, fades out at dusk
+  - Moon fades in at dusk, fades out at dawn
 
 **Time Mapping:**
 
@@ -930,9 +1019,13 @@ ambientIntensity = 0.2 + 0.3 * sunFactor; // Range: 0.2 (night) to 0.5 (day)
 - Simulation time is tracked separately from frame accumulator
 - Simulation time accumulates in game loop via fixed timestep (`simulationTime += dt`)
 - All functions are pure (no side effects, deterministic)
-- **Zero-allocation design**: Pre-allocated Vec3 objects are reused every frame, functions write into existing objects instead of creating new ones (complies with RULE M-1)
-- Inline normalization avoids calling `normalizeVec3()` which would allocate
+- **Zero-allocation design**: Pre-allocated Vec3 and Mat4 objects are reused every frame
+  - Functions write into existing objects instead of creating new ones (complies with RULE M-1)
+  - Celestial objects, transforms, colors, and directions are all pre-allocated
+  - Inline normalization avoids calling allocation-heavy helper functions
 - All values are computed fresh each frame (no caching needed, pure functions)
+- Celestial meshes (sun/moon spheres) are created once and reused
+- Horizon clamping prevents lighting from below the floor when celestial objects are below horizon
 
 #### Key Rule: gl.* never leaks upward
 

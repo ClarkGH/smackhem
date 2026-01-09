@@ -23,6 +23,7 @@ export interface WebInputState {
     };
     pressedKeys: Set<string>;
     keyMapping: KeyMapping;
+    toggleDebugHUD: boolean;
 }
 
 export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => ({
@@ -34,6 +35,7 @@ export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => (
     },
     pressedKeys: new Set<string>(),
     keyMapping: keyMapping || DEFAULT_KEY_MAPPING,
+    toggleDebugHUD: false,
 });
 
 export const setupWebInput = (
@@ -48,6 +50,15 @@ export const setupWebInput = (
 
     const handleKeyDown = (e: KeyboardEvent) => {
         webState.pressedKeys.add(e.key);
+        // Toggle debug HUD on 'H' or 'F3' key
+        if (e.key === 'h' || e.key === 'H' || e.key === 'F3') {
+            console.log('Debug HUD toggle key pressed:', e.key);
+            webState.toggleDebugHUD = true;
+            // Prevent F3 from opening browser dev tools
+            if (e.key === 'F3') {
+                e.preventDefault();
+            }
+        }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -71,7 +82,13 @@ export const setupWebInput = (
     });
 };
 
-export const syncWebInput = (coreState: InputState, webState: WebInputState) => {
+export const syncWebInput = (
+    coreState: InputState,
+    webState: WebInputState,
+): { toggleDebugHUD: boolean } => {
+    // Reset toggle flags after sync (they're consumed once per frame)
+    const toggleDebugHUD = webState.toggleDebugHUD;
+    webState.toggleDebugHUD = false;
     const gamepad = navigator.getGamepads()[0];
 
     let finalLookX = webState.axes.mouseLookX;
@@ -124,4 +141,6 @@ export const syncWebInput = (coreState: InputState, webState: WebInputState) => 
     // Reset mouse deltas or they repeat frames
     webState.axes.mouseLookX = 0;
     webState.axes.mouseLookY = 0;
+
+    return { toggleDebugHUD };
 };
