@@ -4,8 +4,6 @@ import AABB from './math/aabb';
 import { extractPosition } from './math/mathHelpers';
 import { getMeshAABB } from './collision';
 
-// TODO: We may want to move this and other typing/interface namespaces
-// to common classes down the line.
 export type ChunkID = string;
 
 export const CHUNK_SIZE = 10; // Size of each chunk in world units

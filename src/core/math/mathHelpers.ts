@@ -187,6 +187,7 @@ export const lookDirection = (
     return { elements: e };
 };
 
+// Matrix extraction
 export const extractPosition = (matrix: Mat4): Vec3 => ({
     x: matrix.elements[12],
     y: matrix.elements[13],

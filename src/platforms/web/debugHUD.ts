@@ -29,8 +29,8 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
     };
 
     updateOverlaySize();
-    overlay.style.pointerEvents = 'none'; // Don't block mouse input
-    overlay.style.zIndex = '1000'; // Ensure it's on top
+    overlay.style.pointerEvents = 'none';
+    overlay.style.zIndex = '1000';
     overlay.style.position = 'absolute';
     overlay.style.backgroundColor = 'transparent';
     document.body.appendChild(overlay);
