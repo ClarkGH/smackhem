@@ -44,7 +44,7 @@ export const getPlayerAABB = (position: Vec3, height: number, radius: number): A
     );
 };
 
-// Performance optimization: Update AABB in-place (zero allocation)
+// PERFORMANCE: Update AABB in-place (zero allocation)
 export const updatePlayerAABB = (
     position: Vec3,
     height: number,
@@ -96,7 +96,7 @@ export const resolveCollision = (
     context.newPos.x = playerPos.x + movement.x;
     context.newPos.y = playerPos.y + movement.y;
     context.newPos.z = playerPos.z + movement.z;
-    // Update AABB in-place (zero allocation)
+    // PERFORMANCE: Update AABB in-place (zero allocation)
     updatePlayerAABB(context.newPos, playerHeight, playerRadius, context.playerAABB);
 
     let hasCollision = false;
@@ -115,7 +115,7 @@ export const resolveCollision = (
     context.xOnlyPos.x = playerPos.x + movement.x;
     context.xOnlyPos.y = playerPos.y;
     context.xOnlyPos.z = playerPos.z;
-    // Update AABB in-place (zero allocation)
+    // PERFORMANCE: Update AABB in-place (zero allocation)
     updatePlayerAABB(context.xOnlyPos, playerHeight, playerRadius, context.xOnlyAABB);
     let xCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
@@ -129,7 +129,7 @@ export const resolveCollision = (
     context.zOnlyPos.x = playerPos.x;
     context.zOnlyPos.y = playerPos.y;
     context.zOnlyPos.z = playerPos.z + movement.z;
-    // Update AABB in-place (zero allocation)
+    // PERFORMANCE: Update AABB in-place (zero allocation)
     updatePlayerAABB(context.zOnlyPos, playerHeight, playerRadius, context.zOnlyAABB);
     let zCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
@@ -139,10 +139,9 @@ export const resolveCollision = (
         }
     }
 
-    // Return resolved movement
     return {
         x: xCollision ? 0 : movement.x,
-        y: movement.y, // Keep Y movement as-is for now
+        y: movement.y,
         z: zCollision ? 0 : movement.z,
     };
 };

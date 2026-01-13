@@ -28,7 +28,7 @@ export class World {
 
     private _collidableAABBsBuffer: AABB[] = [];
 
-    // Helper to generate a coordinate-based ID (e.g., "0,0")
+    // UTILITY: Helper to generate a coordinate-based ID (e.g., "0,0")
     static getChunkID(x: number, z: number): ChunkID {
         return `${x},${z}`;
     }
@@ -42,15 +42,12 @@ export class World {
     }
 
     getVisibleMeshes(): StaticMesh[] {
-        // Clear buffer and reuse
         this._visibleMeshesBuffer.length = 0;
 
-        // Use forEach instead of for...of to avoid regenerator-runtime dependency (RULE M-3)
         this.activeChunks.forEach((chunk) => {
             this._visibleMeshesBuffer.push(...chunk.meshes);
         });
 
-        // Return buffer reference (callers must not mutate)
         return this._visibleMeshesBuffer;
     }
 
@@ -83,7 +80,6 @@ export class World {
         // Clear buffer and reuse
         this._collidableAABBsBuffer.length = 0;
 
-        // Use forEach instead of for...of to avoid regenerator-runtime dependency (RULE M-3)
         this.activeChunks.forEach((chunk) => {
             chunk.meshes.forEach((mesh) => {
                 // Filter out floor meshes - cubes are at y > 0.1, floors are at y = 0
@@ -96,7 +92,6 @@ export class World {
             });
         });
 
-        // Return buffer reference (callers must not mutate)
         return this._collidableAABBsBuffer;
     }
 }
