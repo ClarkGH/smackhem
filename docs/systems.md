@@ -1,8 +1,25 @@
 # Systems
 
-## 7. World System
+## Table of Contents
 
-### 7.1 World Structure
+- [World System](#world-system)
+  - [World Structure](#world-structure)
+  - [Chunk Definition](#chunk-definition)
+  - [Chunk Streaming](#chunk-streaming)
+- [Geometry Rules (Intentional Constraints)](#geometry-rules-intentional-constraints)
+- [Input System (Console-Ready)](#input-system-console-ready)
+  - [Input Intent](#input-intent)
+  - [Bare Web Input Backend](#bare-web-input-backend)
+  - [Console Input Backend (Future)](#console-input-backend-future)
+- [Party System (Drakkhen-Style)](#party-system-drakkhen-style)
+  - [Party Structure](#party-structure)
+  - [Party/Enemy Behavior](#partyenemy-behavior)
+- [Collision System](#collision-system)
+- [Navigation](#navigation)
+
+## World System
+
+### World Structure
 
 ```typescript
 World {
@@ -16,7 +33,7 @@ Each chunk is:
 - Collision bounds
 - No logic
 
-### 7.2 Chunk Definition
+### Chunk Definition
 
 ```typescript
 Chunk {
@@ -32,7 +49,7 @@ StaticMesh {
 }
 ```
 
-### 7.3 Chunk Streaming
+### Chunk Streaming
 
 - Player position determines active radius
 - Load:
@@ -46,7 +63,7 @@ This works identically on:
 - Desktop
 - Console
 
-## 8. Geometry Rules (Intentional Constraints)
+## Geometry Rules (Intentional Constraints)
 
 - No Curves or Smooth Surfaces: The game will strictly use geometric shapes such as cubes, pyramids, prisms, and planes. This constraint is intentional to simplify the design and rendering pipeline, making it easier to batch objects and optimize performance.
 - No Textures: The game will only use solid colors or shaders for visual effects, making it more minimalist and geometric in appearance.
@@ -60,9 +77,9 @@ Why:
 - Easy to port
 - Easy to debug
 
-## 10. Input System (Console-Ready)
+## Input System (Console-Ready)
 
-### 10.1 Input Intent
+### Input Intent
 
 ```typescript
 interface PlayerIntent {
@@ -72,22 +89,22 @@ interface PlayerIntent {
 }
 ```
 
-### 10.2 Bare Web Input Backend
+### Bare Web Input Backend
 
 - Keyboard → move
 - Mouse → look
 - Gamepad → move/look
 
-### 10.3 Console Input Backend (Future)
+### Console Input Backend (Future)
 
 - Controller only
 - Same intent output
 
 Game logic never sees devices.
 
-## 11. Party System (Drakkhen-Style)
+## Party System (Drakkhen-Style)
 
-### 11.1 Party Structure
+### Party Structure
 
 ```typescript
 interface Party {
@@ -102,7 +119,7 @@ interface PartyMember {
 }
 ```
 
-### 11.2 Party/Enemy Behavior
+### Party/Enemy Behavior
 
 - camera moves in 3D sections.
 - Party "pops out" from the center and splays out in a line on input or event.
@@ -117,7 +134,7 @@ interface PartyMember {
 
 This is cheap, readable, and portable.
 
-## 12. Collision System
+## Collision System
 
 - Manual (Axis-Aligned Bounding Box) checks.
 - 3D camera vs world collision.
@@ -126,3 +143,14 @@ This is cheap, readable, and portable.
 - Deterministic.
 
 This is console-friendly and debuggable.
+
+## Navigation
+
+- **[Index](INDEX.md)** - Project overview and documentation index
+- **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
+- **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
+- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
+- **[Camera](camera.md)** - Camera system and mathematical formulas
+- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Project Structure](project-structure.md)** - Code organization and project structure
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path

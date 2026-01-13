@@ -1,11 +1,28 @@
 # Camera System (First-Person Focus)
 
-## 9.1 Camera Modes
+## Table of Contents
+
+- [Camera Modes](#camera-modes)
+- [Camera Rules](#camera-rules)
+- [Technical Jargon and Formulae](#technical-jargon-and-formulae)
+  - [Identity Matrices](#identity-matrices)
+  - [Perspective Projection Matrix](#perspective-projection-matrix)
+  - [Direction Vector Formula](#direction-vector-formula)
+  - [Look-At Matrix (View Matrix)](#look-at-matrix-view-matrix)
+  - [Orientation Vectors](#orientation-vectors)
+  - [Translation and Final Matrix](#translation-and-final-matrix)
+  - [Quaternion Rotation System](#quaternion-rotation-system)
+  - [Matrix Multiplication](#matrix-multiplication)
+  - [Lighting System (Grayscale)](#lighting-system-grayscale)
+  - [Geometric Mesh Generation](#geometric-mesh-generation)
+- [Navigation](#navigation)
+
+## Camera Modes
 
 - First-person (default)
 - Optional slightly elevated free camera (toggleable)
 
-## 9.2 Camera Rules
+## Camera Rules
 
 - Yaw + pitch only
 - No roll
@@ -15,9 +32,9 @@
   - Update simulation via fixed or variable time/steps
   - interpolate the render
 
-## 9.2.1 Technical Jargon and Formulae
+## Technical Jargon and Formulae
 
-### 9.2.2 Identity Matrices
+### Identity Matrices
 
 Identity matrices represent the default state of an object in 3D space. We use them as the starting point.
 
@@ -33,7 +50,7 @@ If a shader expects a matrix, but we don't want to apply any transformation to t
 
 This ties into the w component. By having 1s on the diagonal and 0s elsewhere, our matrix will tell the GPU to keep x as x, y as y, z as z, and w as 1.
 
-### 9.2.3 Perspective Projection Matrix
+### Perspective Projection Matrix
 
 Perspective lives inside a 16 element array.
 
@@ -71,7 +88,7 @@ We need a projection trick value. We set it as -1 to move the original z-value i
 
 Wherever we are is a silly variable name we're rolling with to do some wonky stuff with right and left handed coordinates. Standby there, brains too tired after learning 3D math.
 
-### 9.2.4 Direction Vector Formula
+### Direction Vector Formula
 
 `Direction = normalize(B - A)`
 
@@ -83,7 +100,7 @@ Everything we build uses lines
 
 `e.g. Direction = (dx, dy, dz) / sqrt(dx^2 + dy^2 + dz^2)`
 
-### 9.2.5 Look-At Matrix (View Matrix)
+### Look-At Matrix (View Matrix)
 
 ~~For a 3D camera, we need to define Up/Right to create a proper orientation matrices. We will be using a 16 element list or array for the matrices~~
 
@@ -93,7 +110,7 @@ Everything we build uses lines
 
 **Note:** This section is obsolete. We now use quaternions to compute camera orientation (see section 9.2.8.1). The view matrix structure remains the same (16-element array), but the rotation vectors are computed via quaternion rotation rather than cross products from a target point.
 
-### 9.2.7 Orientation Vectors
+### Orientation Vectors
 
 3D orientation requires three vectors within a 16 element list to define an xyz coordinate system
 
@@ -117,7 +134,7 @@ Everything we build uses lines
 
 **Note:** The Euler angle formulas above are obsolete. We now compute these vectors using quaternion rotation (see section 9.2.8.1). The basis vectors are obtained by applying the camera's quaternion rotation to the initial basis vectors `(1,0,0)`, `(0,1,0)`, and `(0,0,-1)`.
 
-### 9.2.8 Translation and Final Matrix
+### Translation and Final Matrix
 
 We want to store the inverted position of the camera. View matrices move the world in the opposite direction vs moving the camera. We will always be at "the center".
 
@@ -127,7 +144,7 @@ We'll also want a "w" for the 4x4 matrix mathy stuff (homogenous coordinates)
 
 - e[15] = 1
 
-### 9.2.8.1 Quaternion Rotation System
+### Quaternion Rotation System
 
 We use quaternions to represent 3D rotations, avoiding gimbal lock and providing smooth interpolation. A quaternion is a 4-component vector: `{x, y, z, w}` where `(x, y, z)` is the imaginary part and `w` is the real part.
 
@@ -217,7 +234,7 @@ These form the rotation part of the view matrix (transposed for column-major sto
 
 Camera is a system, not math in input code.
 
-### 9.2.9 Matrix Multiplication
+### Matrix Multiplication
 
 In order to change position, we'll need to combine two matrices for their product. We'll do so via matrix multiplication.
 <https://en.wikipedia.org/wiki/Matrix_multiplication>
@@ -253,7 +270,7 @@ Column major skips full columns of size M to reach the correct column then adds 
 - Column Major = B + W * [(j - L_c) * M + (j - L_r)]
 ```
 
-### 9.2.10 Lighting System (Grayscale)
+### Lighting System (Grayscale)
 
 **Directional Light Direction**
 Light direction is a normalized 3D vector pointing from the light source toward the scene.
@@ -321,7 +338,7 @@ edge2 = v2 - v0
 normal = normalize(cross(edge1, edge2))
 ```
 
-### 9.2.11 Geometric Mesh Generation
+### Geometric Mesh Generation
 
 **Cube Mesh**
 For a cube of size `s`, centered at origin:
@@ -367,3 +384,14 @@ halfH = h / 2
 halfD = d / 2
 // 6 rectangular faces, each as 2 triangles
 ```
+
+## Navigation
+
+- **[Index](INDEX.md)** - Project overview and documentation index
+- **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
+- **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
+- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
+- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
+- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Project Structure](project-structure.md)** - Code organization and project structure
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path

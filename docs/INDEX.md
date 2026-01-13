@@ -9,7 +9,8 @@
 - [Inspired by](#inspired-by)
 - [Shared features](#shared-features)
 - [The MVP Vision](#the-mvp-vision)
-- [Documentation](#documentation)
+- [TBD / Next steps](#tbd--next-steps)
+- [Navigation](#navigation)
 
 ## Overview
 
@@ -64,9 +65,7 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It's one of the most confus
 - Add some color for... reasons.
 - Port demo code to Godot, because "why not?". We're building for fun.
 
-## Documentation
-
-The design documentation has been split into focused documents:
+## Navigation
 
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy

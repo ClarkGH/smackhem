@@ -1,8 +1,11 @@
 # Data Formats
 
-## 13. Data Formats
+## Table of Contents
 
-### 13.1 Map Data (JSON)
+- [Map Data (JSON)](#map-data-json)
+- [Navigation](#navigation)
+
+## Map Data (JSON)
 
 ```json
 {
@@ -20,3 +23,14 @@
 ```
 
 Pure data. No logic. Portable forever.
+
+## Navigation
+
+- **[Index](INDEX.md)** - Project overview and documentation index
+- **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
+- **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
+- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
+- **[Camera](camera.md)** - Camera system and mathematical formulas
+- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
+- **[Project Structure](project-structure.md)** - Code organization and project structure
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path

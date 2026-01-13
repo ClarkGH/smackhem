@@ -1,6 +1,13 @@
 # Porting Strategy
 
-## 15. What "Snap-On Porting" Actually Means (Honest)
+## Table of Contents
+
+- [What "Snap-On Porting" Actually Means (Honest)](#what-snap-on-porting-actually-means-honest)
+- [What We Are Building First (Learning Path)](#what-we-are-building-first-learning-path)
+- [Final Ground Rule (Most Important)](#final-ground-rule-most-important)
+- [Navigation](#navigation)
+
+## What "Snap-On Porting" Actually Means (Honest)
 
 Porting later means:
 
@@ -17,7 +24,7 @@ It does not mean:
 
 That's the win.
 
-## 16. What We Are Building First (Learning Path)
+## What We Are Building First (Learning Path)
 
 1. WebGL renderer (single cube)
    - Uses WebGL2
@@ -32,7 +39,18 @@ That's the win.
 
 If it feels clean, it will port.
 
-## 17. Final Ground Rule (Most Important)
+## Final Ground Rule (Most Important)
 
 If something feels convenient but makes the engine aware it's running in a browser — we don't do it.
 Web is the current backend, not the identity of the engine.
+
+## Navigation
+
+- **[Index](INDEX.md)** - Project overview and documentation index
+- **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
+- **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
+- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
+- **[Camera](camera.md)** - Camera system and mathematical formulas
+- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
+- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Project Structure](project-structure.md)** - Code organization and project structure

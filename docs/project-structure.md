@@ -1,12 +1,21 @@
 # Project Structure
 
-## 14. Project Structure
+## Table of Contents
+
+- [Naming Conventions](#naming-conventions)
+- [Code Organization Principles](#code-organization-principles)
+- [Project Directory Structure](#project-directory-structure)
+- [Root Level Configuration](#root-level-configuration)
+- [Future Structure](#future-structure)
+- [Navigation](#navigation)
+
+## Naming Conventions
 
 - TS files use camel case
 - Every TS file will have a unique name. Vite has some issues with files that share names.
 - Core files get "dibs on" generic naming
 
-### 14.1 Code Organization Principles
+## Code Organization Principles
 
 **When to Use Classes:**
 
@@ -45,6 +54,8 @@ This pattern:
 - Avoids class overhead for simple data
 - Maintains consistency with portability goals
 
+## Project Directory Structure
+
 ```text
 src/
 ├─ core/
@@ -78,6 +89,8 @@ src/
 └─ main.ts                  # Entry point
 ```
 
+## Root Level Configuration
+
 Root level configuration:
 
 - `package.json` - Project dependencies and scripts
@@ -87,9 +100,22 @@ Root level configuration:
 - `LICENSE` - Project license
 - `README.md` - Project documentation
 
+## Future Structure
+
 Future:
 
 - `platforms/native/`
 - `platforms/console/`
 
 No rewrites. Just additions.
+
+## Navigation
+
+- **[Index](INDEX.md)** - Project overview and documentation index
+- **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
+- **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
+- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
+- **[Camera](camera.md)** - Camera system and mathematical formulas
+- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
+- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path

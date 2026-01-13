@@ -1,8 +1,30 @@
 # Architecture
 
+## Table of Contents
+
+- [Design Principles](#smackhem-design-principles)
+  - [Core Goal (Re-Stated)](#core-goal-re-stated)
+  - [Design Principles (Non-Negotiable)](#design-principles-non-negotiable)
+  - [Platform Strategy (High Level)](#platform-strategy-high-level)
+  - [Desktop & Console Porting Strategy](#desktop--console-porting-strategy)
+    - [Porting Constraints](#porting-constraints)
+    - [Development & Porting Timeline](#development--porting-timeline)
+  - [Performance & Authority Constraints](#performance--authority-constraints)
+    - [Common Failure Modes](#common-failure-modes)
+    - [Authority Model: TS Requests, Native Decides, TS Reacts](#authority-model-ts-requests-native-decides-ts-reacts)
+    - [Boundary Call Costs & Mitigations](#boundary-call-costs--mitigations)
+    - [Update Rate Separation](#update-rate-separation)
+    - [Allocation Pressure](#allocation-pressure)
+    - [Responsibility Division](#responsibility-division)
+    - [Boundary Design Rules](#boundary-design-rules)
+- [High-Level Architecture](#high-level-architecture)
+- [Core Systems](#core-systems)
+  - [Game Loop (Fixed Step)](#game-loop-fixed-step)
+- [Navigation](#navigation)
+
 ## "Smackhem" Design Principles
 
-### 1. Core Goal (Re-Stated)
+### Core Goal (Re-Stated)
 
 Build a small, deterministic 3D exploration engine that:
 
@@ -14,7 +36,7 @@ Build a small, deterministic 3D exploration engine that:
 
 This is engine scaffolding, not content.
 
-### 2. Design Principles (Non-Negotiable)
+### Design Principles (Non-Negotiable)
 
 These principles exist only to protect portability:
 
@@ -25,7 +47,7 @@ These principles exist only to protect portability:
 5. WebGL is one backend, not the engine
 If something violates these, it doesn't go in.
 
-### 3. Platform Strategy (High Level)
+### Platform Strategy (High Level)
 
 Today:
 
@@ -42,7 +64,7 @@ Tomorrow (Optional):
 Rule:
 The game should not know or care what GPU or input device exists.
 
-### 3.1 Desktop & Console Porting Strategy
+### Desktop & Console Porting Strategy
 
 **Approach: TypeScript Game Logic DSL + Native Renderer**
 We will port to desktop and console using a hybrid approach:
@@ -215,7 +237,7 @@ platforms/native/
 
 The native renderer implements the same `Renderer` interface as WebGL, but using native OpenGL or Vulkan calls. Game logic in `core/` remains unchanged.
 
-### 3.2 Performance & Authority Constraints
+### Performance & Authority Constraints
 
 **The Real Risk: Scripting Layer Becoming the Engine**
 The greatest danger with the TypeScript + Native hybrid approach is letting the scripting layer quietly become the engine again. This happens when TypeScript starts doing work that should be native.
@@ -356,7 +378,7 @@ Infrequently accessed data (quest state, dialogue trees, AI behavior trees) can 
 **RULE B-5: Authority Is Explicit**
 Every system must have a clear owner. If ownership is ambiguous, the boundary has been violated.
 
-## 4. High-Level Architecture
+## High-Level Architecture
 
 ```text
 ┌──────────────────────────┐
@@ -383,9 +405,9 @@ Every system must have a clear owner. If ownership is ambiguous, the boundary ha
   - → render
   - → reset transient input
 
-## 5. Core Systems
+## Core Systems
 
-### 5.1 Game Loop (Fixed Step)
+### Game Loop (Fixed Step)
 
 Console-safe, deterministic.
 
@@ -404,3 +426,14 @@ renderer.render(world, party, camera);
 - Fixed timestep (e.g. 60Hz)
 - Rendering interpolates
 - No logic in render
+
+## Navigation
+
+- **[Index](INDEX.md)** - Project overview and documentation index
+- **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
+- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
+- **[Camera](camera.md)** - Camera system and mathematical formulas
+- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
+- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Project Structure](project-structure.md)** - Code organization and project structure
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path

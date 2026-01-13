@@ -1,6 +1,20 @@
 # Rendering Layer (Portable by Design)
 
-## 6.1 Renderer Interface
+## Table of Contents
+
+- [Renderer Interface](#renderer-interface)
+- [WebGL Implementation](#webgl-implementation)
+- [Future Native Renderer](#future-native-renderer)
+- [Day/Night Lighting Cycle](#daynight-lighting-cycle)
+  - [Architecture](#architecture)
+  - [Physical Sun/Moon Rules](#physical-sunmoon-rules)
+  - [Lighting Parameters](#lighting-parameters)
+  - [Renderer Interface Extension](#renderer-interface-extension)
+  - [Implementation](#implementation)
+- [Key Rule: gl.* never leaks upward](#key-rule-gl-never-leaks-upward)
+- [Navigation](#navigation)
+
+## Renderer Interface
 
 ```typescript
 interface Renderer {
@@ -14,7 +28,7 @@ interface Renderer {
 }
 ```
 
-## 6.2 WebGL Implementation
+## WebGL Implementation
 
 - Uses WebGL2
 - One shader pair
@@ -22,13 +36,13 @@ interface Renderer {
 - **Grayscale directional lighting** (ambient + diffuse)
 - Depth test only
 
-## 6.3 Future Native Renderer
+## Future Native Renderer
 
 - Same interface
 - Different implementation
 - Game code unchanged
 
-## 6.4 Day/Night Lighting Cycle
+## Day/Night Lighting Cycle
 
 The lighting system supports a deterministic sun/moon cycle that rotates light direction, changes color, and adjusts ambient intensity based on simulation time.
 
@@ -215,3 +229,14 @@ The sun and moon are rendered as visible spheres in the sky:
 ## Key Rule: gl.* never leaks upward
 
 No GPU calls should appear outside the renderer layer. All WebGL/GPU operations are encapsulated within the renderer implementation.
+
+## Navigation
+
+- **[Index](INDEX.md)** - Project overview and documentation index
+- **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
+- **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
+- **[Camera](camera.md)** - Camera system and mathematical formulas
+- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
+- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Project Structure](project-structure.md)** - Code organization and project structure
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path

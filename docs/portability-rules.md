@@ -1,23 +1,43 @@
-# Smackhem – Portability Enforcement Rules
+# Portability Enforcement Rules
+
+## Table of Contents
+
+- [Purpose](#purpose)
+- [The Prime Directive](#the-prime-directive)
+- [Layer Boundaries (Hard Rule)](#layer-boundaries-hard-rule)
+  - [Core (Portable Forever)](#core-portable-forever)
+  - [Services (Abstract Interfaces)](#services-abstract-interfaces)
+  - [Backends (Replaceable)](#backends-replaceable)
+- [Rendering Enforcement Rules](#rendering-enforcement-rules)
+- [Input Enforcement Rules](#input-enforcement-rules)
+- [Time & Simulation Rules](#time--simulation-rules)
+- [World & Data Rules](#world--data-rules)
+- [Memory & Performance Rules (Console-Safe)](#memory--performance-rules-console-safe)
+- [Asset Loading Rules](#asset-loading-rules)
+- [Debugging Rules](#debugging-rules)
+- [Fake Port Validation Rule](#fake-port-validation-rule)
+- [The Final Sanity Check](#the-final-sanity-check)
+- [Closing Statement](#closing-statement)
+- [Navigation](#navigation)
 
 ## Purpose
 
 These rules exist to protect future portability (desktop, console, native) while allowing fast learning and iteration today.
 They are not style preferences. They are constraints. Breaking them knowingly is a design decision, not an accident.
 
-## 0. The Prime Directive
+## The Prime Directive
 
 The engine core is platform-agnostic.
 Platforms are backends. Backends may change; core logic and data must not.
 If a feature cannot be described without referencing a specific platform, it must be isolated or redesigned.
 
-## 1. Layer Boundaries (Hard Rule)
+## Layer Boundaries (Hard Rule)
 
 The project is divided into three layers. Code may only depend downward.
 
 CORE  →  SERVICES  →  BACKENDS
 
-### 1.1 Core (Portable Forever)
+### Core (Portable Forever)
 
 Allowed:
 
@@ -39,7 +59,7 @@ Forbidden:
 
 If code in `core/` references a platform concept, it is a violation.
 
-### 1.2 Services (Abstract Interfaces)
+### Services (Abstract Interfaces)
 
 Services define what the engine needs, never how it is done.
 
@@ -55,7 +75,7 @@ Services:
 - Contain no platform code
 - Contain no logic beyond type definitions
 
-### 1.3 Backends (Replaceable)
+### Backends (Replaceable)
 
 Backends implement services for a specific platform.
 
@@ -71,7 +91,7 @@ Backends:
 - May change freely
 - Must not leak upward
 
-## 2. Rendering Enforcement Rules
+## Rendering Enforcement Rules
 
 ### RULE R-1: No GPU Calls Outside the Renderer
 
@@ -127,7 +147,7 @@ Lighting parameters (direction, color, ambient intensity) may be computed determ
 
 This allows for deterministic day/night cycles while keeping rendering implementation details in the renderer layer.
 
-## 3. Input Enforcement Rules
+## Input Enforcement Rules
 
 ### RULE I-1: Input Is Intent, Not Hardware
 
@@ -156,7 +176,7 @@ Every gameplay feature must be usable with:
 
 If it requires a mouse or keyboard, it is invalid by default.
 
-## 4. Time & Simulation Rules
+## Time & Simulation Rules
 
 ### RULE T-1: Fixed Timestep Only
 
@@ -190,7 +210,7 @@ Any effect that varies over time (lighting cycles, animations, etc.) must:
 
 Simulation time is the single source of truth for time-based effects.
 
-## 5. World & Data Rules
+## World & Data Rules
 
 ### RULE W-1: Data Is Pure
 
@@ -212,7 +232,7 @@ Chunks:
 
 No global hidden state.
 
-## 6. Memory & Performance Rules (Console-Safe)
+## Memory & Performance Rules (Console-Safe)
 
 ### RULE M-1: No Allocation in Hot Loops
 
@@ -251,7 +271,7 @@ Allowed:
 
 Reason: Iterator/generator syntax requires regenerator-runtime polyfill, which adds overhead and complexity. Console ports may not support this runtime, and it violates the "no hidden dependencies" principle.
 
-## 7. Asset Loading Rules
+## Asset Loading Rules
 
 ### RULE A-1: Assets Are Requested by ID
 
@@ -269,7 +289,7 @@ fetch("./maps/overworld_01.json")
 
 Paths are backend details.
 
-## 8. Debugging Rules
+## Debugging Rules
 
 ### RULE D-1: Debug Is Optional
 
@@ -279,7 +299,7 @@ Debug features:
 - Must not affect core logic
 - Must not be required for gameplay
 
-## 9. Fake Port Validation Rule
+## Fake Port Validation Rule
 
 ### RULE P-1: Deletion Test
 
@@ -291,7 +311,7 @@ At any time, it must be possible to:
 
 If this fails, portability has already been broken.
 
-## 10. The Final Sanity Check
+## The Final Sanity Check
 
 Before we add any feature, we ask:
 Could this exist unchanged on a console with no browser, no mouse, and no JIT?
@@ -312,3 +332,14 @@ If followed consistently:
 - Console is realistic
 
 Break them knowingly, not accidentally.
+
+## Navigation
+
+- **[Index](INDEX.md)** - Project overview and documentation index
+- **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
+- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
+- **[Camera](camera.md)** - Camera system and mathematical formulas
+- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
+- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Project Structure](project-structure.md)** - Code organization and project structure
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path
