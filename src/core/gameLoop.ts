@@ -8,8 +8,13 @@ import {
     PLAYER_RADIUS,
     getCameraForward,
     getCameraRight,
+    type Camera,
 } from './camera';
-import { resolveCollision, createCollisionContext } from './collision';
+import {
+    resolveCollision,
+    createCollisionContext,
+    type CollisionContext
+} from './collision';
 import {
     matrixMultiplyInto,
     identity,
@@ -21,43 +26,60 @@ import type { Vec3, Mat4 } from '../types/common';
 
 const FIXED_DT = 1 / 60;
 
-const createGameLoop = (
-    renderer: Renderer,
-    input: Input,
-    world: World,
-    getAspectRatio: () => number,
-    debugHUD?: {
-        render: (_info: {
-            cameraPosition: Vec3;
-            cameraForward: Vec3;
-            sunPosition?: Vec3;
-            moonPosition?: Vec3;
-            timeOfDay?: number;
-        }) => void;
-        toggle: () => void;
-        isVisible: () => boolean;
-    },
-) => {
+export interface DebugHUD {
+    render: (_info: {
+        cameraPosition: Vec3;
+        cameraForward: Vec3;
+        sunPosition?: Vec3;
+        moonPosition?: Vec3;
+        timeOfDay?: number;
+    }) => void;
+    toggle: () => void;
+    isVisible: () => boolean;
+}
+
+export class GameLoop {
     // State variables
-    let simulationTime = 0;
-    let debugHUDVisible = false;
-    let accumulator = 0;
+    private simulationTime = 0;
+
+    private debugHUDVisible = false;
+
+    private accumulator = 0;
 
     // Core objects
-    const camera = createCamera();
-    const collisionContext = createCollisionContext();
+    private camera: Camera;
+
+    private collisionContext: CollisionContext;
+
+    // Dependencies
+    private renderer: Renderer;
+
+    private input: Input;
+
+    private world: World;
+
+    private getAspectRatio: () => number;
+
+    private debugHUD?: DebugHUD;
 
     // Constants
-    const DAY_LENGTH_SECONDS = 120; // 2 minutes per full cycle (configurable)
-    const HORIZON_THRESHOLD = 0.0; // Elevation threshold for horizon (radians)
-    const DECLINATION_OFFSET = 0.0; // Seasonal tilt offset (for future use, currently 0)
-    const CELESTIAL_DISTANCE = camera.far - 1.0; // Very large distance (effectively infinite, must be < camera.far)
-    const SUN_SIZE = 0.5; // Radius of sun orb (sphere)
-    const MOON_SIZE = 0.4; // Radius of moon orb (sphere)
-    const SUN_COLOR: Vec3 = { x: 1.0, y: 0.85, z: 0.2 }; // Golden yellow
-    const MOON_COLOR: Vec3 = { x: 0.4, y: 0.6, z: 0.9 }; // Cool blue
+    private readonly DAY_LENGTH_SECONDS = 120; // 2 minutes per full cycle (configurable)
 
-    /* 
+    private readonly HORIZON_THRESHOLD = 0.0; // Elevation threshold for horizon (radians)
+
+    private readonly DECLINATION_OFFSET = 0.0; // Seasonal tilt offset (for future use, currently 0)
+
+    private readonly SUN_SIZE = 0.5; // Radius of sun orb (sphere)
+
+    private readonly MOON_SIZE = 0.4; // Radius of moon orb (sphere)
+
+    private readonly SUN_COLOR: Vec3 = { x: 1.0, y: 0.85, z: 0.2 }; // Golden yellow
+
+    private readonly MOON_COLOR: Vec3 = { x: 0.4, y: 0.6, z: 0.9 }; // Cool blue
+
+    private readonly CELESTIAL_DISTANCE: number; // Computed from camera.far
+
+    /*
      * PERFORMANCE:
      * All objects are pre-allocated and reused every frame.
      * This avoids allocation overhead and improves performance.
@@ -65,58 +87,105 @@ const createGameLoop = (
      */
 
     // Pre-allocated lighting calculation objects
-    const lightColor = { x: 0, y: 0, z: 0 }; // TODO: Review. Sun light color?
-    const lightDirection = { x: 0, y: 0, z: 0 }; // TODO: Review. Sun light direction?
-    const sunAzimuth = { value: 0 }; // For spherical coordinate calculations
-    const sunElevation = { value: 0 }; // For spherical coordinate calculations
+    private readonly lightColor: Vec3 = { x: 0, y: 0, z: 0 }; // TODO: Review. Sun light color?
+
+    private readonly lightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // TODO: Review. Sun light direction?
+
+    private readonly sunAzimuth = { value: 0 }; // For spherical coordinate calculations
+
+    private readonly sunElevation = { value: 0 }; // For spherical coordinate calculations
 
     // Pre-allocated sun objects
-    const sunPosition = { x: 0, y: 0, z: 0 };
-    const sunColorWithVisibility = { x: 0, y: 0, z: 0 };
-    const sunDirectionForPosition = { x: 0, y: 0, z: 0 }; // Negated light direction for sun positioning
-    const sunTransform = identity(); // 4x4 matrix
+    private readonly sunPosition: Vec3 = { x: 0, y: 0, z: 0 };
+
+    private readonly sunColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
+
+    private readonly sunDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated light direction for sun positioning
+
+    private readonly sunTransform: Mat4;
 
     // Pre-allocated moon objects
-    const moonPosition = { x: 0, y: 0, z: 0 };
-    const moonLightDirection = { x: 0, y: 0, z: 0 }; // For moon (opposite of sun)
-    const moonColorWithVisibility = { x: 0, y: 0, z: 0 };
-    const moonDirectionForPosition = { x: 0, y: 0, z: 0 }; // Negated moon direction for moon positioning
-    const moonTransform = identity(); // 4x4 matrix
+    private readonly moonPosition: Vec3 = { x: 0, y: 0, z: 0 };
+
+    private readonly moonLightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // For moon (opposite of sun)
+
+    private readonly moonColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
+
+    private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated moon direction for moon positioning
+
+    private readonly moonTransform: Mat4;
 
     // Pre-allocated MVP matrices
-    const sunMVP = identity();
-    const moonMVP = identity();
-    const meshMVP = identity();
+    private readonly sunMVP: Mat4;
+
+    private readonly moonMVP: Mat4;
+
+    private readonly meshMVP: Mat4;
 
     // Mesh objects
-    const sunMesh = renderer.createSphereMesh(SUN_SIZE, 16);
-    const moonMesh = renderer.createSphereMesh(MOON_SIZE, 16);
+    private readonly sunMesh;
 
-    const getTimeOfDay = (simTime: number): number => (simTime % DAY_LENGTH_SECONDS) / DAY_LENGTH_SECONDS;
+    private readonly moonMesh;
+
+    constructor(
+        renderer: Renderer,
+        input: Input,
+        world: World,
+        getAspectRatio: () => number,
+        debugHUD?: DebugHUD,
+    ) {
+        this.renderer = renderer;
+        this.input = input;
+        this.world = world;
+        this.getAspectRatio = getAspectRatio;
+        this.debugHUD = debugHUD;
+
+        // Core objects
+        this.camera = createCamera();
+        this.collisionContext = createCollisionContext();
+
+        // Compute CELESTIAL_DISTANCE from camera.far
+        this.CELESTIAL_DISTANCE = this.camera.far - 1.0; // Very large distance (effectively infinite, must be < camera.far)
+
+        // Pre-allocated matrices
+        this.sunTransform = identity();
+        this.moonTransform = identity();
+        this.sunMVP = identity();
+        this.moonMVP = identity();
+        this.meshMVP = identity();
+
+        // Mesh objects
+        this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE, 16);
+        this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE, 16);
+    }
+
+    private computeTimeOfDay(simTime: number): number {
+        return (simTime % this.DAY_LENGTH_SECONDS) / this.DAY_LENGTH_SECONDS;
+    }
 
     // PERFORMANCE: Writes into existing objects to avoid allocation
-    const computeSunSpherical = (
+    private computeSunSpherical(
         timeOfDay: number,
         outAzimuth: { value: number },
         outElevation: { value: number },
-    ): void => {
+    ): void {
         const angle = timeOfDay * Math.PI * 2;
 
-        const elevation = Math.sin(angle) + DECLINATION_OFFSET;
+        const elevation = Math.sin(angle) + this.DECLINATION_OFFSET;
         const azimuth = Math.PI / 2 + angle;
 
         // eslint-disable-next-line no-param-reassign
         outAzimuth.value = azimuth;
         // eslint-disable-next-line no-param-reassign
         outElevation.value = elevation;
-    };
+    }
 
     // PERFORMANCE: Writes into existing object to avoid allocation
-    const sphericalToDirection = (
+    private sphericalToDirection(
         azimuth: number,
         elevation: number,
         out: Vec3,
-    ): void => {
+    ): void {
         const cosElev = Math.cos(elevation);
         out.x = cosElev * Math.sin(azimuth);
         out.y = Math.sin(elevation);
@@ -130,16 +199,16 @@ const createGameLoop = (
             out.y /= len;
             out.z /= len;
         }
-    };
+    }
 
     // PERFORMANCE: Writes into existing object to avoid allocation
-    const computeSunDirection = (timeOfDay: number, out: Vec3): void => {
+    private computeSunDirection(timeOfDay: number, out: Vec3): void {
         const azimuth = { value: 0 };
         const elevation = { value: 0 };
 
-        computeSunSpherical(timeOfDay, azimuth, elevation);
-        sphericalToDirection(azimuth.value, elevation.value, out);
-        if (elevation.value < HORIZON_THRESHOLD) {
+        this.computeSunSpherical(timeOfDay, azimuth, elevation);
+        this.sphericalToDirection(azimuth.value, elevation.value, out);
+        if (elevation.value < this.HORIZON_THRESHOLD) {
             const len = Math.sqrt(out.x * out.x + out.z * out.z);
             if (len > 0.0001) {
                 out.x /= len;
@@ -151,17 +220,17 @@ const createGameLoop = (
                 out.z = -1; // Default: north
             }
         }
-    };
+    }
 
     // PERFORMANCE: Writes into existing object to avoid allocation
-    const computeLightColor = (
+    private computeLightColor(
         timeOfDay: number,
         elevation: number,
         out: Vec3,
-    ): void => {
+    ): void {
         const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
 
-        if (elevation < HORIZON_THRESHOLD) {
+        if (elevation < this.HORIZON_THRESHOLD) {
             out.x = 0.3;
             out.y = 0.4;
             out.z = 0.6; // Cool blue
@@ -181,11 +250,11 @@ const createGameLoop = (
             out.y = 0.7 + 0.3 * smoothT; // Green component: 1.0 at zenith, 0.7 at horizon
             out.z = 0.5 + 0.5 * smoothT; // Blue component: 1.0 at zenith, 0.5 at horizon (warmer)
         }
-    };
+    }
 
     // PERFORMANCE: Pure function, no allocations
-    const computeAmbientIntensity = (elevation: number): number => {
-        if (elevation < HORIZON_THRESHOLD) {
+    private computeAmbientIntensity(elevation: number): number {
+        if (elevation < this.HORIZON_THRESHOLD) {
             return 0.1; // Dark night ambient
         }
 
@@ -195,70 +264,72 @@ const createGameLoop = (
         const intensity = cosElev * cosElev * cosElev * cosElev; // cos^4
 
         return 0.1 + 0.4 * intensity;
-    };
+    }
 
     // PERFORMANCE: Pure function, no allocations
-    const computeSunVisibility = (timeOfDay: number): number => {
+    private computeSunVisibility(timeOfDay: number): number {
         const dayCenter = 0.5; // Noon is center of day
         const dayWidth = 0.5; // Day spans 0.25 to 0.75 (half the cycle)
         const dist = Math.abs(timeOfDay - dayCenter) * 2; // Distance from center, scaled
         return Math.max(0, 1 - (dist / dayWidth)); // Fade from 1 at center to 0 at edges
-    };
+    }
 
     // PERFORMANCE: Pure function, no allocations
-    const computeMoonVisibility = (timeOfDay: number): number => 1 - computeSunVisibility(timeOfDay);
+    private computeMoonVisibility(timeOfDay: number): number {
+        return 1 - this.computeSunVisibility(timeOfDay);
+    }
 
     // PERFORMANCE: Writes into existing object to avoid allocation (complies with RULE M-1)
-    const computeCelestialPosition = (
+    private computeCelestialPosition(
         dirVec: Vec3,
         distance: number,
         playerPosition: Vec3,
         out: Vec3,
-    ): void => {
+    ): void {
         out.x = playerPosition.x + dirVec.x * distance;
         out.y = playerPosition.y + dirVec.y * distance;
         out.z = playerPosition.z + dirVec.z * distance;
-    };
+    }
 
     // PERFORMANCE: Writes into existing matrix to avoid allocation
-    const computeCelestialTransform = (
+    private computeCelestialTransform(
         position: Vec3,
         size: number,
         out: Mat4,
-    ): void => {
+    ): void {
         const o = out.elements;
 
         o[0] = size; o[1] = 0; o[2] = 0; o[3] = 0;
         o[4] = 0; o[5] = size; o[6] = 0; o[7] = 0;
         o[8] = 0; o[9] = 0; o[10] = size; o[11] = 0;
         o[12] = position.x; o[13] = position.y; o[14] = position.z; o[15] = 1;
-    };
+    }
 
-    const updateSimulation = (dt: number) => {
-        simulationTime += dt;
-        const intent = input.getIntent();
+    private updateSimulation(dt: number): void {
+        this.simulationTime += dt;
+        const intent = this.input.getIntent();
 
         if (intent.toggleDebugHUD) {
-            if (debugHUD) {
-                debugHUD.toggle();
-                debugHUDVisible = debugHUD.isVisible();
+            if (this.debugHUD) {
+                this.debugHUD.toggle();
+                this.debugHUDVisible = this.debugHUD.isVisible();
             } else {
                 console.warn('Debug HUD toggle requested but debugHUD not available');
             }
         }
         const sensitivity = 0.005;
-        camera.yaw += intent.look.yaw * sensitivity;
-        camera.pitch -= intent.look.pitch * sensitivity;
+        this.camera.yaw += intent.look.yaw * sensitivity;
+        this.camera.pitch -= intent.look.pitch * sensitivity;
 
         // Clamp pitch to prevent flipping
         const limit = Math.PI / 2 - 0.01;
-        camera.pitch = Math.max(-limit, Math.min(limit, camera.pitch));
+        this.camera.pitch = Math.max(-limit, Math.min(limit, this.camera.pitch));
 
         const { x: moveX, y: moveY } = intent.move;
 
         if (moveX !== 0 || moveY !== 0) {
-            const forward = getCameraForward(camera.yaw, camera.pitch);
-            const right = getCameraRight(camera.yaw);
+            const forward = getCameraForward(this.camera.yaw, this.camera.pitch);
+            const right = getCameraRight(this.camera.yaw);
 
             const proposedMovement = {
                 x: (forward.x * moveY + right.x * moveX) * PLAYER_SPEED * dt,
@@ -266,126 +337,134 @@ const createGameLoop = (
                 z: (forward.z * moveY + right.z * moveX) * PLAYER_SPEED * dt,
             };
 
-            const worldAABBs = world.getCollidableAABBs();
+            const worldAABBs = this.world.getCollidableAABBs();
 
             const resolvedMovement = resolveCollision(
-                camera.position,
+                this.camera.position,
                 proposedMovement,
                 worldAABBs,
                 PLAYER_HEIGHT,
                 PLAYER_RADIUS,
-                collisionContext,
+                this.collisionContext,
             );
 
-            camera.position.x += resolvedMovement.x;
-            camera.position.z += resolvedMovement.z;
-            camera.position.y = PLAYER_HEIGHT;
+            this.camera.position.x += resolvedMovement.x;
+            this.camera.position.z += resolvedMovement.z;
+            this.camera.position.y = PLAYER_HEIGHT;
         }
-    };
+    }
 
-    const update = (deltaTime: number) => {
-        accumulator += deltaTime;
-        while (accumulator >= FIXED_DT) {
-            updateSimulation(FIXED_DT);
-            accumulator -= FIXED_DT;
+    update(deltaTime: number): void {
+        this.accumulator += deltaTime;
+        while (this.accumulator >= FIXED_DT) {
+            this.updateSimulation(FIXED_DT);
+            this.accumulator -= FIXED_DT;
         }
-    };
+    }
 
-    const render = () => {
-        renderer.beginFrame();
+    render(): void {
+        this.renderer.beginFrame();
 
-        const aspect = getAspectRatio();
-        const viewProj = getCameraMatrix(camera, aspect);
+        const aspect = this.getAspectRatio();
+        const viewProj = getCameraMatrix(this.camera, aspect);
 
         // PERFORMANCE: Reuse pre-allocated objects, zero allocations per frame
-        const timeOfDay = getTimeOfDay(simulationTime);
+        const timeOfDay = this.computeTimeOfDay(this.simulationTime);
 
-        computeSunSpherical(timeOfDay, sunAzimuth, sunElevation);
-        computeSunDirection(timeOfDay, lightDirection);
-        computeLightColor(timeOfDay, sunElevation.value, lightColor);
+        this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);
+        this.computeSunDirection(timeOfDay, this.lightDirection);
+        this.computeLightColor(timeOfDay, this.sunElevation.value, this.lightColor);
 
-        const ambientIntensity = computeAmbientIntensity(sunElevation.value);
-        const moonAzimuth = { value: sunAzimuth.value + Math.PI };
-        const moonElevation = { value: -sunElevation.value };
-        sphericalToDirection(moonAzimuth.value, moonElevation.value, moonLightDirection);
+        const ambientIntensity = this.computeAmbientIntensity(this.sunElevation.value);
+        const moonAzimuth = { value: this.sunAzimuth.value + Math.PI };
+        const moonElevation = { value: -this.sunElevation.value };
+        this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
 
-        const sunVisibility = computeSunVisibility(timeOfDay);
-        const moonVisibility = computeMoonVisibility(timeOfDay);
-        const activeLightDirection = moonVisibility > sunVisibility ? moonLightDirection : lightDirection;
+        const sunVisibility = this.computeSunVisibility(timeOfDay);
+        const moonVisibility = this.computeMoonVisibility(timeOfDay);
+        const activeLightDirection = moonVisibility > sunVisibility ? this.moonLightDirection : this.lightDirection;
 
-        if (renderer.setLightDirection) {
-            renderer.setLightDirection(activeLightDirection);
+        if (this.renderer.setLightDirection) {
+            this.renderer.setLightDirection(activeLightDirection);
         }
-        if (renderer.setLightColor) {
-            renderer.setLightColor(lightColor);
+        if (this.renderer.setLightColor) {
+            this.renderer.setLightColor(this.lightColor);
         }
-        if (renderer.setAmbientIntensity) {
-            renderer.setAmbientIntensity(ambientIntensity);
+        if (this.renderer.setAmbientIntensity) {
+            this.renderer.setAmbientIntensity(ambientIntensity);
         }
 
-        sunDirectionForPosition.x = lightDirection.x;
-        sunDirectionForPosition.y = lightDirection.y;
-        sunDirectionForPosition.z = lightDirection.z;
+        this.sunDirectionForPosition.x = this.lightDirection.x;
+        this.sunDirectionForPosition.y = this.lightDirection.y;
+        this.sunDirectionForPosition.z = this.lightDirection.z;
 
-        computeCelestialPosition(sunDirectionForPosition, CELESTIAL_DISTANCE, camera.position, sunPosition);
+        this.computeCelestialPosition(
+            this.sunDirectionForPosition,
+            this.CELESTIAL_DISTANCE,
+            this.camera.position,
+            this.sunPosition,
+        );
 
-        moonDirectionForPosition.x = moonLightDirection.x;
-        moonDirectionForPosition.y = moonLightDirection.y;
-        moonDirectionForPosition.z = moonLightDirection.z;
+        this.moonDirectionForPosition.x = this.moonLightDirection.x;
+        this.moonDirectionForPosition.y = this.moonLightDirection.y;
+        this.moonDirectionForPosition.z = this.moonLightDirection.z;
 
-        computeCelestialPosition(moonDirectionForPosition, CELESTIAL_DISTANCE, camera.position, moonPosition);
-        computeCelestialTransform(sunPosition, SUN_SIZE, sunTransform);
-        computeCelestialTransform(moonPosition, MOON_SIZE, moonTransform);
+        this.computeCelestialPosition(
+            this.moonDirectionForPosition,
+            this.CELESTIAL_DISTANCE,
+            this.camera.position,
+            this.moonPosition,
+        );
+        this.computeCelestialTransform(this.sunPosition, this.SUN_SIZE, this.sunTransform);
+        this.computeCelestialTransform(this.moonPosition, this.MOON_SIZE, this.moonTransform);
 
         if (sunVisibility > 0) {
-            sunColorWithVisibility.x = SUN_COLOR.x * sunVisibility;
-            sunColorWithVisibility.y = SUN_COLOR.y * sunVisibility;
-            sunColorWithVisibility.z = SUN_COLOR.z * sunVisibility;
+            this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
+            this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
+            this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
 
-            matrixMultiplyInto(viewProj, sunTransform, sunMVP);
-            renderer.drawMesh(sunMesh, sunMVP, sunColorWithVisibility);
+            matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
+            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
         }
 
         if (moonVisibility > 0) {
-            moonColorWithVisibility.x = MOON_COLOR.x * moonVisibility;
-            moonColorWithVisibility.y = MOON_COLOR.y * moonVisibility;
-            moonColorWithVisibility.z = MOON_COLOR.z * moonVisibility;
+            this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
+            this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
+            this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
 
-            matrixMultiplyInto(viewProj, moonTransform, moonMVP);
-            renderer.drawMesh(moonMesh, moonMVP, moonColorWithVisibility);
+            matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
+            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
         }
 
-        const visibleMeshes = world.getVisibleMeshes();
+        const visibleMeshes = this.world.getVisibleMeshes();
         visibleMeshes.forEach((sm) => {
-            matrixMultiplyInto(viewProj, sm.transform, meshMVP);
-            renderer.drawMesh(sm.mesh, meshMVP, sm.color);
+            matrixMultiplyInto(viewProj, sm.transform, this.meshMVP);
+            this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
         });
 
-        if (debugHUD && debugHUDVisible) {
-            const rotation = quaternionFromYawPitch(camera.yaw, camera.pitch);
+        if (this.debugHUD && this.debugHUDVisible) {
+            const rotation = quaternionFromYawPitch(this.camera.yaw, this.camera.pitch);
             const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
 
-            debugHUD.render({
-                cameraPosition: camera.position,
+            this.debugHUD.render({
+                cameraPosition: this.camera.position,
                 cameraForward: forward,
-                sunPosition,
-                moonPosition,
+                sunPosition: this.sunPosition,
+                moonPosition: this.moonPosition,
                 timeOfDay,
             });
         }
 
-        renderer.endFrame();
-    };
+        this.renderer.endFrame();
+    }
 
-    const getCameraPosition = (): Vec3 => camera.position;
-    const getTimeOfDayExported = (): number => getTimeOfDay(simulationTime);
+    getCameraPosition(): Vec3 {
+        return this.camera.position;
+    }
 
-    return {
-        update,
-        render,
-        getCameraPosition,
-        getTimeOfDay: getTimeOfDayExported,
-    };
-};
+    getTimeOfDay(): number {
+        return (this.simulationTime % this.DAY_LENGTH_SECONDS) / this.DAY_LENGTH_SECONDS;
+    }
+}
 
-export default createGameLoop;
+export default GameLoop;

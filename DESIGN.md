@@ -1553,6 +1553,45 @@ Pure data. No logic. Portable forever.
 - Every TS file will have a unique name. Vite has some issues with files that share names.
 - Core files get "dibs on" generic naming
 
+#### 14.1 Code Organization Principles
+
+**When to Use Classes:**
+
+- Stateful systems with lifecycle (World, GameLoop, Renderer, Input, Clock)
+- Complex state with multiple methods
+- Platform implementations that implement service interfaces
+
+**When to Use Factory Functions:**
+
+- Simple data structures (Camera, CollisionContext, InputState)
+- Objects that are primarily data with minimal behavior
+- Configuration objects
+
+**When to Use Pure Functions:**
+
+- Math utilities (matrix operations, quaternions, vectors)
+- Stateless transformations
+- Helper functions
+
+**Data Structure Pattern:**
+Simple data structures should be plain objects created via factory functions:
+
+- `createCamera()` → `Camera`
+- `createAABB()` → `AABB`
+- `createCollisionContext()` → `CollisionContext`
+
+Methods on data structures should be pure functions:
+
+- `aabbContains(aabb, point)` instead of `aabb.contains(point)`
+- `getCameraMatrix(camera, aspect)` instead of `camera.getMatrix(aspect)`
+
+This pattern:
+
+- Keeps data serializable
+- Makes functions testable in isolation
+- Avoids class overhead for simple data
+- Maintains consistency with portability goals
+
 ```text
 src/
 ├─ core/

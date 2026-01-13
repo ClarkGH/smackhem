@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Input } from '../../services/input';
-import createGameLoop from '../../core/gameLoop';
+import { GameLoop } from '../../core/gameLoop';
 import NullRenderer from './nullRenderer';
 import { World } from '../../core/world';
 
@@ -21,7 +21,7 @@ describe('Deletion test', () => {
         };
         const mockWorld: World = new World();
 
-        expect(() => createGameLoop(
+        expect(() => new GameLoop(
             renderer,
             mockInput,
             mockWorld,

@@ -1,7 +1,7 @@
 import type { Renderer } from '../../services/renderer';
 import type { Clock } from '../../services/clock';
 import type { Input } from '../../services/input';
-import createGameLoop from '../../core/gameLoop';
+import { GameLoop } from '../../core/gameLoop';
 import WebGLRenderer from './webGLRenderer';
 import {
     World,
@@ -9,7 +9,7 @@ import {
     CHUNK_SIZE,
     CHUNK_LOAD_RADIUS,
 } from '../../core/world';
-import AABB from '../../core/math/aabb';
+import { createAABB } from '../../core/math/aabb';
 import { createTranslationMatrix } from '../../core/math/mathHelpers';
 import WebClock from './webClock';
 import { createCamera } from '../../core/camera';
@@ -107,7 +107,7 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
 
     return {
         id: chunkId,
-        bounds: new AABB(
+        bounds: createAABB(
             { x: chunkCenterX - 5, y: -1, z: chunkCenterZ - 5 },
             { x: chunkCenterX + 5, y: 5, z: chunkCenterZ + 5 },
         ),
@@ -196,7 +196,7 @@ export const bootstrapWeb = (): void => {
         // Create debug HUD
         const debugHUD = createDebugHUD(platform.canvas);
 
-        const gameLoop = createGameLoop(
+        const gameLoop = new GameLoop(
             platform.renderer,
             platform.input,
             world,

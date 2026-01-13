@@ -1,6 +1,10 @@
 import type { Vec3 } from '../types/common';
 import type { StaticMesh } from './world';
-import AABB from './math/aabb';
+import {
+    createAABB,
+    type AABB,
+    aabbIntersects,
+} from './math/aabb';
 import { extractPosition } from './math/mathHelpers';
 
 export interface CollisionContext {
@@ -16,9 +20,9 @@ export const createCollisionContext = (): CollisionContext => ({
     newPos: { x: 0, y: 0, z: 0 },
     xOnlyPos: { x: 0, y: 0, z: 0 },
     zOnlyPos: { x: 0, y: 0, z: 0 },
-    playerAABB: new AABB(),
-    xOnlyAABB: new AABB(),
-    zOnlyAABB: new AABB(),
+    playerAABB: createAABB(),
+    xOnlyAABB: createAABB(),
+    zOnlyAABB: createAABB(),
 });
 
 // TODO: review if we want to be cylinder or box
@@ -26,7 +30,7 @@ export const createCollisionContext = (): CollisionContext => ({
 // with size (radius*2, height, radius*2)
 export const getPlayerAABB = (position: Vec3, height: number, radius: number): AABB => {
     const centerY = position.y - height / 2;
-    return new AABB(
+    return createAABB(
         {
             x: position.x - radius,
             y: centerY,
@@ -61,7 +65,7 @@ export const updatePlayerAABB = (
 export const getMeshAABB = (mesh: StaticMesh, meshSize: number): AABB => {
     const position = extractPosition(mesh.transform);
     const halfSize = meshSize / 2;
-    return new AABB(
+    return createAABB(
         {
             x: position.x - halfSize,
             y: position.y - halfSize,
@@ -78,7 +82,7 @@ export const getMeshAABB = (mesh: StaticMesh, meshSize: number): AABB => {
 export const checkCollision = (
     playerAABB: AABB,
     worldAABB: AABB,
-): boolean => playerAABB.intersects(worldAABB);
+): boolean => aabbIntersects(playerAABB, worldAABB);
 
 export const resolveCollision = (
     playerPos: Vec3,

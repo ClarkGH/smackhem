@@ -1,6 +1,6 @@
 import { MeshHandle } from '../services/renderer';
 import { Mat4, Vec3 } from '../types/common';
-import AABB from './math/aabb';
+import { type AABB } from './math/aabb';
 import { extractPosition } from './math/mathHelpers';
 import { getMeshAABB } from './collision';
 

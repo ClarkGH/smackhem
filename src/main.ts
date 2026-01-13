@@ -1,6 +1,6 @@
 // Platform-agnostic entry point
 import { World } from './core/world';
-import createGameLoop from './core/gameLoop';
+import { GameLoop } from './core/gameLoop';
 import { createCamera } from './core/camera';
 import type { PlatformServices } from './platforms/web/webBootstrap';
 import { createDebugHUD } from './platforms/web/debugHUD';
@@ -62,7 +62,7 @@ const main = async () => {
         debugHUD = createDebugHUD(platform.canvas as HTMLCanvasElement);
     }
 
-    const gameLoop = createGameLoop(
+    const gameLoop = new GameLoop(
         platform.renderer,
         platform.input,
         world,
