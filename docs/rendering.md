@@ -5,6 +5,12 @@
 - [Renderer Interface](#renderer-interface)
 - [WebGL Implementation](#webgl-implementation)
 - [Future Native Renderer](#future-native-renderer)
+- [Lighting System (Grayscale)](#lighting-system-grayscale)
+  - [Directional Light Direction](#directional-light-direction)
+  - [Lambertian Diffuse Lighting](#lambertian-diffuse-lighting)
+  - [Final Lighting Calculation](#final-lighting-calculation)
+  - [Normal Transformation](#normal-transformation)
+  - [Normal Calculation from Triangle](#normal-calculation-from-triangle)
 - [Day/Night Lighting Cycle](#daynight-lighting-cycle)
   - [Architecture](#architecture)
   - [Physical Sun/Moon Rules](#physical-sunmoon-rules)
@@ -41,6 +47,70 @@ interface Renderer {
 - Same interface
 - Different implementation
 - Game code unchanged
+
+## Lighting System (Grayscale)
+
+The rendering system uses grayscale directional lighting with ambient and diffuse components. All lighting calculations are performed in shaders using world-space normals.
+
+### Directional Light Direction
+
+Light direction is a normalized 3D vector pointing from the light source toward the scene.
+For a sun in the east casting light westward:
+
+```typescript
+lightDirection = normalize({x: -1, y: 0.2, z: 0})
+```
+
+### Lambertian Diffuse Lighting
+
+Diffuse lighting calculation (performed in fragment shader):
+
+```typescript
+dotProduct = dot(surfaceNormal, -lightDirection)
+diffuse = max(dotProduct, 0.0)
+```
+
+The dot product between the surface normal and the negated light direction determines how much light hits the surface. Surfaces facing away from the light receive no diffuse lighting.
+
+### Final Lighting Calculation
+
+Combines ambient and diffuse lighting:
+
+```typescript
+lighting = ambientIntensity + diffuse * (1.0 - ambientIntensity)
+finalColor = baseColor * lightColor * lighting
+```
+
+Where:
+
+- `ambientIntensity` = varies with time of day (0.1-0.5, dark night to bright day)
+- `lightColor` = varies with time of day (cool moon tones to warm sun tones, grayscale)
+- `baseColor` = mesh color (grayscale values)
+
+The ambient component ensures surfaces are never completely black, while the diffuse component provides directional shading.
+
+### Normal Transformation
+
+Surface normals must be transformed by the inverse transpose of the model matrix when the model matrix includes non-uniform scaling or rotation:
+
+```typescript
+normalMatrix = transpose(inverse(modelMatrix))
+transformedNormal = normalize(normalMatrix * normal)
+```
+
+**Note:** In our current implementation, model transforms are translation-only, so we use the identity matrix for normal transformation. This optimization is documented in the renderer implementation.
+
+### Normal Calculation from Triangle
+
+For a triangle with vertices v0, v1, v2, the normal is computed as:
+
+```typescript
+edge1 = v1 - v0
+edge2 = v2 - v0
+normal = normalize(cross(edge1, edge2))
+```
+
+The cross product of two edges gives the triangle's normal vector, which is then normalized to unit length.
 
 ## Day/Night Lighting Cycle
 

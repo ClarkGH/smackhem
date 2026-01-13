@@ -8,13 +8,11 @@
   - [Identity Matrices](#identity-matrices)
   - [Perspective Projection Matrix](#perspective-projection-matrix)
   - [Direction Vector Formula](#direction-vector-formula)
-  - [Look-At Matrix (View Matrix)](#look-at-matrix-view-matrix)
+  - [View Matrix (Quaternion-Based)](#view-matrix-quaternion-based)
   - [Orientation Vectors](#orientation-vectors)
   - [Translation and Final Matrix](#translation-and-final-matrix)
   - [Quaternion Rotation System](#quaternion-rotation-system)
   - [Matrix Multiplication](#matrix-multiplication)
-  - [Lighting System (Grayscale)](#lighting-system-grayscale)
-  - [Geometric Mesh Generation](#geometric-mesh-generation)
 - [Navigation](#navigation)
 
 ## Camera Modes
@@ -100,19 +98,15 @@ Everything we build uses lines
 
 `e.g. Direction = (dx, dy, dz) / sqrt(dx^2 + dy^2 + dz^2)`
 
-### Look-At Matrix (View Matrix)
+### View Matrix (Quaternion-Based)
 
-~~For a 3D camera, we need to define Up/Right to create a proper orientation matrices. We will be using a 16 element list or array for the matrices~~
+The view matrix transforms world coordinates into camera space. We use quaternions to compute camera orientation, avoiding gimbal lock and providing smooth rotation.
 
-~~`Forward Axis = normalize(Target - EyeLevel)`~~
-~~`Right Axis = normalize(forwardAxis x WorldUp)`~~
-~~`Up Axis = forwardAxis x rightAxis`~~
-
-**Note:** This section is obsolete. We now use quaternions to compute camera orientation (see section 9.2.8.1). The view matrix structure remains the same (16-element array), but the rotation vectors are computed via quaternion rotation rather than cross products from a target point.
+**Note:** The view matrix structure is a 16-element array (column-major order). The rotation vectors are computed via quaternion rotation rather than cross products from a target point. See [Quaternion Rotation System](#quaternion-rotation-system) for details.
 
 ### Orientation Vectors
 
-3D orientation requires three vectors within a 16 element list to define an xyz coordinate system
+3D orientation requires three vectors within a 16 element list to define an xyz coordinate system.
 
 `e = element list`
 
@@ -122,17 +116,15 @@ Everything we build uses lines
 - `Up = e[4] to e[6]` (column 1)
 - `Forward = e[8] to e[10]` (column 2)
 
-~~Right is perpendicular to Forward. We calculate it by taking the cross product of the World-Up and Forward vectors. This results in a horizontal vector that points to the right of the camera's perspective.~~
+**Computation:**
 
-~~Up is the cross product of the Forward and Right vectors. It points up from the top of the camera's eye level.~~
+The basis vectors are obtained by applying the camera's quaternion rotation to the initial basis vectors:
 
-~~Forward is the cross product of the forward and right axes. It's the exact direction the camera is pointing at.~~
+- Initial right: `(1, 0, 0)`
+- Initial up: `(0, 1, 0)`
+- Initial forward: `(0, 0, -1)` (WebGL looks down -Z)
 
-~~`x component = (cosYaw * cosPitch)`~~
-~~`y component = (sinPitch)`~~
-~~`z component = (sinYaw * cosPitch)`~~
-
-**Note:** The Euler angle formulas above are obsolete. We now compute these vectors using quaternion rotation (see section 9.2.8.1). The basis vectors are obtained by applying the camera's quaternion rotation to the initial basis vectors `(1,0,0)`, `(0,1,0)`, and `(0,0,-1)`.
+See [Quaternion Rotation System](#quaternion-rotation-system) for the rotation computation.
 
 ### Translation and Final Matrix
 
@@ -268,121 +260,6 @@ Row major skips full row of size N to reach the correct row, then adds the colum
 Column major skips full columns of size M to reach the correct column then adds the row offset
 
 - Column Major = B + W * [(j - L_c) * M + (j - L_r)]
-```
-
-### Lighting System (Grayscale)
-
-**Directional Light Direction**
-Light direction is a normalized 3D vector pointing from the light source toward the scene.
-For a sun in the east casting light westward:
-
-```typescript
-lightDirection = normalize({x: -1, y: 0.2, z: 0})
-```
-
-**Lambertian Diffuse Lighting**
-Diffuse lighting calculation:
-
-```typescript
-dotProduct = dot(surfaceNormal, -lightDirection)
-diffuse = max(dotProduct, 0.0)
-```
-
-**Final Lighting Calculation**
-Combines ambient and diffuse lighting:
-
-```typescript
-lighting = ambientIntensity + diffuse * (1.0 - ambientIntensity)
-finalColor = baseColor * lightColor * lighting
-```
-
-Where:
-
-- `ambientIntensity` = varies with time of day (0.2-0.5, dark night to bright day)
-- `lightColor` = varies with time of day (cool moon tones to warm sun tones, grayscale)
-- `baseColor` = mesh color (grayscale values)
-
-**Day/Night Cycle**
-The lighting system implements a deterministic sun/moon cycle:
-
-- **Light Direction**: Rotates around Y axis based on simulation time
-  - Sun arc: from horizon (east) → overhead (noon) → horizon (west) → below horizon (night)
-  - Moon arc: opposite phase (visible during night)
-  - Direction computed as: `{x: cos(angle), y: sin(angle), z: 0}` where angle = `timeOfDay * 2π`
-
-- **Light Color**: Interpolates between cool (night) and warm (day)
-  - Uses sinusoidal interpolation for smooth transitions
-  - Day: warmer tones (slightly higher RGB values)
-  - Night: cooler tones (slightly lower, more neutral RGB values)
-
-- **Ambient Intensity**: Varies from dark (night) to bright (day)
-  - Range: 0.2 (night) to 0.5 (day)
-  - Smoothly transitions via sinusoidal interpolation
-
-All lighting parameters are computed deterministically from accumulated simulation time, ensuring reproducibility across platforms and game sessions.
-
-**Normal Transformation**
-Surface normals must be transformed by the inverse transpose of the model matrix:
-
-```typescript
-normalMatrix = transpose(inverse(modelMatrix))
-transformedNormal = normalize(normalMatrix * normal)
-```
-
-**Normal Calculation from Triangle**
-For a triangle with vertices v0, v1, v2:
-
-```typescript
-edge1 = v1 - v0
-edge2 = v2 - v0
-normal = normalize(cross(edge1, edge2))
-```
-
-### Geometric Mesh Generation
-
-**Cube Mesh**
-For a cube of size `s`, centered at origin:
-
-```typescript
-half = s / 2
-vertices = [
-    // 6 faces × 2 triangles × 3 vertices = 36 vertices
-    // Each face: two triangles forming a square
-]
-```
-
-**Pyramid Mesh**
-For a pyramid of base size `s` and height `h`:
-
-```typescript
-half = s / 2
-apex = h
-// Base: square (2 triangles)
-// 4 faces: triangles from base corners to apex
-```
-
-**Sphere Mesh (UV Sphere)**
-TODO: Revisit this. Can we add performance?
-For a sphere of radius `r` with `segments` divisions:
-
-```typescript
-for lat = 0 to segments:
-    theta = (lat * π) / segments
-    for lon = 0 to segments:
-        phi = (lon * 2π) / segments
-        x = r * cos(phi) * sin(theta)
-        y = r * cos(theta)
-        z = r * sin(phi) * sin(theta)
-```
-
-**Prism Mesh**
-For a rectangular prism of width `w`, height `h`, depth `d`:
-
-```typescript
-halfW = w / 2
-halfH = h / 2
-halfD = d / 2
-// 6 rectangular faces, each as 2 triangles
 ```
 
 ## Navigation

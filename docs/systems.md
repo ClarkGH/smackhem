@@ -7,6 +7,11 @@
   - [Chunk Definition](#chunk-definition)
   - [Chunk Streaming](#chunk-streaming)
 - [Geometry Rules (Intentional Constraints)](#geometry-rules-intentional-constraints)
+- [Geometric Mesh Generation](#geometric-mesh-generation)
+  - [Cube Mesh](#cube-mesh)
+  - [Pyramid Mesh](#pyramid-mesh)
+  - [Sphere Mesh (UV Sphere)](#sphere-mesh-uv-sphere)
+  - [Prism Mesh](#prism-mesh)
 - [Input System (Console-Ready)](#input-system-console-ready)
   - [Input Intent](#input-intent)
   - [Bare Web Input Backend](#bare-web-input-backend)
@@ -76,6 +81,76 @@ Why:
 - Easy to serialize
 - Easy to port
 - Easy to debug
+
+## Geometric Mesh Generation
+
+The renderer provides methods to generate geometric meshes procedurally. All meshes are created through the `Renderer` interface, ensuring platform-agnostic mesh creation.
+
+### Cube Mesh
+
+For a cube of size `s`, centered at origin:
+
+```typescript
+half = s / 2
+vertices = [
+    // 6 faces × 2 triangles × 3 vertices = 36 vertices
+    // Each face: two triangles forming a square
+    // Front face: (-h,-h,h), (h,-h,h), (h,h,h), (-h,-h,h), (h,h,h), (-h,h,h)
+    // Back face: (-h,-h,-h), (-h,h,-h), (h,h,-h), (-h,-h,-h), (h,h,-h), (h,-h,-h)
+    // Left, Right, Top, Bottom faces follow similar pattern
+]
+```
+
+The cube is generated with proper vertex normals for lighting calculations.
+
+### Pyramid Mesh
+
+For a pyramid of base size `s` and height `h`:
+
+```typescript
+half = s / 2
+apex = h
+// Base: square (2 triangles)
+//   (-h,0,-h), (h,0,-h), (h,0,h), (-h,0,-h), (h,0,h), (-h,0,h)
+// 4 faces: triangles from base corners to apex
+//   Front: (-h,0,h), (h,0,h), (0,apex,0)
+//   Back: (h,0,-h), (-h,0,-h), (0,apex,0)
+//   Left: (-h,0,-h), (-h,0,h), (0,apex,0)
+//   Right: (h,0,h), (h,0,-h), (0,apex,0)
+```
+
+### Sphere Mesh (UV Sphere)
+
+**Note:** Performance consideration - sphere generation may be optimized in the future.
+
+For a sphere of radius `r` with `segments` divisions:
+
+```typescript
+for lat = 0 to segments:
+    theta = (lat * π) / segments
+    for lon = 0 to segments:
+        phi = (lon * 2π) / segments
+        x = r * cos(phi) * sin(theta)
+        y = r * cos(theta)
+        z = r * sin(phi) * sin(theta)
+```
+
+The sphere is generated using UV mapping (latitude/longitude), creating a grid of vertices that form triangles. Higher segment counts produce smoother spheres but require more vertices.
+
+### Prism Mesh
+
+For a rectangular prism of width `w`, height `h`, depth `d`:
+
+```typescript
+halfW = w / 2
+halfH = h / 2
+halfD = d / 2
+// 6 rectangular faces, each as 2 triangles
+// Front: (-w,-h,d), (w,-h,d), (w,h,d), (-w,-h,d), (w,h,d), (-w,h,d)
+// Back, Left, Right, Top, Bottom follow similar pattern with appropriate coordinate signs
+```
+
+The prism allows for non-uniform scaling, creating rectangular boxes of any dimensions.
 
 ## Input System (Console-Ready)
 
