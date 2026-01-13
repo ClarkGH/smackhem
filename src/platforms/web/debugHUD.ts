@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import type { Vec3 } from '../../types/common';
 
 export interface DebugInfo {
@@ -7,100 +6,142 @@ export interface DebugInfo {
     sunPosition?: Vec3;
     moonPosition?: Vec3;
     timeOfDay?: number;
-    lightDirection?: Vec3;
 }
 
-export interface DebugHUD {
-    render: (info: DebugInfo) => void;
+export const createDebugHUD = (canvas: HTMLCanvasElement): {
+    render: (_info: DebugInfo) => void;
     toggle: () => void;
     isVisible: () => boolean;
-    resize: (width: number, height: number) => void;
-}
-
-export const createDebugHUD = (canvas: HTMLCanvasElement): DebugHUD => {
+} => {
+    // Create 2D canvas overlay positioned on top of WebGL canvas
     const overlay = document.createElement('canvas');
+
+    // Position overlay to match canvas
+    const updateOverlaySize = () => {
+        const rect = canvas.getBoundingClientRect();
+        overlay.style.position = 'absolute';
+        overlay.style.left = `${rect.left}px`;
+        overlay.style.top = `${rect.top}px`;
+        overlay.style.width = `${canvas.width}px`;
+        overlay.style.height = `${canvas.height}px`;
+        overlay.width = canvas.width;
+        overlay.height = canvas.height;
+    };
+
+    updateOverlaySize();
+    overlay.style.pointerEvents = 'none';
+    overlay.style.zIndex = '1000';
     overlay.style.position = 'absolute';
-    overlay.style.left = '0';
-    overlay.style.top = '0';
-    overlay.style.pointerEvents = 'none'; // Don't block mouse input
-    overlay.width = canvas.width;
-    overlay.height = canvas.height;
+    overlay.style.backgroundColor = 'transparent';
+    document.body.appendChild(overlay);
 
-    if (canvas.style.position !== 'relative') {
-        // eslint-disable-next-line no-param-reassign
-        canvas.style.position = 'relative';
-    }
-
-    canvas.parentElement?.appendChild(overlay);
+    // Update overlay size when window resizes
+    window.addEventListener('resize', updateOverlaySize);
 
     const ctx = overlay.getContext('2d');
+    if (!ctx) {
+        throw new Error('Failed to create 2D context for debug HUD');
+    }
+
     let visible = false;
 
     const formatVec3 = (v: Vec3): string => `(${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)})`;
 
-    const formatTimeOfDay = (timeOfDay: number): string => {
-        const totalSeconds = timeOfDay * 120; // DAY_LENGTH_SECONDS
-        const hours = Math.floor(totalSeconds / 60);
-        const minutes = Math.floor(totalSeconds % 60);
-        return `${timeOfDay.toFixed(2)} (${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')})`;
+    const formatTime = (timeOfDay: number): string => {
+        // Convert timeOfDay (0-1) to hours:minutes format
+        const totalMinutes = timeOfDay * 24 * 60;
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = Math.floor(totalMinutes % 60);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     };
 
-    return {
-        render: (info: DebugInfo) => {
-            if (!visible || !ctx) return;
+    const render = (info: DebugInfo): void => {
+        if (!visible || !ctx) return;
+
+        // Update overlay size/position in case canvas moved
+        updateOverlaySize();
+
+        // Clear the overlay
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+        // Set font and color with stroke for visibility
+        ctx.font = '14px monospace';
+        ctx.textBaseline = 'top';
+
+        // Helper function to draw text with outline for visibility
+        const drawText = (text: string, x: number, y: number) => {
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.miterLimit = 2;
+            ctx.strokeText(text, x, y);
+            ctx.fillStyle = 'red';
+            ctx.fillText(text, x, y);
+        };
+
+        let y = 10;
+        const lineHeight = 20;
+
+        // Camera Position
+        drawText(
+            `Camera Position: ${formatVec3(info.cameraPosition)}`,
+            10,
+            y,
+        );
+        y += lineHeight;
+
+        // Facing Direction
+        drawText(
+            `Facing Direction: ${formatVec3(info.cameraForward)}`,
+            10,
+            y,
+        );
+        y += lineHeight;
+
+        // Sun Position
+        if (info.sunPosition) {
+            drawText(
+                `Sun Position: ${formatVec3(info.sunPosition)}`,
+                10,
+                y,
+            );
+            y += lineHeight;
+        }
+
+        // Moon Position
+        if (info.moonPosition) {
+            drawText(
+                `Moon Position: ${formatVec3(info.moonPosition)}`,
+                10,
+                y,
+            );
+            y += lineHeight;
+        }
+
+        // Time of Day
+        if (info.timeOfDay !== undefined) {
+            const timeStr = formatTime(info.timeOfDay);
+            drawText(
+                `Time of Day: ${info.timeOfDay.toFixed(3)} (${timeStr})`,
+                10,
+                y,
+            );
+        }
+    };
+
+    const toggle = (): void => {
+        visible = !visible;
+        console.log(`Debug HUD ${visible ? 'enabled' : 'disabled'}`);
+        if (!visible && ctx) {
+            // Clear when hiding
             ctx.clearRect(0, 0, overlay.width, overlay.height);
-            ctx.fillStyle = '#ff0000'; // Red color
-            ctx.font = '14px monospace';
-            ctx.textBaseline = 'top';
-
-            let y = 10;
-            const lineHeight = 18;
-
-            // Camera Position
-            ctx.fillText(`Camera Position: ${formatVec3(info.cameraPosition)}`, 10, y);
-            y += lineHeight;
-
-            // Facing Direction
-            ctx.fillText(`Facing Direction: ${formatVec3(info.cameraForward)}`, 10, y);
-            y += lineHeight;
-
-            // Light Direction
-            if (info.lightDirection) {
-                ctx.fillText(`Light Direction: ${formatVec3(info.lightDirection)}`, 10, y);
-                y += lineHeight;
-            }
-
-            // Sun Position
-            if (info.sunPosition) {
-                const sunY = info.sunPosition.y;
-                const sunText = sunY < 0 ? 'Below Horizon' : formatVec3(info.sunPosition);
-                ctx.fillText(`Sun Position: ${sunText}`, 10, y);
-                y += lineHeight;
-            }
-
-            // Moon Position
-            if (info.moonPosition) {
-                const moonY = info.moonPosition.y;
-                const moonText = moonY < 0 ? 'Below Horizon' : formatVec3(info.moonPosition);
-                ctx.fillText(`Moon Position: ${moonText}`, 10, y);
-                y += lineHeight;
-            }
-
-            // Time of Day
-            if (info.timeOfDay !== undefined) {
-                ctx.fillText(`Time of Day: ${formatTimeOfDay(info.timeOfDay)}`, 10, y);
-            }
-        },
-        toggle: () => {
-            visible = !visible;
-            if (ctx) {
-                ctx.clearRect(0, 0, overlay.width, overlay.height);
-            }
-        },
-        isVisible: () => visible,
-        resize: (width: number, height: number) => {
-            overlay.width = width;
-            overlay.height = height;
-        },
+        } else if (visible) {
+            // Update position when showing
+            updateOverlaySize();
+        }
     };
+
+    const isVisible = (): boolean => visible;
+
+    return { render, toggle, isVisible };
 };

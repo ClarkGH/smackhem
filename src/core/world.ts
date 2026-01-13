@@ -1,11 +1,9 @@
 import { MeshHandle } from '../services/renderer';
 import { Mat4, Vec3 } from '../types/common';
-import AABB from './math/aabb';
+import { type AABB } from './math/aabb';
 import { extractPosition } from './math/mathHelpers';
 import { getMeshAABB } from './collision';
 
-// TODO: We may want to move this and other typing/interface namespaces
-// to common classes down the line.
 export type ChunkID = string;
 
 export const CHUNK_SIZE = 10; // Size of each chunk in world units
@@ -30,7 +28,7 @@ export class World {
 
     private _collidableAABBsBuffer: AABB[] = [];
 
-    // Helper to generate a coordinate-based ID (e.g., "0,0")
+    // UTILITY: Helper to generate a coordinate-based ID (e.g., "0,0")
     static getChunkID(x: number, z: number): ChunkID {
         return `${x},${z}`;
     }
@@ -44,14 +42,12 @@ export class World {
     }
 
     getVisibleMeshes(): StaticMesh[] {
-        // Clear buffer and reuse
         this._visibleMeshesBuffer.length = 0;
 
-        Array.from(this.activeChunks.values()).forEach((chunk) => {
+        this.activeChunks.forEach((chunk) => {
             this._visibleMeshesBuffer.push(...chunk.meshes);
         });
 
-        // Return buffer reference (callers must not mutate)
         return this._visibleMeshesBuffer;
     }
 
@@ -84,7 +80,7 @@ export class World {
         // Clear buffer and reuse
         this._collidableAABBsBuffer.length = 0;
 
-        Array.from(this.activeChunks.values()).forEach((chunk) => {
+        this.activeChunks.forEach((chunk) => {
             chunk.meshes.forEach((mesh) => {
                 // Filter out floor meshes - cubes are at y > 0.1, floors are at y = 0
                 const position = extractPosition(mesh.transform);
@@ -96,7 +92,6 @@ export class World {
             });
         });
 
-        // Return buffer reference (callers must not mutate)
         return this._collidableAABBsBuffer;
     }
 }

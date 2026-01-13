@@ -1,18 +1,28 @@
 import type { Vec3 } from '../types/common';
 import type { StaticMesh } from './world';
-import AABB from './math/aabb';
+import {
+    createAABB,
+    type AABB,
+    aabbIntersects,
+} from './math/aabb';
 import { extractPosition } from './math/mathHelpers';
 
 export interface CollisionContext {
     newPos: Vec3;
     xOnlyPos: Vec3;
     zOnlyPos: Vec3;
+    playerAABB: AABB;
+    xOnlyAABB: AABB;
+    zOnlyAABB: AABB;
 }
 
 export const createCollisionContext = (): CollisionContext => ({
     newPos: { x: 0, y: 0, z: 0 },
     xOnlyPos: { x: 0, y: 0, z: 0 },
     zOnlyPos: { x: 0, y: 0, z: 0 },
+    playerAABB: createAABB(),
+    xOnlyAABB: createAABB(),
+    zOnlyAABB: createAABB(),
 });
 
 // TODO: review if we want to be cylinder or box
@@ -20,7 +30,7 @@ export const createCollisionContext = (): CollisionContext => ({
 // with size (radius*2, height, radius*2)
 export const getPlayerAABB = (position: Vec3, height: number, radius: number): AABB => {
     const centerY = position.y - height / 2;
-    return new AABB(
+    return createAABB(
         {
             x: position.x - radius,
             y: centerY,
@@ -34,12 +44,28 @@ export const getPlayerAABB = (position: Vec3, height: number, radius: number): A
     );
 };
 
+// PERFORMANCE: Update AABB in-place (zero allocation)
+export const updatePlayerAABB = (
+    position: Vec3,
+    height: number,
+    radius: number,
+    out: AABB,
+): void => {
+    const centerY = position.y - height / 2;
+    out.min.x = position.x - radius;
+    out.min.y = centerY;
+    out.min.z = position.z - radius;
+    out.max.x = position.x + radius;
+    out.max.y = centerY + height;
+    out.max.z = position.z + radius;
+};
+
 // Extract AABB from a mesh transform
 // For cubes: extract position from transform, create AABB with size based on mesh type
 export const getMeshAABB = (mesh: StaticMesh, meshSize: number): AABB => {
     const position = extractPosition(mesh.transform);
     const halfSize = meshSize / 2;
-    return new AABB(
+    return createAABB(
         {
             x: position.x - halfSize,
             y: position.y - halfSize,
@@ -56,7 +82,7 @@ export const getMeshAABB = (mesh: StaticMesh, meshSize: number): AABB => {
 export const checkCollision = (
     playerAABB: AABB,
     worldAABB: AABB,
-): boolean => playerAABB.intersects(worldAABB);
+): boolean => aabbIntersects(playerAABB, worldAABB);
 
 export const resolveCollision = (
     playerPos: Vec3,
@@ -70,11 +96,12 @@ export const resolveCollision = (
     context.newPos.x = playerPos.x + movement.x;
     context.newPos.y = playerPos.y + movement.y;
     context.newPos.z = playerPos.z + movement.z;
-    const playerAABB = getPlayerAABB(context.newPos, playerHeight, playerRadius);
+    // PERFORMANCE: Update AABB in-place (zero allocation)
+    updatePlayerAABB(context.newPos, playerHeight, playerRadius, context.playerAABB);
 
     let hasCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
-        if (checkCollision(playerAABB, worldAABBs[i])) {
+        if (checkCollision(context.playerAABB, worldAABBs[i])) {
             hasCollision = true;
             break;
         }
@@ -88,10 +115,11 @@ export const resolveCollision = (
     context.xOnlyPos.x = playerPos.x + movement.x;
     context.xOnlyPos.y = playerPos.y;
     context.xOnlyPos.z = playerPos.z;
-    const xOnlyAABB = getPlayerAABB(context.xOnlyPos, playerHeight, playerRadius);
+    // PERFORMANCE: Update AABB in-place (zero allocation)
+    updatePlayerAABB(context.xOnlyPos, playerHeight, playerRadius, context.xOnlyAABB);
     let xCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
-        if (checkCollision(xOnlyAABB, worldAABBs[i])) {
+        if (checkCollision(context.xOnlyAABB, worldAABBs[i])) {
             xCollision = true;
             break;
         }
@@ -101,19 +129,19 @@ export const resolveCollision = (
     context.zOnlyPos.x = playerPos.x;
     context.zOnlyPos.y = playerPos.y;
     context.zOnlyPos.z = playerPos.z + movement.z;
-    const zOnlyAABB = getPlayerAABB(context.zOnlyPos, playerHeight, playerRadius);
+    // PERFORMANCE: Update AABB in-place (zero allocation)
+    updatePlayerAABB(context.zOnlyPos, playerHeight, playerRadius, context.zOnlyAABB);
     let zCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
-        if (checkCollision(zOnlyAABB, worldAABBs[i])) {
+        if (checkCollision(context.zOnlyAABB, worldAABBs[i])) {
             zCollision = true;
             break;
         }
     }
 
-    // Return resolved movement
     return {
         x: xCollision ? 0 : movement.x,
-        y: movement.y, // Keep Y movement as-is for now
+        y: movement.y,
         z: zCollision ? 0 : movement.z,
     };
 };

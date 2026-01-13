@@ -1,7 +1,7 @@
 import type { Renderer } from '../../services/renderer';
 import type { Clock } from '../../services/clock';
 import type { Input } from '../../services/input';
-import createGameLoop from '../../core/gameLoop';
+import { GameLoop } from '../../core/gameLoop';
 import WebGLRenderer from './webGLRenderer';
 import {
     World,
@@ -9,11 +9,12 @@ import {
     CHUNK_SIZE,
     CHUNK_LOAD_RADIUS,
 } from '../../core/world';
-import AABB from '../../core/math/aabb';
+import { createAABB } from '../../core/math/aabb';
 import { createTranslationMatrix } from '../../core/math/mathHelpers';
 import WebClock from './webClock';
 import { createCamera } from '../../core/camera';
 import { WebInputService } from './webInputService';
+import { createDebugHUD } from './debugHUD';
 import type { Vec3 } from '../../types/common';
 
 export interface PlatformServices {
@@ -106,7 +107,7 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
 
     return {
         id: chunkId,
-        bounds: new AABB(
+        bounds: createAABB(
             { x: chunkCenterX - 5, y: -1, z: chunkCenterZ - 5 },
             { x: chunkCenterX + 5, y: 5, z: chunkCenterZ + 5 },
         ),
@@ -155,7 +156,7 @@ export const updateActiveChunks = (
     });
 };
 
-export const createWebPlatform = async (): Promise<PlatformServices> => {
+export const createWebPlatform = async (): Promise<PlatformServices & { canvas: HTMLCanvasElement }> => {
     // DOM setup
     const canvas = document.createElement('canvas');
     canvas.width = 800; // TODO: Variable width
@@ -180,6 +181,7 @@ export const createWebPlatform = async (): Promise<PlatformServices> => {
         renderer,
         clock,
         input,
+        canvas,
         getAspectRatio: () => canvas.width / canvas.height,
     };
 };
@@ -191,11 +193,15 @@ export const bootstrapWeb = (): void => {
         const initialCamera = createCamera();
         updateActiveChunks(world, initialCamera.position, platform.renderer);
 
-        const gameLoop = createGameLoop(
+        // Create debug HUD
+        const debugHUD = createDebugHUD(platform.canvas);
+
+        const gameLoop = new GameLoop(
             platform.renderer,
             platform.input,
             world,
             platform.getAspectRatio,
+            debugHUD,
         );
 
         const loop = () => {
