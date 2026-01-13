@@ -4,8 +4,10 @@ export interface DebugInfo {
     cameraPosition: Vec3;
     cameraForward: Vec3;
     sunPosition?: Vec3;
-    moonPosition?: Vec3;
+    // moonPosition?: Vec3;
     timeOfDay?: number;
+    yaw?: number;
+    pitch?: number;
 }
 
 export const createDebugHUD = (canvas: HTMLCanvasElement): {
@@ -55,6 +57,26 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     };
 
+    const getCardinalDirection = (yaw: number): string => {
+        // Normalize yaw to 0-2π range
+        const normalizedYaw = ((yaw % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+        
+        // Convert to degrees for easier comparison
+        const degrees = (normalizedYaw * 180) / Math.PI;
+        
+        // Determine cardinal direction
+        // yaw=0 faces -Z (North), yaw=π/2 faces +X (East), yaw=π faces +Z (South), yaw=3π/2 faces -X (West)
+        if (degrees >= 315 || degrees < 45) {
+            return 'North';
+        } else if (degrees >= 45 && degrees < 135) {
+            return 'East';
+        } else if (degrees >= 135 && degrees < 225) {
+            return 'South';
+        } else {
+            return 'West';
+        }
+    };
+
     const render = (info: DebugInfo): void => {
         if (!visible || !ctx) return;
 
@@ -98,6 +120,28 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         );
         y += lineHeight;
 
+        // Cardinal Direction and Yaw/Pitch
+        if (info.yaw !== undefined) {
+            const cardinal = getCardinalDirection(info.yaw);
+            const yawDeg = (info.yaw * 180) / Math.PI;
+            drawText(
+                `Direction: ${cardinal} (Yaw: ${yawDeg.toFixed(1)}°)`,
+                10,
+                y,
+            );
+            y += lineHeight;
+        }
+
+        if (info.pitch !== undefined) {
+            const pitchDeg = (info.pitch * 180) / Math.PI;
+            drawText(
+                `Pitch: ${pitchDeg.toFixed(1)}°`,
+                10,
+                y,
+            );
+            y += lineHeight;
+        }
+
         // Sun Position
         if (info.sunPosition) {
             drawText(
@@ -109,14 +153,14 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         }
 
         // Moon Position
-        if (info.moonPosition) {
-            drawText(
-                `Moon Position: ${formatVec3(info.moonPosition)}`,
-                10,
-                y,
-            );
-            y += lineHeight;
-        }
+        // if (info.moonPosition) {
+        //     drawText(
+        //         `Moon Position: ${formatVec3(info.moonPosition)}`,
+        //         10,
+        //         y,
+        //     );
+        //     y += lineHeight;
+        // }
 
         // Time of Day
         if (info.timeOfDay !== undefined) {

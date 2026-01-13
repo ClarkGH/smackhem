@@ -50,7 +50,7 @@ const main = async () => {
             cameraPosition: { x: number; y: number; z: number };
             cameraForward: { x: number; y: number; z: number };
             sunPosition?: { x: number; y: number; z: number };
-            moonPosition?: { x: number; y: number; z: number };
+            // moonPosition?: { x: number; y: number; z: number };
             timeOfDay?: number;
         }) => void;
         toggle: () => void;
