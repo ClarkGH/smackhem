@@ -58,39 +58,29 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
     };
 
     const getCardinalDirection = (yaw: number): string => {
-        // Normalize yaw to 0-2π range
         const normalizedYaw = ((yaw % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
-        
-        // Convert to degrees for easier comparison
+
         const degrees = (normalizedYaw * 180) / Math.PI;
-        
-        // Determine cardinal direction
-        // yaw=0 faces -Z (North), yaw=π/2 faces +X (East), yaw=π faces +Z (South), yaw=3π/2 faces -X (West)
+
         if (degrees >= 315 || degrees < 45) {
             return 'North';
-        } else if (degrees >= 45 && degrees < 135) {
+        } if (degrees >= 45 && degrees < 135) {
             return 'East';
-        } else if (degrees >= 135 && degrees < 225) {
+        } if (degrees >= 135 && degrees < 225) {
             return 'South';
-        } else {
-            return 'West';
         }
+        return 'West';
     };
 
     const render = (info: DebugInfo): void => {
         if (!visible || !ctx) return;
 
-        // Update overlay size/position in case canvas moved
         updateOverlaySize();
 
-        // Clear the overlay
         ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-        // Set font and color with stroke for visibility
         ctx.font = '14px monospace';
         ctx.textBaseline = 'top';
 
-        // Helper function to draw text with outline for visibility
         const drawText = (text: string, x: number, y: number) => {
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 3;
@@ -104,7 +94,6 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         let y = 10;
         const lineHeight = 20;
 
-        // Camera Position
         drawText(
             `Camera Position: ${formatVec3(info.cameraPosition)}`,
             10,
@@ -112,7 +101,6 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         );
         y += lineHeight;
 
-        // Facing Direction
         drawText(
             `Facing Direction: ${formatVec3(info.cameraForward)}`,
             10,
@@ -120,10 +108,10 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         );
         y += lineHeight;
 
-        // Cardinal Direction and Yaw/Pitch
         if (info.yaw !== undefined) {
             const cardinal = getCardinalDirection(info.yaw);
-            const yawDeg = (info.yaw * 180) / Math.PI;
+            const normalizedYaw = ((info.yaw % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+            const yawDeg = (normalizedYaw * 180) / Math.PI;
             drawText(
                 `Direction: ${cardinal} (Yaw: ${yawDeg.toFixed(1)}°)`,
                 10,
@@ -142,7 +130,6 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
             y += lineHeight;
         }
 
-        // Sun Position
         if (info.sunPosition) {
             drawText(
                 `Sun Position: ${formatVec3(info.sunPosition)}`,

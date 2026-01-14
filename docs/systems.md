@@ -11,6 +11,7 @@
   - [Cube Mesh](#cube-mesh)
   - [Pyramid Mesh](#pyramid-mesh)
   - [Sphere Mesh (UV Sphere)](#sphere-mesh-uv-sphere)
+  - [Plane Mesh](#plane-mesh)
   - [Prism Mesh](#prism-mesh)
 - [Input System (Console-Ready)](#input-system-console-ready)
   - [Input Intent](#input-intent)
@@ -101,7 +102,7 @@ vertices = [
 ]
 ```
 
-The cube is generated with proper vertex normals for lighting calculations.
+The cube is generated with proper vertex normals for lighting calculations. Normals are calculated automatically from vertex winding order.
 
 ### Pyramid Mesh
 
@@ -136,6 +137,27 @@ for lat = 0 to segments:
 ```
 
 The sphere is generated using UV mapping (latitude/longitude), creating a grid of vertices that form triangles. Higher segment counts produce smoother spheres but require more vertices.
+
+**Note:** Sphere normals are negated after calculation to fix lighting direction (normals point inward by default, need to point outward).
+
+### Plane Mesh
+
+For a plane mesh of size `s` on the XZ plane (Y = 0, typically used for floors):
+
+```typescript
+half = s / 2
+// Two triangles forming a square on XZ plane
+vertices = [
+    -h, 0, -h,  // Triangle 1
+    h, 0, -h,
+    h, 0, h,
+    -h, 0, -h,  // Triangle 2
+    h, 0, h,
+    -h, 0, h,
+]
+```
+
+**Important:** Plane mesh normals must be negated after calculation. The automatic normal calculation from vertex winding order produces normals pointing DOWN (0, -1, 0), but for floor/ground planes we need normals pointing UP (0, 1, 0) for correct lighting. All normals are negated before mesh creation.
 
 ### Prism Mesh
 
