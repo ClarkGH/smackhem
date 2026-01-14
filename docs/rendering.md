@@ -144,15 +144,17 @@ The lighting system supports a deterministic sun/moon cycle that rotates light d
    - Normalized 3D vector in world space
    - Sun at top (noon), moon at bottom (midnight)
 
-2. **Light Color**: Elevation-based gradient (sunlight only)
+2. **Light Color**: Visibility-based blending (sun and moon colors)
    - Grayscale RGB values
-   - Transitions from white (zenith) to red/orange (horizon) based on sun elevation
-   - No night colors (currently debugging sun cycle)
+   - Blends between warm sun tones (white at zenith, red/orange at horizon) and cool moon tones (cool blue)
+   - Uses sun/moon visibility to weight the blend
+   - Sun color transitions from white (zenith) to red/orange (horizon) based on sun elevation
    - Smooth interpolation via smoothstep function
+   - Note: Currently stays in cool colors a bit more than ideal (to be fine-tuned)
 
-3. **Ambient Intensity**: Currently disabled
-   - Returns 0.0 for debugging purposes
-   - Will be restored later with elevation-based transitions
+3. **Ambient Intensity**: Elevation-based transitions
+   - Varies from 0.1 (dark night) to 0.5 (bright day) based on sun elevation
+   - Uses smoothstep interpolation for smooth transitions
 
 ### Renderer Interface Extension
 
@@ -198,38 +200,60 @@ out.z = cosElev * Math.cos(azimuth);  // North-south component
 // Note: No horizon clamping - sun can go below horizon for debugging
 ```
 
-**Moon Calculation (Currently Disabled):**
+**Moon Calculation:**
 
-Moon code is currently commented out for debugging. Will be restored and replaced in the future.
+Moon position and light direction are computed from sun position (opposite phase):
+
+```typescript
+const moonAzimuth = sunAzimuth + Math.PI; // Opposite direction
+const moonElevation = -sunElevation; // Opposite elevation
+sphericalToDirection(moonAzimuth, moonElevation, moonLightDirection);
+```
 
 **Light Direction Selection:**
 
-The system currently uses sun light direction only (moon disabled):
+The system selects between sun and moon light directions based on visibility:
 
 ```typescript
 const sunVisibility = computeSunVisibility(timeOfDay); // 1.0 at noon, 0.0 at night
-const activeLightDirection = lightDirection; // Always use sun light direction
+const moonVisibility = computeMoonVisibility(timeOfDay); // 1.0 at midnight, 0.0 at noon
+const activeLightDirection = moonVisibility > sunVisibility ? moonLightDirection : lightDirection;
 ```
 
-**Light Color (Elevation-Based Gradient):**
+**Light Color (Visibility-Based Blending):**
 
-Color transitions based on sun elevation (sunlight only, no night colors):
+Light color blends between sun and moon colors based on visibility:
 
 ```typescript
-// Normalize elevation to 0-1 range (horizon to zenith)
+const sunVisibility = computeSunVisibility(timeOfDay);
+const moonVisibility = computeMoonVisibility(timeOfDay);
+
+// Compute sun color (elevation-based: white at zenith, red/orange at horizon)
 const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
+const smoothT = normalizedElev * normalizedElev * (3 - 2 * normalizedElev); // Smoothstep
 
-// Elevation-based color transition (sunlight only, no night colors)
-const t = normalizedElev;
-const smoothT = t * t * (3 - 2 * t); // Smoothstep function
-
-// White at zenith, red/orange at horizon
-lightColor = {
+const sunColor = {
     x: 0.8 + 0.2 * smoothT, // 1.0 at zenith, 0.8 at horizon
     y: 0.7 + 0.3 * smoothT, // 1.0 at zenith, 0.7 at horizon
     z: 0.5 + 0.5 * smoothT  // 1.0 at zenith, 0.5 at horizon (warmer)
 };
+
+// Moon color (cool blue)
+const moonColor = { x: 0.4, y: 0.6, z: 0.9 };
+
+// Blend based on visibility
+const totalVisibility = sunVisibility + moonVisibility;
+const sunWeight = sunVisibility / totalVisibility;
+const moonWeight = moonVisibility / totalVisibility;
+
+lightColor = {
+    x: sunColor.x * sunWeight + moonColor.x * moonWeight,
+    y: sunColor.y * sunWeight + moonColor.y * moonWeight,
+    z: sunColor.z * sunWeight + moonColor.z * moonWeight
+};
 ```
+
+Note: Currently stays in cool colors a bit more than ideal (to be fine-tuned).
 
 **Ambient Intensity (Currently Disabled):**
 
@@ -242,7 +266,7 @@ return 0.0;
 
 **Visual Celestial Objects:**
 
-The sun is rendered as a visible sphere in the sky (moon currently disabled):
+Both the sun and moon are rendered as visible spheres in the sky:
 
 - **Positioning**: Placed at infinite distance along light direction vector
   - Distance: `CELESTIAL_DISTANCE = camera.far - 1.0` (ensures visibility)
@@ -250,12 +274,15 @@ The sun is rendered as a visible sphere in the sky (moon currently disabled):
 
 - **Size Constants**:
   - `SUN_SIZE = 0.5` (radius of sun sphere)
+  - `MOON_SIZE = 0.4` (radius of moon sphere)
 
 - **Colors**:
   - Sun: `{ x: 1.0, y: 0.85, z: 0.2 }` (golden yellow)
+  - Moon: `{ x: 0.4, y: 0.6, z: 0.9 }` (cool blue)
 
 - **Visibility**: Colors are multiplied by visibility factor (0-1) for smooth fade in/out
   - Sun fades in at dawn, fades out at dusk
+  - Moon fades in at dusk, fades out at dawn
 
 **Time Mapping:**
 
