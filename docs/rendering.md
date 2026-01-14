@@ -144,14 +144,15 @@ The lighting system supports a deterministic sun/moon cycle that rotates light d
    - Normalized 3D vector in world space
    - Sun at top (noon), moon at bottom (midnight)
 
-2. **Light Color**: Warm (day) to cool (night) transition
+2. **Light Color**: Elevation-based gradient (sunlight only)
    - Grayscale RGB values
-   - Warmer tones during day, cooler tones during night
-   - Smooth interpolation via sinusoidal functions
+   - Transitions from white (zenith) to red/orange (horizon) based on sun elevation
+   - No night colors (currently debugging sun cycle)
+   - Smooth interpolation via smoothstep function
 
-3. **Ambient Intensity**: Brightness variation
-   - Lower during night (darker), higher during day (brighter)
-   - Smoothly transitions between day and night
+3. **Ambient Intensity**: Currently disabled
+   - Returns 0.0 for debugging purposes
+   - Will be restored later with elevation-based transitions
 
 ### Renderer Interface Extension
 
@@ -182,7 +183,9 @@ The implementation uses spherical coordinates (azimuth + elevation) for physical
 
 ```typescript
 // Compute sun azimuth and elevation
-const angle = timeOfDay * Math.PI * 2; // Full rotation (0 to 2π)
+// Phase offset: shift so noon (elevation peak) is at timeOfDay = 0.5
+// Standard hours: dawn ~0.25, noon 0.5, dusk ~0.75, midnight 0.0/1.0
+const angle = (timeOfDay - 0.25) * Math.PI * 2; // Full rotation with phase offset
 const elevation = Math.sin(angle) + DECLINATION_OFFSET; // -1 (midnight) to 1 (noon)
 const azimuth = Math.PI / 2 + angle; // Starts at east (π/2), rotates clockwise
 
@@ -192,87 +195,73 @@ out.x = cosElev * Math.sin(azimuth);  // East-west component
 out.y = Math.sin(elevation);          // Up-down component
 out.z = cosElev * Math.cos(azimuth);  // North-south component
 // Normalize for unit vector
+// Note: No horizon clamping - sun can go below horizon for debugging
 ```
 
-**Moon Calculation:**
+**Moon Calculation (Currently Disabled):**
 
-Moon follows opposite phase from sun:
+Moon code is currently commented out for debugging. Will be restored and replaced in the future.
 
-- Azimuth: `sunAzimuth + π` (opposite direction)
-- Elevation: `-sunElevation` (opposite height)
+**Light Direction Selection:**
 
-**Light Direction Selection (Visibility-Based):**
-
-The system dynamically selects which light source to use based on visibility:
+The system currently uses sun light direction only (moon disabled):
 
 ```typescript
 const sunVisibility = computeSunVisibility(timeOfDay); // 1.0 at noon, 0.0 at night
-const moonVisibility = 1.0 - sunVisibility; // Inverse of sun visibility
-const activeLightDirection = moonVisibility > sunVisibility ? moonLightDirection : lightDirection;
+const activeLightDirection = lightDirection; // Always use sun light direction
 ```
 
 **Light Color (Elevation-Based Gradient):**
 
-Color transitions simulate atmospheric scattering (Rayleigh scattering):
+Color transitions based on sun elevation (sunlight only, no night colors):
 
 ```typescript
 // Normalize elevation to 0-1 range (horizon to zenith)
 const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
 
-if (elevation < HORIZON_THRESHOLD) {
-    // Below horizon: cool night color
-    lightColor = { x: 0.3, y: 0.4, z: 0.6 }; // Cool blue
-} else {
-    // Above horizon: gradient from white (zenith) to red/orange (horizon)
-    const t = normalizedElev;
-    const smoothT = t * t * (3 - 2 * t); // Smoothstep function
-    lightColor = {
-        x: 0.8 + 0.2 * smoothT, // 1.0 at zenith, 0.8 at horizon
-        y: 0.7 + 0.3 * smoothT, // 1.0 at zenith, 0.7 at horizon
-        z: 0.5 + 0.5 * smoothT  // 1.0 at zenith, 0.5 at horizon (warmer)
-    };
-}
+// Elevation-based color transition (sunlight only, no night colors)
+const t = normalizedElev;
+const smoothT = t * t * (3 - 2 * t); // Smoothstep function
+
+// White at zenith, red/orange at horizon
+lightColor = {
+    x: 0.8 + 0.2 * smoothT, // 1.0 at zenith, 0.8 at horizon
+    y: 0.7 + 0.3 * smoothT, // 1.0 at zenith, 0.7 at horizon
+    z: 0.5 + 0.5 * smoothT  // 1.0 at zenith, 0.5 at horizon (warmer)
+};
 ```
 
-**Ambient Intensity (Cosine Power Curve):**
+**Ambient Intensity (Currently Disabled):**
 
-Uses high-power cosine for sharp transition near horizon:
+Ambient intensity is currently disabled for debugging (returns 0.0). Will be restored later with elevation-based transitions.
 
 ```typescript
-if (elevation < HORIZON_THRESHOLD) {
-    return 0.1; // Dark night ambient
-}
-const normalizedElev = (elevation + 1) / 2; // 0 (horizon) to 1 (zenith)
-const cosElev = Math.cos((normalizedElev * Math.PI) / 2);
-const intensity = cosElev * cosElev * cosElev * cosElev; // cos^4 curve
-return 0.1 + 0.4 * intensity; // Range: 0.1 (horizon) to 0.5 (zenith)
+// Ambient disabled for debugging (will restore later)
+return 0.0;
 ```
 
 **Visual Celestial Objects:**
 
-The sun and moon are rendered as visible spheres in the sky:
+The sun is rendered as a visible sphere in the sky (moon currently disabled):
 
-- **Positioning**: Placed at infinite distance along their light direction vectors
+- **Positioning**: Placed at infinite distance along light direction vector
   - Distance: `CELESTIAL_DISTANCE = camera.far - 1.0` (ensures visibility)
   - Position: `camera.position + (lightDirection * CELESTIAL_DISTANCE)`
 
 - **Size Constants**:
   - `SUN_SIZE = 0.5` (radius of sun sphere)
-  - `MOON_SIZE = 0.4` (radius of moon sphere)
 
 - **Colors**:
   - Sun: `{ x: 1.0, y: 0.85, z: 0.2 }` (golden yellow)
-  - Moon: `{ x: 0.4, y: 0.6, z: 0.9 }` (cool blue)
 
 - **Visibility**: Colors are multiplied by visibility factor (0-1) for smooth fade in/out
   - Sun fades in at dawn, fades out at dusk
-  - Moon fades in at dusk, fades out at dawn
 
 **Time Mapping:**
 
-- Time 0 = midnight (moon visible)
+- Time 0.0/1.0 = midnight (sun below horizon)
 - Time 0.25 = dawn (sun rising in east)
-- Time 0.5 = noon (sun overhead)
+- Time 0.5 = noon (sun overhead at zenith)
 - Time 0.75 = dusk (sun setting in west)
 
 **Constraints:**
@@ -293,8 +282,8 @@ The sun and moon are rendered as visible spheres in the sky:
   - Celestial objects, transforms, colors, and directions are all pre-allocated
   - Inline normalization avoids calling allocation-heavy helper functions
 - All values are computed fresh each frame (no caching needed, pure functions)
-- Celestial meshes (sun/moon spheres) are created once and reused
-- Horizon clamping prevents lighting from below the floor when celestial objects are below horizon
+- Celestial meshes (sun sphere) are created once and reused
+- No horizon clamping - sun can go below horizon for debugging
 
 ## Key Rule: gl.* never leaks upward
 

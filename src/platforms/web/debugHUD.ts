@@ -4,8 +4,10 @@ export interface DebugInfo {
     cameraPosition: Vec3;
     cameraForward: Vec3;
     sunPosition?: Vec3;
-    moonPosition?: Vec3;
+    // moonPosition?: Vec3;
     timeOfDay?: number;
+    yaw?: number;
+    pitch?: number;
 }
 
 export const createDebugHUD = (canvas: HTMLCanvasElement): {
@@ -55,20 +57,30 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     };
 
+    const getCardinalDirection = (yaw: number): string => {
+        const normalizedYaw = ((yaw % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+
+        const degrees = (normalizedYaw * 180) / Math.PI;
+
+        if (degrees >= 315 || degrees < 45) {
+            return 'North';
+        } if (degrees >= 45 && degrees < 135) {
+            return 'East';
+        } if (degrees >= 135 && degrees < 225) {
+            return 'South';
+        }
+        return 'West';
+    };
+
     const render = (info: DebugInfo): void => {
         if (!visible || !ctx) return;
 
-        // Update overlay size/position in case canvas moved
         updateOverlaySize();
 
-        // Clear the overlay
         ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-        // Set font and color with stroke for visibility
         ctx.font = '14px monospace';
         ctx.textBaseline = 'top';
 
-        // Helper function to draw text with outline for visibility
         const drawText = (text: string, x: number, y: number) => {
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 3;
@@ -82,7 +94,6 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         let y = 10;
         const lineHeight = 20;
 
-        // Camera Position
         drawText(
             `Camera Position: ${formatVec3(info.cameraPosition)}`,
             10,
@@ -90,7 +101,6 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         );
         y += lineHeight;
 
-        // Facing Direction
         drawText(
             `Facing Direction: ${formatVec3(info.cameraForward)}`,
             10,
@@ -98,7 +108,28 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         );
         y += lineHeight;
 
-        // Sun Position
+        if (info.yaw !== undefined) {
+            const cardinal = getCardinalDirection(info.yaw);
+            const normalizedYaw = ((info.yaw % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+            const yawDeg = (normalizedYaw * 180) / Math.PI;
+            drawText(
+                `Direction: ${cardinal} (Yaw: ${yawDeg.toFixed(1)}°)`,
+                10,
+                y,
+            );
+            y += lineHeight;
+        }
+
+        if (info.pitch !== undefined) {
+            const pitchDeg = (info.pitch * 180) / Math.PI;
+            drawText(
+                `Pitch: ${pitchDeg.toFixed(1)}°`,
+                10,
+                y,
+            );
+            y += lineHeight;
+        }
+
         if (info.sunPosition) {
             drawText(
                 `Sun Position: ${formatVec3(info.sunPosition)}`,
@@ -109,14 +140,14 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
         }
 
         // Moon Position
-        if (info.moonPosition) {
-            drawText(
-                `Moon Position: ${formatVec3(info.moonPosition)}`,
-                10,
-                y,
-            );
-            y += lineHeight;
-        }
+        // if (info.moonPosition) {
+        //     drawText(
+        //         `Moon Position: ${formatVec3(info.moonPosition)}`,
+        //         10,
+        //         y,
+        //     );
+        //     y += lineHeight;
+        // }
 
         // Time of Day
         if (info.timeOfDay !== undefined) {

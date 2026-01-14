@@ -101,10 +101,11 @@ export default class WebGLRenderer implements Renderer {
             
             void main() {
                 // Normalize light direction (should be normalized on CPU, but safety check)
-                // u_lightDirection points FROM light source TOWARD scene, which is what we need for Lambertian lighting
+                // u_lightDirection points FROM light source TOWARD surface
                 vec3 lightDir = normalize(u_lightDirection);
                 
                 // Calculate diffuse lighting (Lambertian)
+                // Dot product with normal gives how aligned the surface is with light direction
                 float diff = max(dot(v_normal, lightDir), 0.0);
                 
                 // Combine ambient and diffuse
@@ -283,7 +284,16 @@ export default class WebGLRenderer implements Renderer {
             -h, 0, h,
         ]);
 
-        const mesh = this.createMesh(vertices);
+        // Negate normals for plane mesh - calculated normals point down, but we want them pointing up for floor
+        const verticesArray = new Float32Array(vertices);
+        const calculatedNormals = this.calculateNormals(verticesArray);
+        for (let i = 0; i < calculatedNormals.length; i += 3) {
+            calculatedNormals[i] *= -1;
+            calculatedNormals[i + 1] *= -1;
+            calculatedNormals[i + 2] *= -1;
+        }
+
+        const mesh = this.createMesh(vertices, calculatedNormals);
         this.meshCache.set(key, mesh);
 
         return mesh;
