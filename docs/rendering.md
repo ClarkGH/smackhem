@@ -255,14 +255,9 @@ lightColor = {
 
 Note: Currently stays in cool colors a bit more than ideal (to be fine-tuned).
 
-**Ambient Intensity (Currently Disabled):**
+**Ambient Intensity (Elevation-Based):**
 
-Ambient intensity is currently disabled for debugging (returns 0.0). Will be restored later with elevation-based transitions.
-
-```typescript
-// Ambient disabled for debugging (will restore later)
-return 0.0;
-```
+Ambient intensity varies from 0.1 (dark night) to 0.5 (bright day) based on sun elevation, using smoothstep interpolation for smooth transitions.
 
 **Visual Celestial Objects:**
 

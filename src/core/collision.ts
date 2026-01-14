@@ -14,6 +14,7 @@ export interface CollisionContext {
     playerAABB: AABB;
     xOnlyAABB: AABB;
     zOnlyAABB: AABB;
+    resolvedMovement: Vec3;
 }
 
 export const createCollisionContext = (): CollisionContext => ({
@@ -23,6 +24,7 @@ export const createCollisionContext = (): CollisionContext => ({
     playerAABB: createAABB(),
     xOnlyAABB: createAABB(),
     zOnlyAABB: createAABB(),
+    resolvedMovement: { x: 0, y: 0, z: 0 },
 });
 
 // TODO: review if we want to be cylinder or box
@@ -108,7 +110,11 @@ export const resolveCollision = (
     }
 
     if (!hasCollision) {
-        return movement;
+        // PERFORMANCE: Write into existing object to avoid allocation
+        context.resolvedMovement.x = movement.x;
+        context.resolvedMovement.y = movement.y;
+        context.resolvedMovement.z = movement.z;
+        return context.resolvedMovement;
     }
 
     // Try X-only movement
@@ -139,9 +145,9 @@ export const resolveCollision = (
         }
     }
 
-    return {
-        x: xCollision ? 0 : movement.x,
-        y: movement.y,
-        z: zCollision ? 0 : movement.z,
-    };
+    // PERFORMANCE: Write into existing object to avoid allocation (complies with RULE M-1)
+    context.resolvedMovement.x = xCollision ? 0 : movement.x;
+    context.resolvedMovement.y = movement.y;
+    context.resolvedMovement.z = zCollision ? 0 : movement.z;
+    return context.resolvedMovement;
 };
