@@ -4,7 +4,7 @@ export interface DebugInfo {
     cameraPosition: Vec3;
     cameraForward: Vec3;
     sunPosition?: Vec3;
-    // moonPosition?: Vec3;
+    moonPosition?: Vec3;
     timeOfDay?: number;
     yaw?: number;
     pitch?: number;
@@ -139,17 +139,15 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
             y += lineHeight;
         }
 
-        // Moon Position
-        // if (info.moonPosition) {
-        //     drawText(
-        //         `Moon Position: ${formatVec3(info.moonPosition)}`,
-        //         10,
-        //         y,
-        //     );
-        //     y += lineHeight;
-        // }
+        if (info.moonPosition) {
+            drawText(
+                `Moon Position: ${formatVec3(info.moonPosition)}`,
+                10,
+                y,
+            );
+            y += lineHeight;
+        }
 
-        // Time of Day
         if (info.timeOfDay !== undefined) {
             const timeStr = formatTime(info.timeOfDay);
             drawText(

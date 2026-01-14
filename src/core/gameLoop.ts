@@ -31,7 +31,7 @@ export interface DebugHUD {
         cameraPosition: Vec3;
         cameraForward: Vec3;
         sunPosition?: Vec3;
-        // moonPosition?: Vec3;
+        moonPosition?: Vec3;
         timeOfDay?: number;
         yaw?: number;
         pitch?: number;
@@ -73,11 +73,11 @@ export class GameLoop {
 
     private readonly SUN_SIZE = 0.5; // Radius of sun orb (sphere)
 
-    // private readonly MOON_SIZE = 0.4; // Radius of moon orb (sphere)
+    private readonly MOON_SIZE = 0.4; // Radius of moon orb (sphere)
 
     private readonly SUN_COLOR: Vec3 = { x: 1.0, y: 0.85, z: 0.2 }; // Golden yellow
 
-    // private readonly MOON_COLOR: Vec3 = { x: 0.4, y: 0.6, z: 0.9 }; // Cool blue
+    private readonly MOON_COLOR: Vec3 = { x: 0.4, y: 0.6, z: 0.9 }; // Cool blue
 
     private readonly CELESTIAL_DISTANCE: number; // Computed from camera.far
 
@@ -107,27 +107,27 @@ export class GameLoop {
     private readonly sunTransform: Mat4;
 
     // Pre-allocated moon objects
-    // private readonly moonPosition: Vec3 = { x: 0, y: 0, z: 0 };
+    private readonly moonPosition: Vec3 = { x: 0, y: 0, z: 0 };
 
-    // private readonly moonLightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // For moon (opposite of sun)
+    private readonly moonLightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // For moon (opposite of sun)
 
-    // private readonly moonColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
+    private readonly moonColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
 
-    // private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated moon direction for moon positioning
+    private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated moon direction for moon positioning
 
-    // private readonly moonTransform: Mat4;
+    private readonly moonTransform: Mat4;
 
     // Pre-allocated MVP matrices
     private readonly sunMVP: Mat4;
 
-    // private readonly moonMVP: Mat4;
+    private readonly moonMVP: Mat4;
 
     private readonly meshMVP: Mat4;
 
     // Mesh objects
     private readonly sunMesh;
 
-    // private readonly moonMesh;
+    private readonly moonMesh;
 
     constructor(
         renderer: Renderer,
@@ -151,14 +151,14 @@ export class GameLoop {
 
         // Pre-allocated matrices
         this.sunTransform = identity();
-        // this.moonTransform = identity();
+        this.moonTransform = identity();
         this.sunMVP = identity();
-        // this.moonMVP = identity();
+        this.moonMVP = identity();
         this.meshMVP = identity();
 
         // Mesh objects
         this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE, 16);
-        // this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE, 16);
+        this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE, 16);
     }
 
     private computeTimeOfDay(simTime: number): number {
@@ -218,9 +218,11 @@ export class GameLoop {
         elevation: number,
         out: Vec3,
     ): void {
-        const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
+        const sunVisibility = this.computeSunVisibility(timeOfDay);
+        const moonVisibility = this.computeMoonVisibility(timeOfDay);
 
-        // Elevation-based color transition (sunlight only, no night colors)
+        // Compute sun color (elevation-based: white at zenith, red/orange at horizon)
+        const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
         const t = normalizedElev;
         let smoothT = 0;
         if (t <= 0) {
@@ -231,16 +233,49 @@ export class GameLoop {
             smoothT = t * t * (3 - 2 * t); // Smoothstep function
         }
 
-        // White at zenith, red/orange at horizon
-        out.x = 0.8 + 0.2 * smoothT; // Red component: 1.0 at zenith, 0.8 at horizon
-        out.y = 0.7 + 0.3 * smoothT; // Green component: 1.0 at zenith, 0.7 at horizon
-        out.z = 0.5 + 0.5 * smoothT; // Blue component: 1.0 at zenith, 0.5 at horizon (warmer)
+        const sunColorX = 0.8 + 0.2 * smoothT; // Red component: 1.0 at zenith, 0.8 at horizon
+        const sunColorY = 0.7 + 0.3 * smoothT; // Green component: 1.0 at zenith, 0.7 at horizon
+        const sunColorZ = 0.5 + 0.5 * smoothT; // Blue component: 1.0 at zenith, 0.5 at horizon (warmer)
+
+        // Moon color (cool blue)
+        const moonColorX = this.MOON_COLOR.x;
+        const moonColorY = this.MOON_COLOR.y;
+        const moonColorZ = this.MOON_COLOR.z;
+
+        // Blend between sun and moon colors based on visibility
+        const totalVisibility = sunVisibility + moonVisibility;
+        if (totalVisibility > 0) {
+            const sunWeight = sunVisibility / totalVisibility;
+            const moonWeight = moonVisibility / totalVisibility;
+            out.x = sunColorX * sunWeight + moonColorX * moonWeight;
+            out.y = sunColorY * sunWeight + moonColorY * moonWeight;
+            out.z = sunColorZ * sunWeight + moonColorZ * moonWeight;
+        } else {
+            // Fallback to moon color if no visibility
+            out.x = moonColorX;
+            out.y = moonColorY;
+            out.z = moonColorZ;
+        }
     }
 
     // PERFORMANCE: Pure function, no allocations
     private computeAmbientIntensity(elevation: number): number {
-        // Ambient disabled for debugging (will restore later)
-        return 0.0;
+        // Normalize elevation from [-1, 1] to [0, 1]
+        const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
+
+        // Elevation-based ambient transition
+        const t = normalizedElev;
+        let smoothT = 0;
+        if (t <= 0) {
+            smoothT = 0;
+        } else if (t >= 1) {
+            smoothT = 1;
+        } else {
+            smoothT = t * t * (3 - 2 * t); // Smoothstep function
+        }
+
+        // Interpolate between 0.1 (night) and 0.5 (day)
+        return 0.1 + (0.5 - 0.1) * smoothT;
     }
 
     // PERFORMANCE: Pure function, no allocations
@@ -252,9 +287,9 @@ export class GameLoop {
     }
 
     // PERFORMANCE: Pure function, no allocations
-    // private computeMoonVisibility(timeOfDay: number): number {
-    //     return 1 - this.computeSunVisibility(timeOfDay);
-    // }
+    private computeMoonVisibility(timeOfDay: number): number {
+        return 1 - this.computeSunVisibility(timeOfDay);
+    }
 
     // PERFORMANCE: Writes into existing object to avoid allocation (complies with RULE M-1)
     private computeCelestialPosition(
@@ -353,14 +388,13 @@ export class GameLoop {
         this.computeLightColor(timeOfDay, this.sunElevation.value, this.lightColor);
 
         const ambientIntensity = this.computeAmbientIntensity(this.sunElevation.value);
-        // const moonAzimuth = { value: this.sunAzimuth.value + Math.PI };
-        // const moonElevation = { value: -this.sunElevation.value };
-        // this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
+        const moonAzimuth = { value: this.sunAzimuth.value + Math.PI };
+        const moonElevation = { value: -this.sunElevation.value };
+        this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
 
         const sunVisibility = this.computeSunVisibility(timeOfDay);
-        // const moonVisibility = this.computeMoonVisibility(timeOfDay);
-        // const activeLightDirection = moonVisibility > sunVisibility ? this.moonLightDirection : this.lightDirection;
-        const activeLightDirection = this.lightDirection; // Always use sun light direction
+        const moonVisibility = this.computeMoonVisibility(timeOfDay);
+        const activeLightDirection = moonVisibility > sunVisibility ? this.moonLightDirection : this.lightDirection;
 
         if (this.renderer.setLightDirection) {
             this.renderer.setLightDirection(activeLightDirection);
@@ -383,18 +417,18 @@ export class GameLoop {
             this.sunPosition,
         );
 
-        // this.moonDirectionForPosition.x = this.moonLightDirection.x;
-        // this.moonDirectionForPosition.y = this.moonLightDirection.y;
-        // this.moonDirectionForPosition.z = this.moonLightDirection.z;
+        this.moonDirectionForPosition.x = this.moonLightDirection.x;
+        this.moonDirectionForPosition.y = this.moonLightDirection.y;
+        this.moonDirectionForPosition.z = this.moonLightDirection.z;
 
-        // this.computeCelestialPosition(
-        //     this.moonDirectionForPosition,
-        //     this.CELESTIAL_DISTANCE,
-        //     this.camera.position,
-        //     this.moonPosition,
-        // );
+        this.computeCelestialPosition(
+            this.moonDirectionForPosition,
+            this.CELESTIAL_DISTANCE,
+            this.camera.position,
+            this.moonPosition,
+        );
         this.computeCelestialTransform(this.sunPosition, this.SUN_SIZE, this.sunTransform);
-        // this.computeCelestialTransform(this.moonPosition, this.MOON_SIZE, this.moonTransform);
+        this.computeCelestialTransform(this.moonPosition, this.MOON_SIZE, this.moonTransform);
 
         if (sunVisibility > 0) {
             this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
@@ -405,14 +439,14 @@ export class GameLoop {
             this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
         }
 
-        // if (moonVisibility > 0) {
-        //     this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
-        //     this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
-        //     this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
+        if (moonVisibility > 0) {
+            this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
+            this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
+            this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
 
-        //     matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
-        //     this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
-        // }
+            matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
+            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
+        }
 
         const visibleMeshes = this.world.getVisibleMeshes();
         visibleMeshes.forEach((sm) => {
@@ -428,7 +462,7 @@ export class GameLoop {
                 cameraPosition: this.camera.position,
                 cameraForward: forward,
                 sunPosition: this.sunPosition,
-                // moonPosition: this.moonPosition,
+                moonPosition: this.moonPosition,
                 timeOfDay,
                 yaw: this.camera.yaw,
                 pitch: this.camera.pitch,
