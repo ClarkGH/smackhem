@@ -656,14 +656,14 @@ export default class WebGLRenderer implements Renderer {
         // Vertices: 2 triangles forming a square on XZ plane, Y = 0
         const vertices = new Float32Array([
             // Triangle 1
-            -0.5, 0, -0.5,  0, 1, // bottom-left
-             0.5, 0, -0.5,  1, 1, // bottom-right
-             0.5, 0,  0.5,  1, 0, // top-right
-            
+            -0.5, 0, -0.5, 0, 1, // bottom-left
+            0.5, 0, -0.5, 1, 1, // bottom-right
+            0.5, 0, 0.5, 1, 0, // top-right
+
             // Triangle 2
-            -0.5, 0, -0.5,  0, 1, // bottom-left
-             0.5, 0,  0.5,  1, 0, // top-right
-            -0.5, 0,  0.5,  0, 0, // top-left
+            -0.5, 0, -0.5, 0, 1, // bottom-left
+            0.5, 0, 0.5, 1, 0, // top-right
+            -0.5, 0, 0.5, 0, 0, // top-left
         ]);
 
         const vao = gl.createVertexArray();
@@ -692,14 +692,8 @@ export default class WebGLRenderer implements Renderer {
     }
 
     async loadTexture(assetId: string): Promise<TextureHandle> {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:692',message:'loadTexture start',data:{assetId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         // Check cache first
         if (this.textureCache.has(assetId)) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:695',message:'texture found in cache',data:{assetId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             return this.textureCache.get(assetId)!;
         }
 
@@ -707,27 +701,15 @@ export default class WebGLRenderer implements Renderer {
         // For now, assume asset ID is the filename without extension
         // Vite serves files from src/ at root, so use absolute path
         const path = `/${assetId}.png`;
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:700',message:'fetching texture',data:{path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
 
         // Load image
         const response = await fetch(path);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:703',message:'fetch response',data:{path,ok:response.ok,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         if (!response.ok) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:705',message:'fetch failed',data:{path,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             throw new Error(`Failed to load texture: ${path}`);
         }
 
         const blob = await response.blob();
         const imageBitmap = await createImageBitmap(blob);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:710',message:'imageBitmap created',data:{width:imageBitmap.width,height:imageBitmap.height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
 
         // Create WebGL texture
         const texture = this.gl.createTexture();
@@ -765,30 +747,16 @@ export default class WebGLRenderer implements Renderer {
         // Create handle and cache
         const handle: TextureHandle = { id: assetId };
         this.textureCache.set(assetId, handle);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:747',message:'texture loaded successfully',data:{assetId,handleId:handle.id,textureWidth:webglTexture.width,textureHeight:webglTexture.height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
 
         return handle;
     }
 
-    drawTexturedQuad(texture: TextureHandle, transform: Mat4, size: number): void {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:751',message:'drawTexturedQuad called',data:{textureId:texture.id,hasProgram:!!this.textureProgram,hasVAO:!!this.quadVAO},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
+    // eslint-disable-next-line no-unused-vars
+    drawTexturedQuad(texture: TextureHandle, transform: Mat4, _size: number): void {
         const webglTexture = this.textures.get(texture.id);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:753',message:'texture lookup',data:{textureId:texture.id,found:!!webglTexture},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         if (!webglTexture || !this.textureProgram || !this.quadVAO) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:755',message:'drawTexturedQuad early return',data:{hasTexture:!!webglTexture,hasProgram:!!this.textureProgram,hasVAO:!!this.quadVAO},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-            // #endregion
             return;
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:760',message:'drawTexturedQuad rendering',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
 
         const { gl } = this;
 
@@ -810,9 +778,6 @@ export default class WebGLRenderer implements Renderer {
         // Set transform uniform
         const transformLoc = gl.getUniformLocation(this.textureProgram, 'u_transform');
         if (transformLoc) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:812',message:'setting transform uniform',data:{transformElements:[...Array.from(transform.elements)],size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             gl.uniformMatrix4fv(transformLoc, false, transform.elements);
         }
 
@@ -838,12 +803,9 @@ export default class WebGLRenderer implements Renderer {
 
         // Draw quad (6 vertices: 2 triangles)
         gl.drawArrays(gl.TRIANGLES, 0, 6);
-        
+
         // Disable blending after drawing
         gl.disable(gl.BLEND);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:797',message:'drawArrays called',data:{mode:'TRIANGLES',count:6},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
 
         gl.bindVertexArray(null);
         gl.bindTexture(gl.TEXTURE_2D, null);

@@ -11,6 +11,7 @@ export interface DebugInfo {
 }
 
 export const createDebugHUD = (canvas: HTMLCanvasElement): {
+    // eslint-disable-next-line no-unused-vars
     render: (_info: DebugInfo) => void;
     toggle: () => void;
     isVisible: () => boolean;

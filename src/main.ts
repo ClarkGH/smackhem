@@ -46,6 +46,7 @@ const main = async () => {
 
     // Create debug HUD (only for web platform)
     let debugHUD: {
+        // eslint-disable-next-line no-unused-vars
         render: (_info: {
             cameraPosition: { x: number; y: number; z: number };
             cameraForward: { x: number; y: number; z: number };

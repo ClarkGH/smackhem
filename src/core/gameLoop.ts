@@ -20,7 +20,6 @@ import {
     identity,
     quaternionFromYawPitch,
     quaternionApplyToVector,
-    createTranslationMatrix,
 } from './math/mathHelpers';
 import { World } from './world';
 import type { Vec3, Mat4 } from '../types/common';
@@ -35,6 +34,7 @@ import {
 const FIXED_DT = 1 / 60;
 
 export interface DebugHUD {
+    // eslint-disable-next-line no-unused-vars
     render: (_info: {
         cameraPosition: Vec3;
         cameraForward: Vec3;
@@ -196,26 +196,14 @@ export class GameLoop {
     }
 
     private async loadCircleTexture(): Promise<void> {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:199',message:'loadCircleTexture start',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         try {
             this.circleTexture = await this.renderer.loadTexture('circle-sleep00');
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:201',message:'loadCircleTexture success',data:{textureId:this.circleTexture?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
         } catch (error) {
             console.error('Failed to load circle texture:', error);
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:203',message:'loadCircleTexture error',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
         }
     }
 
     private pause(): void {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:202',message:'pause called',data:{cameraPos:this.camera.position,cameraYaw:this.camera.yaw,cameraPitch:this.camera.pitch},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         this.isPaused = true;
         this.savedPitch = this.camera.pitch;
         this.targetPitch = 0; // Reset to horizontal view
@@ -229,17 +217,11 @@ export class GameLoop {
 
         // Calculate start and end positions for circle
         this.calculateTransitionPositions();
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:219',message:'transition positions calculated',data:{startPos:this.transitionStartPos,endPos:this.transitionEndPos},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
 
         // Initialize character position to start position (so it's visible from the beginning)
         this.instanceState.characterPosition.x = this.transitionStartPos.x;
         this.instanceState.characterPosition.y = this.transitionStartPos.y;
         this.instanceState.characterPosition.z = this.transitionStartPos.z;
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:225',message:'character position initialized',data:{characterPos:this.instanceState.characterPosition},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
     }
 
     private unpause(): void {
@@ -252,17 +234,12 @@ export class GameLoop {
         // We want to go from current position (floor) back to below camera
         // Since lerp goes from startPos (t=0) to endPos (t=1), and we're going backwards (t=1 to t=0),
         // we need: startPos = below camera, endPos = current position (floor)
-        
-        // Save current end position (floor) temporarily
-        const tempX = this.transitionEndPos.x;
-        const tempY = this.transitionEndPos.y;
-        const tempZ = this.transitionEndPos.z;
-        
+
         // Set end to current position (floor where circle is now)
         this.transitionEndPos.x = this.instanceState.characterPosition.x;
         this.transitionEndPos.y = this.instanceState.characterPosition.y;
         this.transitionEndPos.z = this.instanceState.characterPosition.z;
-        
+
         // Set start to below camera (where we want to end up)
         this.transitionStartPos.x = this.camera.position.x;
         this.transitionStartPos.y = this.camera.position.y - 5.0; // Below camera
@@ -276,11 +253,10 @@ export class GameLoop {
         // When pitch is 0, camera looks horizontally
         // To place circle at bottom of screen, we need to go forward and down
         // in view space, then transform to world space
-        
+
         // Use target pitch (0) for calculation since we're transitioning to it
         const forward = getCameraForward(this.camera.yaw, this.targetPitch);
-        const right = getCameraRight(this.camera.yaw);
-        
+
         // In view space with pitch=0: forward is forward, down is -Y (world up is view down when pitch=0)
         // Place circle at bottom-center of screen:
         // - Forward some distance (far enough to be in front, e.g., 3-5 units)
@@ -289,7 +265,7 @@ export class GameLoop {
         const fovHalf = this.camera.fov / 2; // Half of vertical FOV
         // At distance d, bottom edge is at d * tan(fov/2) below center
         const downDistance = forwardDistance * Math.tan(fovHalf) * 1.5; // 1.5x to ensure it's off-screen initially
-        
+
         // Transform from view space to world space
         // Down in view space = -world Y (when pitch=0)
         this.transitionStartPos.x = this.camera.position.x + forward.x * forwardDistance;
@@ -484,11 +460,8 @@ export class GameLoop {
 
         // Update instance state transition (only when paused)
         if (this.isPaused && this.instanceState.isTransitioning) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:450',message:'updating transition',data:{progress:this.instanceState.transitionProgress,direction:this.instanceState.transitionDirection,dt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             // Update transition progress using fixed timestep
-            this.instanceState.transitionProgress += dt * this.instanceState.transitionDirection / TRANSITION_DURATION;
+            this.instanceState.transitionProgress += (dt * this.instanceState.transitionDirection) / TRANSITION_DURATION;
 
             // Clamp to [0, 1]
             if (this.instanceState.transitionProgress >= 1.0) {
@@ -668,20 +641,11 @@ export class GameLoop {
         });
 
         // Render circle character when paused and active/transitioning
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:632',message:'render circle check',data:{isPaused:this.isPaused,isTransitioning:this.instanceState.isTransitioning,isActive:this.instanceState.isActive,hasTexture:!!this.circleTexture},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         if (this.isPaused && (this.instanceState.isTransitioning || this.instanceState.isActive)) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:633',message:'render circle condition true',data:{position:this.instanceState.characterPosition,progress:this.instanceState.transitionProgress},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             if (this.circleTexture) {
                 // Calculate transform for circle (billboard at character position)
                 const pos = this.instanceState.characterPosition;
                 const circleSize = 0.5; // Small size as specified
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:635',message:'before billboard calc',data:{pos,cameraPos:this.camera.position,circleSize},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                // #endregion
 
                 // Calculate billboard orientation (face camera, stay vertical)
                 const toCamera = {
@@ -715,16 +679,9 @@ export class GameLoop {
                 m[8] = up.x * circleSize; m[9] = up.y * circleSize; m[10] = up.z * circleSize; m[11] = 0;
                 // Column 3: position
                 m[12] = pos.x; m[13] = pos.y; m[14] = pos.z; m[15] = 1;
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:668',message:'before MVP multiply',data:{circleTransform:[...Array.from(m)],right,up},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                // #endregion
 
                 // Multiply by view-projection matrix (use meshMVP as temporary, already rendered world meshes)
                 matrixMultiplyInto(viewProj, this.circleTransform, this.meshMVP);
-                // #region agent log
-                const mvpForLog = this.meshMVP.elements;
-                fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'gameLoop.ts:672',message:'calling drawTexturedQuad',data:{textureId:this.circleTexture.id,mvp:[...Array.from(mvpForLog)],pos},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                // #endregion
                 // Render textured quad (no camera position needed - billboard calculated on CPU)
                 this.renderer.drawTexturedQuad(this.circleTexture, this.meshMVP, 1.0);
             }
