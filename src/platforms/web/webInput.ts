@@ -24,6 +24,7 @@ export interface WebInputState {
     pressedKeys: Set<string>;
     keyMapping: KeyMapping;
     toggleDebugHUD: boolean;
+    pause: boolean;
 }
 
 export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => ({
@@ -36,6 +37,7 @@ export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => (
     pressedKeys: new Set<string>(),
     keyMapping: keyMapping || DEFAULT_KEY_MAPPING,
     toggleDebugHUD: false,
+    pause: false,
 });
 
 export const setupWebInput = (
@@ -58,6 +60,11 @@ export const setupWebInput = (
             if (e.key === 'F3') {
                 e.preventDefault();
             }
+        }
+        // Pause on space key
+        if (e.key === ' ' || e.key === 'Space') {
+            webState.pause = true;
+            e.preventDefault(); // Prevent page scroll
         }
     };
 
@@ -85,10 +92,12 @@ export const setupWebInput = (
 export const syncWebInput = (
     coreState: InputState,
     webState: WebInputState,
-): { toggleDebugHUD: boolean } => {
+): { toggleDebugHUD: boolean; pause: boolean } => {
     // Reset toggle flags after sync (they're consumed once per frame)
     const toggleDebugHUD = webState.toggleDebugHUD;
     webState.toggleDebugHUD = false;
+    const pause = webState.pause;
+    webState.pause = false;
     const gamepad = navigator.getGamepads()[0];
 
     let finalLookX = webState.axes.mouseLookX;
@@ -142,5 +151,5 @@ export const syncWebInput = (
     webState.axes.mouseLookX = 0;
     webState.axes.mouseLookY = 0;
 
-    return { toggleDebugHUD };
+    return { toggleDebugHUD, pause };
 };

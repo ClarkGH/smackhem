@@ -17,6 +17,8 @@ export class WebInputService implements Input {
 
     private toggleDebugHUD: boolean = false;
 
+    private pause: boolean = false;
+
     constructor(canvas: HTMLCanvasElement) {
         this.coreState = createInputState();
         this.webState = createWebInputState();
@@ -26,6 +28,7 @@ export class WebInputService implements Input {
     update(): void {
         const result = syncWebInput(this.coreState, this.webState);
         this.toggleDebugHUD = result.toggleDebugHUD;
+        this.pause = result.pause;
     }
 
     getIntent(): PlayerIntent {
@@ -44,6 +47,11 @@ export class WebInputService implements Input {
             intent.toggleDebugHUD = true;
             // Reset after consuming (one-shot event)
             this.toggleDebugHUD = false;
+        }
+        if (this.pause) {
+            intent.pause = true;
+            // Reset after consuming (one-shot event)
+            this.pause = false;
         }
         return intent;
     }

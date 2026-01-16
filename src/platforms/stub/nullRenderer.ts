@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import type { Renderer, MeshHandle } from '../../services/renderer';
+import type { Renderer, MeshHandle, TextureHandle } from '../../services/renderer';
 import type { Mat4, Vec3 } from '../../types/common';
 
 export default class NullRenderer implements Renderer {
@@ -37,5 +37,14 @@ export default class NullRenderer implements Renderer {
 
     createSphereMesh(_radius: number, _segments: number): MeshHandle {
         return { id: 'stub-sphere' };
+    }
+
+    async loadTexture(_assetId: string): Promise<TextureHandle> {
+        // Stub implementation
+        return { id: `stub_texture_${_assetId}` };
+    }
+
+    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number): void {
+        // Stub implementation
     }
 }

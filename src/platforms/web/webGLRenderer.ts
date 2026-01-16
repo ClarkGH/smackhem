@@ -1,10 +1,16 @@
-import type { Renderer, MeshHandle } from '../../services/renderer';
+import type { Renderer, MeshHandle, TextureHandle } from '../../services/renderer';
 import type { Mat4, Vec3 } from '../../types/common';
 import { identity } from '../../core/math/mathHelpers';
 
 interface WebGLMesh {
     vao: WebGLVertexArrayObject;
     vertexCount: number;
+}
+
+interface WebGLTextureData {
+    texture: WebGLTexture;
+    width: number;
+    height: number;
 }
 
 export default class WebGLRenderer implements Renderer {
@@ -19,6 +25,14 @@ export default class WebGLRenderer implements Renderer {
     private wireframe: boolean = false;
 
     private meshCache = new Map<string, MeshHandle>();
+
+    private textures = new Map<string, WebGLTextureData>();
+
+    private textureCache = new Map<string, TextureHandle>();
+
+    private textureProgram: WebGLProgram | null = null;
+
+    private quadVAO: WebGLVertexArrayObject | null = null;
 
     private lightDirection: Vec3 = { x: -1, y: 0, z: 0 };
 
@@ -65,6 +79,8 @@ export default class WebGLRenderer implements Renderer {
         this.identityMatrix = identity();
 
         this.initShaders();
+        this.initTextureShaders();
+        this.createQuadMesh();
     }
 
     private initShaders(): void {
@@ -573,5 +589,263 @@ export default class WebGLRenderer implements Renderer {
 
     setAmbientIntensity(intensity: number): void {
         this.ambientIntensity = intensity;
+    }
+
+    private initTextureShaders(): void {
+        const vertexShaderSource = `#version 300 es
+            in vec3 a_position;
+            in vec2 a_texCoord;
+            
+            uniform mat4 u_transform;
+            
+            out vec2 v_texCoord;
+            
+            void main() {
+                // Quad vertices are on XZ plane (horizontal, Y=0)
+                // Transform already includes billboard rotation and position
+                // Position components: x = horizontal, z = depth (both map to quad XZ plane)
+                vec4 worldPos = u_transform * vec4(a_position.x, 0.0, a_position.z, 1.0);
+                
+                v_texCoord = a_texCoord;
+                gl_Position = worldPos;
+            }
+        `;
+
+        const fragmentShaderSource = `#version 300 es
+            precision mediump float;
+            
+            uniform sampler2D u_texture;
+            uniform vec3 u_lightDirection;
+            uniform vec3 u_lightColor;
+            uniform float u_ambientIntensity;
+            
+            in vec2 v_texCoord;
+            
+            out vec4 fragColor;
+            
+            void main() {
+                vec4 textureSample = texture(u_texture, v_texCoord);
+                vec3 textureColor = textureSample.rgb;
+                float textureAlpha = textureSample.a;
+                vec3 lightDir = normalize(u_lightDirection);
+                vec3 normal = vec3(0, 1, 0); // Fixed vertical normal for billboard
+                float diff = max(dot(normal, lightDir), 0.0); // Lambertian diffuse
+                float lighting = u_ambientIntensity + diff * (1.0 - u_ambientIntensity);
+                vec3 finalColor = textureColor * u_lightColor * lighting;
+                fragColor = vec4(finalColor, textureAlpha);
+            }
+        `;
+
+        const vertexShader = this.compileShader(this.gl.VERTEX_SHADER, vertexShaderSource);
+        const fragmentShader = this.compileShader(this.gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+        if (!vertexShader || !fragmentShader) {
+            throw new Error('Failed to compile texture shaders');
+        }
+
+        this.textureProgram = this.createProgram(vertexShader, fragmentShader);
+        if (!this.textureProgram) {
+            throw new Error('Failed to create texture shader program');
+        }
+    }
+
+    private createQuadMesh(): void {
+        const { gl } = this;
+
+        // Create quad with UV coordinates (centered at origin, facing camera)
+        // Vertices: 2 triangles forming a square on XZ plane, Y = 0
+        const vertices = new Float32Array([
+            // Triangle 1
+            -0.5, 0, -0.5,  0, 1, // bottom-left
+             0.5, 0, -0.5,  1, 1, // bottom-right
+             0.5, 0,  0.5,  1, 0, // top-right
+            
+            // Triangle 2
+            -0.5, 0, -0.5,  0, 1, // bottom-left
+             0.5, 0,  0.5,  1, 0, // top-right
+            -0.5, 0,  0.5,  0, 0, // top-left
+        ]);
+
+        const vao = gl.createVertexArray();
+        if (!vao) throw new Error('Failed to create quad VAO');
+
+        gl.bindVertexArray(vao);
+
+        const vbo = gl.createBuffer();
+        if (!vbo) throw new Error('Failed to create quad VBO');
+        gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+        // Position attribute (3 floats: x, y, z)
+        const positionLoc = gl.getAttribLocation(this.textureProgram!, 'a_position');
+        gl.enableVertexAttribArray(positionLoc);
+        gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 20, 0); // stride 20 (5 floats * 4 bytes)
+
+        // Texture coordinate attribute (2 floats: u, v)
+        const texCoordLoc = gl.getAttribLocation(this.textureProgram!, 'a_texCoord');
+        gl.enableVertexAttribArray(texCoordLoc);
+        gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 20, 12); // offset 12 (3 floats * 4 bytes)
+
+        gl.bindVertexArray(null);
+
+        this.quadVAO = vao;
+    }
+
+    async loadTexture(assetId: string): Promise<TextureHandle> {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:692',message:'loadTexture start',data:{assetId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        // Check cache first
+        if (this.textureCache.has(assetId)) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:695',message:'texture found in cache',data:{assetId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            return this.textureCache.get(assetId)!;
+        }
+
+        // Map asset ID to file path (backend-specific)
+        // For now, assume asset ID is the filename without extension
+        // Vite serves files from src/ at root, so use absolute path
+        const path = `/${assetId}.png`;
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:700',message:'fetching texture',data:{path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+
+        // Load image
+        const response = await fetch(path);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:703',message:'fetch response',data:{path,ok:response.ok,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        if (!response.ok) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:705',message:'fetch failed',data:{path,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            throw new Error(`Failed to load texture: ${path}`);
+        }
+
+        const blob = await response.blob();
+        const imageBitmap = await createImageBitmap(blob);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:710',message:'imageBitmap created',data:{width:imageBitmap.width,height:imageBitmap.height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+
+        // Create WebGL texture
+        const texture = this.gl.createTexture();
+        if (!texture) {
+            throw new Error('Failed to create WebGL texture');
+        }
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+        this.gl.texImage2D(
+            this.gl.TEXTURE_2D,
+            0,
+            this.gl.RGBA,
+            this.gl.RGBA,
+            this.gl.UNSIGNED_BYTE,
+            imageBitmap,
+        );
+
+        // Set texture parameters
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+
+        // Store texture
+        const webglTexture: WebGLTextureData = {
+            texture,
+            width: imageBitmap.width,
+            height: imageBitmap.height,
+        };
+
+        this.textures.set(assetId, webglTexture);
+
+        // Create handle and cache
+        const handle: TextureHandle = { id: assetId };
+        this.textureCache.set(assetId, handle);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:747',message:'texture loaded successfully',data:{assetId,handleId:handle.id,textureWidth:webglTexture.width,textureHeight:webglTexture.height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+
+        return handle;
+    }
+
+    drawTexturedQuad(texture: TextureHandle, transform: Mat4, size: number): void {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:751',message:'drawTexturedQuad called',data:{textureId:texture.id,hasProgram:!!this.textureProgram,hasVAO:!!this.quadVAO},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        const webglTexture = this.textures.get(texture.id);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:753',message:'texture lookup',data:{textureId:texture.id,found:!!webglTexture},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        if (!webglTexture || !this.textureProgram || !this.quadVAO) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:755',message:'drawTexturedQuad early return',data:{hasTexture:!!webglTexture,hasProgram:!!this.textureProgram,hasVAO:!!this.quadVAO},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
+            return;
+        }
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:760',message:'drawTexturedQuad rendering',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+
+        const { gl } = this;
+
+        // Use texture shader program
+        gl.useProgram(this.textureProgram);
+        gl.bindVertexArray(this.quadVAO);
+
+        // Bind texture
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, webglTexture.texture);
+
+        // Set texture uniform
+        const textureLoc = gl.getUniformLocation(this.textureProgram, 'u_texture');
+        if (textureLoc) {
+            gl.uniform1i(textureLoc, 0);
+        }
+
+        // Transform already includes billboard rotation and size scaling from CPU
+        // Set transform uniform
+        const transformLoc = gl.getUniformLocation(this.textureProgram, 'u_transform');
+        if (transformLoc) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:812',message:'setting transform uniform',data:{transformElements:[...Array.from(transform.elements)],size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
+            gl.uniformMatrix4fv(transformLoc, false, transform.elements);
+        }
+
+        // Set lighting uniforms
+        const lightDirectionLoc = gl.getUniformLocation(this.textureProgram, 'u_lightDirection');
+        if (lightDirectionLoc) {
+            gl.uniform3f(lightDirectionLoc, this.lightDirection.x, this.lightDirection.y, this.lightDirection.z);
+        }
+
+        const lightColorLoc = gl.getUniformLocation(this.textureProgram, 'u_lightColor');
+        if (lightColorLoc) {
+            gl.uniform3f(lightColorLoc, this.lightColor.x, this.lightColor.y, this.lightColor.z);
+        }
+
+        const ambientIntensityLoc = gl.getUniformLocation(this.textureProgram, 'u_ambientIntensity');
+        if (ambientIntensityLoc) {
+            gl.uniform1f(ambientIntensityLoc, this.ambientIntensity);
+        }
+
+        // Enable alpha blending for transparency
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        // Draw quad (6 vertices: 2 triangles)
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        
+        // Disable blending after drawing
+        gl.disable(gl.BLEND);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/da763320-a91b-4587-8569-40de85c5a3e5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webGLRenderer.ts:797',message:'drawArrays called',data:{mode:'TRIANGLES',count:6},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+
+        gl.bindVertexArray(null);
+        gl.bindTexture(gl.TEXTURE_2D, null);
     }
 }

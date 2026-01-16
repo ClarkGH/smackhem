@@ -6,6 +6,11 @@ export interface MeshHandle {
     id: string;
 }
 
+export interface TextureHandle {
+    // Opaque identifier, FFI-friendly
+    id: string;
+}
+
 export interface Renderer {
     beginFrame(): void;
     drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3): void;
@@ -19,4 +24,6 @@ export interface Renderer {
     setLightDirection?(_direction: Vec3): void;
     setLightColor?(_color: Vec3): void;
     setAmbientIntensity?(_intensity: number): void;
+    loadTexture(_assetId: string): Promise<TextureHandle>;
+    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number): void;
 }
