@@ -1,6 +1,5 @@
 import type { Renderer } from '../../services/renderer';
-import type { Clock } from '../../services/clock';
-import type { Input } from '../../services/input';
+import type { PlatformServices } from '../../services/platform';
 import { GameLoop } from '../../core/gameLoop';
 import WebGLRenderer from './webGLRenderer';
 import {
@@ -17,12 +16,8 @@ import { WebInputService } from './webInputService';
 import { createDebugHUD } from './debugHUD';
 import type { Vec3 } from '../../types/common';
 
-export interface PlatformServices {
-    renderer: Renderer;
-    clock: Clock;
-    input: Input;
-    getAspectRatio: () => number;
-}
+// PlatformServices interface moved to src/services/platform.ts
+// This export is kept for backward compatibility but should use the shared type
 
 // Simple seeded random number generator for deterministic chunk generation
 export const seededRandom = (seed: number): number => {

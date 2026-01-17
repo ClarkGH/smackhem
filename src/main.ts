@@ -2,7 +2,7 @@
 import { World } from './core/world';
 import { GameLoop } from './core/gameLoop';
 import { createCamera } from './core/camera';
-import type { PlatformServices } from './platforms/web/webBootstrap';
+import type { PlatformServices } from './services/platform';
 import { createDebugHUD } from './platforms/web/debugHUD';
 
 // Platform factory - will be replaced at build time
@@ -25,15 +25,15 @@ const main = async () => {
     const world = new World();
 
     // Import chunk management function (platform-specific)
-    // TODO: Refactor to avoid variable shadowing
     // eslint-disable-next-line no-shadow, no-unused-vars
     let updateActiveChunks: (w: World, pos: { x: number; y: number; z: number }, r: PlatformServices['renderer']) => void;
 
     // __PLATFORM__ is a build-time define from Vite, not available at ESLint parse time
     // eslint-disable-next-line no-undef
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
-        // Stub platform doesn't need chunk management for now
-        updateActiveChunks = () => {};
+        // Stub platform chunk management (deterministic, same as web)
+        const { updateActiveChunks: stubUpdateActiveChunks } = await import('./platforms/stub/stubBootstrap');
+        updateActiveChunks = stubUpdateActiveChunks;
     } else {
         // Default to web platform chunk management
         const { updateActiveChunks: webUpdateActiveChunks } = await import('./platforms/web/webBootstrap');
