@@ -17,6 +17,11 @@
   - [Lighting Parameters](#lighting-parameters)
   - [Renderer Interface Extension](#renderer-interface-extension)
   - [Implementation](#implementation)
+- [2D Sprite Rendering (Instance Characters)](#2d-sprite-rendering-instance-characters)
+  - [Renderer Interface Extension](#renderer-interface-extension-1)
+  - [Implementation Details](#implementation-details)
+  - [Sprite Lighting (In Progress)](#sprite-lighting-in-progress)
+  - [Architecture](#architecture-1)
 - [Key Rule: gl.* never leaks upward](#key-rule-gl-never-leaks-upward)
 - [Navigation](#navigation)
 
@@ -37,10 +42,11 @@ interface Renderer {
 ## WebGL Implementation
 
 - Uses WebGL2
-- One shader pair
-- No textures
-- **Grayscale directional lighting** (ambient + diffuse)
-- Depth test only
+- One shader pair for world geometry
+- One shader pair for 2D sprites/textures (for instance characters)
+- World geometry: No textures, grayscale directional lighting (ambient + diffuse)
+- 2D sprites: Textures supported (RGBA with alpha blending), **lighting in progress**
+- Depth test only (world geometry and sprites)
 
 ## Future Native Renderer
 
@@ -306,6 +312,50 @@ Both the sun and moon are rendered as visible spheres in the sky:
 - All values are computed fresh each frame (no caching needed, pure functions)
 - Celestial meshes (sun sphere) are created once and reused
 - No horizon clamping - sun can go below horizon for debugging
+
+## 2D Sprite Rendering (Instance Characters)
+
+The renderer supports 2D sprite rendering for instance characters (party members, NPCs, enemies). Sprites are rendered as textured quads with billboard orientation in the 3D scene.
+
+### Renderer Interface Extension
+
+```typescript
+interface Renderer {
+    // ... existing methods ...
+    loadTexture(_assetId: string): Promise<TextureHandle>;
+    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number): void;
+}
+```
+
+### Implementation Details
+
+- **Texture Loading**: Assets are requested by logical ID (e.g., `'circle-sleep00'`), not file paths (compliant with RULE A-1)
+- **Texture Format**: RGBA images with alpha channel for transparency
+- **Alpha Blending**: Enabled for sprite rendering (`SRC_ALPHA, ONE_MINUS_SRC_ALPHA`)
+- **Billboard Calculation**: Sprites are oriented to face the camera while remaining vertical (calculated on CPU)
+- **Positioning**: Sprites use 3D world positions (typically on floor plane, Y=0)
+- **Quad Geometry**: Unit quad on XZ plane (Y=0), scaled by size parameter
+
+### Sprite Lighting (In Progress)
+
+**Current Status:**
+
+- Sprites currently receive basic lighting (ambient + diffuse) using the same lighting parameters as world geometry
+- Lighting is applied in the texture fragment shader using a fixed vertical normal (0, 1, 0)
+- **Issue**: Sprites appear the same color as the floor plane because they use the same lighting calculation
+
+**Planned Enhancement:**
+
+- Implement faux directional lighting specific to 2D sprites
+- May use different lighting calculations or sprite-specific shading to make characters stand out from the environment
+- Goal: Sprites should have visual distinction from the flat floor plane while still responding to the day/night cycle
+
+### Architecture
+
+- Sprite rendering is managed by the instance system (`core/instance.ts`)
+- Individual sprite state is tracked in `InstanceCharacter` (`core/instanceCharacter.ts`)
+- Billboard transform calculation happens in game loop before rendering
+- All GPU operations (texture loading, shader management, rendering) are encapsulated in the renderer backend
 
 ## Key Rule: gl.* never leaks upward
 

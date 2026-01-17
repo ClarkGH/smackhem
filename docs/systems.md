@@ -2,6 +2,11 @@
 
 ## Table of Contents
 
+- [Instance System](#instance-system)
+  - [Instance System Architecture](#instance-system-architecture)
+  - [Instance Transition](#instance-transition)
+  - [Instance Character Management](#instance-character-management)
+  - [Separation of Concerns](#separation-of-concerns)
 - [World System](#world-system)
   - [World Structure](#world-structure)
   - [Chunk Definition](#chunk-definition)
@@ -199,6 +204,60 @@ interface PlayerIntent {
 
 Game logic never sees devices.
 
+## Instance System
+
+The instance system manages the 2D mode where party members, NPCs, and enemies are displayed as 2D sprites in either a frozen 3D scene, or a 2D instance.
+
+### Instance System Architecture
+
+```typescript
+interface Instance {
+    isActive: boolean;
+    isTransitioning: boolean;
+    transitionProgress: number; // 0.0 to 1.0 (fixed timestep accumulated)
+    transitionDirection: number; // 1.0 for forward (entering), -1.0 for reverse (exiting)
+}
+
+interface InstanceCharacter {
+    position: Vec3; // 3D world position (on floor plane)
+    // Future: sprite/texture reference
+    // Future: collision bounds (AABB for 2D)
+    // Future: type (party member, NPC, enemy)
+}
+```
+
+### Instance Transition
+
+- **Pause/Unpause**: Triggered by space key, freezes the 3D world (timer, sun/moon, game simulation)
+- **Camera Pitch**: Transitions to 0 degrees (horizontal) when entering instance mode
+- **Character Transition**: Circle character transitions from bottom of screen into frozen 3D scene
+  - Start: Positioned at bottom of viewport (off-screen initially)
+  - End: Position on floor plane (Y=0 + half sprite height) in front of camera
+  - Duration: 1.0 second (fixed timestep)
+  - Interpolation: Smoothstep easing function for smooth animation
+- **Position Calculation**: Uses screen-space projection (FOV-based) to calculate start position relative to camera view frustum
+- **Transition State**: Managed by instance system, tracks progress and direction
+
+### Instance Character Management
+
+- Each character in an instance (party member, NPC, enemy) is represented by an `InstanceCharacter`
+- Characters share the same state structure and rendering pipeline
+- Position is in 3D world space (allows proper depth testing and collision with 3D environment)
+- Future: Each character will have sprite/texture reference, collision bounds, and type identifier
+
+### Separation of Concerns
+
+**`core/instance.ts`**: Instance system (manages 2D mode state and transitions)
+**`core/instanceCharacter.ts`**: Individual character/entity state (shared by party, NPCs, enemies)
+**`core/party.ts`**: Party-specific logic (party formation, relationships, leader selection)
+**`core/math/mathHelpers.ts`**: General utilities (`smoothstep`, `lerpVec3`)
+
+This separation allows:
+
+- Scalability: Can add NPCs/enemies by creating `InstanceCharacter` entities
+- Reusability: Transition and math logic is shared across entity types
+- Clear boundaries: Instance system ≠ party logic ≠ math utilities
+
 ## Party System (Drakkhen-Style)
 
 ### Party Structure
@@ -228,6 +287,8 @@ interface PartyMember {
 - Offsets are relative, not simulated
 - NPCs and enemies will be 2D models with simple AI patterns that follow set behaviors, including spawning, patrolling, attacking, and reacting to player presence.
 - Enemy movement will be constrained to the 2D plane, and they will collide with some 3D environmental features.
+
+**Implementation Note**: The instance system manages all 2D characters (party members, NPCs, enemies) uniformly via `InstanceCharacter`. Party-specific logic (formation, relationships) is handled separately in the party system.
 
 This is cheap, readable, and portable.
 

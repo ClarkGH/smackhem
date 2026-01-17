@@ -20,16 +20,20 @@ import {
     identity,
     quaternionFromYawPitch,
     quaternionApplyToVector,
+    smoothstep,
+    lerpVec3,
 } from './math/mathHelpers';
 import { World } from './world';
 import type { Vec3, Mat4 } from '../types/common';
 import {
-    createInstanceState,
+    createInstance,
     TRANSITION_DURATION,
-    smoothstep,
-    lerpVec3,
-    type InstanceState,
-} from './party';
+    type Instance,
+} from './instance';
+import {
+    createInstanceCharacter,
+    type InstanceCharacter,
+} from './instanceCharacter';
 
 const FIXED_DT = 1 / 60;
 
@@ -64,7 +68,9 @@ export class GameLoop {
 
     private isTransitioningPitch = false;
 
-    private instanceState: InstanceState;
+    private instance: Instance;
+
+    private instanceCharacter: InstanceCharacter;
 
     private circleTexture: TextureHandle | null = null;
 
@@ -188,8 +194,9 @@ export class GameLoop {
         this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE, 16);
         this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE, 16);
 
-        // Instance state
-        this.instanceState = createInstanceState();
+        // Instance system
+        this.instance = createInstance();
+        this.instanceCharacter = createInstanceCharacter({ x: 0, y: 0, z: 0 });
 
         // Load circle texture asynchronously
         this.loadCircleTexture();
@@ -210,24 +217,24 @@ export class GameLoop {
         this.isTransitioningPitch = true;
 
         // Start transition
-        this.instanceState.isTransitioning = true;
-        this.instanceState.transitionDirection = 1.0; // Forward
-        this.instanceState.transitionProgress = 0.0;
-        this.instanceState.isActive = false;
+        this.instance.isTransitioning = true;
+        this.instance.transitionDirection = 1.0; // Forward
+        this.instance.transitionProgress = 0.0;
+        this.instance.isActive = false;
 
         // Calculate start and end positions for circle
         this.calculateTransitionPositions();
 
         // Initialize character position to start position (so it's visible from the beginning)
-        this.instanceState.characterPosition.x = this.transitionStartPos.x;
-        this.instanceState.characterPosition.y = this.transitionStartPos.y;
-        this.instanceState.characterPosition.z = this.transitionStartPos.z;
+        this.instanceCharacter.position.x = this.transitionStartPos.x;
+        this.instanceCharacter.position.y = this.transitionStartPos.y;
+        this.instanceCharacter.position.z = this.transitionStartPos.z;
     }
 
     private unpause(): void {
         // Start reverse transition
-        this.instanceState.isTransitioning = true;
-        this.instanceState.transitionDirection = -1.0; // Reverse
+        this.instance.isTransitioning = true;
+        this.instance.transitionDirection = -1.0; // Reverse
         // Don't restore camera pitch - leave it at 0 degrees
 
         // For reverse transition, swap start and end positions
@@ -236,9 +243,9 @@ export class GameLoop {
         // we need: startPos = below camera, endPos = current position (floor)
 
         // Set end to current position (floor where circle is now)
-        this.transitionEndPos.x = this.instanceState.characterPosition.x;
-        this.transitionEndPos.y = this.instanceState.characterPosition.y;
-        this.transitionEndPos.z = this.instanceState.characterPosition.z;
+        this.transitionEndPos.x = this.instanceCharacter.position.x;
+        this.transitionEndPos.y = this.instanceCharacter.position.y;
+        this.transitionEndPos.z = this.instanceCharacter.position.z;
 
         // Set start to below camera (where we want to end up)
         this.transitionStartPos.x = this.camera.position.x;
@@ -459,34 +466,34 @@ export class GameLoop {
         }
 
         // Update instance state transition (only when paused)
-        if (this.isPaused && this.instanceState.isTransitioning) {
+        if (this.isPaused && this.instance.isTransitioning) {
             // Update transition progress using fixed timestep
-            this.instanceState.transitionProgress += (dt * this.instanceState.transitionDirection) / TRANSITION_DURATION;
+            this.instance.transitionProgress += (dt * this.instance.transitionDirection) / TRANSITION_DURATION;
 
             // Clamp to [0, 1]
-            if (this.instanceState.transitionProgress >= 1.0) {
-                this.instanceState.transitionProgress = 1.0;
-                this.instanceState.isTransitioning = false;
-                if (this.instanceState.transitionDirection > 0) {
-                    this.instanceState.isActive = true;
+            if (this.instance.transitionProgress >= 1.0) {
+                this.instance.transitionProgress = 1.0;
+                this.instance.isTransitioning = false;
+                if (this.instance.transitionDirection > 0) {
+                    this.instance.isActive = true;
                 }
-            } else if (this.instanceState.transitionProgress <= 0.0) {
-                this.instanceState.transitionProgress = 0.0;
-                this.instanceState.isTransitioning = false;
-                if (this.instanceState.transitionDirection < 0) {
-                    this.instanceState.isActive = false;
+            } else if (this.instance.transitionProgress <= 0.0) {
+                this.instance.transitionProgress = 0.0;
+                this.instance.isTransitioning = false;
+                if (this.instance.transitionDirection < 0) {
+                    this.instance.isActive = false;
                     // Reverse transition complete, actually unpause now
                     this.isPaused = false;
                 }
             }
 
             // Calculate current position via interpolation
-            const smoothT = smoothstep(this.instanceState.transitionProgress);
+            const smoothT = smoothstep(this.instance.transitionProgress);
             lerpVec3(
                 this.transitionStartPos,
                 this.transitionEndPos,
                 smoothT,
-                this.instanceState.characterPosition,
+                this.instanceCharacter.position,
             );
         }
 
@@ -641,10 +648,10 @@ export class GameLoop {
         });
 
         // Render circle character when paused and active/transitioning
-        if (this.isPaused && (this.instanceState.isTransitioning || this.instanceState.isActive)) {
+        if (this.isPaused && (this.instance.isTransitioning || this.instance.isActive)) {
             if (this.circleTexture) {
                 // Calculate transform for circle (billboard at character position)
-                const pos = this.instanceState.characterPosition;
+                const pos = this.instanceCharacter.position;
                 const circleSize = 0.5; // Small size as specified
 
                 // Calculate billboard orientation (face camera, stay vertical)
