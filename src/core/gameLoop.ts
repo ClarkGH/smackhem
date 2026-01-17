@@ -506,6 +506,31 @@ export class GameLoop {
             }
         }
 
+        // Handle WASD movement for circle character in instance mode
+        // Only when paused, active (transition complete), and not transitioning
+        if (this.isPaused && this.instance.isActive && !this.instance.isTransitioning) {
+            const { x: moveX, y: moveY } = intent.move;
+
+            if (moveX !== 0 || moveY !== 0) {
+                // Use camera yaw at pitch 0 (horizontal forward/right vectors for XZ plane movement)
+                const forward = getCameraForward(this.camera.yaw, 0);
+                const right = getCameraRight(this.camera.yaw);
+
+                // Calculate movement in XZ plane (Y stays at floor level)
+                const moveDistance = PLAYER_SPEED * dt;
+                const movement = {
+                    x: (forward.x * moveY + right.x * moveX) * moveDistance,
+                    y: 0,
+                    z: (forward.z * moveY + right.z * moveX) * moveDistance,
+                };
+
+                // Update instance character position (Y remains at circleSize/2 for floor level)
+                this.instanceCharacter.position.x += movement.x;
+                this.instanceCharacter.position.z += movement.z;
+                // Y stays constant at floor level (circleSize / 2)
+            }
+        }
+
         // Skip normal simulation updates when paused (except instance state above)
         if (this.isPaused) {
             return;
