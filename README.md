@@ -47,5 +47,5 @@ Minimalism is key, following YAGNI principles.
 7. JSON - Map/Chunk/Asset metadata.
 8. Math - Custom Vec2/Vec3/Mat4
 9. Target Platforms - Web -> Desktop -> Console(future).
-10. [Design Document](DESIGN.md)
+10. Aseprite - Sprite creation
 11. [Documentation Overview](docs/INDEX.md)
