@@ -230,13 +230,49 @@ interface InstanceCharacter {
 
 - **Pause/Unpause**: Triggered by space key, freezes the 3D world (timer, sun/moon, game simulation)
 - **Camera Pitch**: Transitions to 0 degrees (horizontal) when entering instance mode
-- **Character Transition**: Circle character transitions from bottom of screen into frozen 3D scene
-  - Start: Positioned at bottom of viewport (off-screen initially)
-  - End: Position on floor plane (Y=0 + half sprite height) in front of camera
+- **Character Transition**: Circle character transitions from camera position forward along the XZ plane into frozen 3D scene
+  - Start: Camera's X/Z position at floor level
+  - End: Position 5 units forward from camera along forward direction, at floor level
   - Duration: 1.0 second (fixed timestep)
-  - Interpolation: Smoothstep easing function for smooth animation
-- **Position Calculation**: Uses screen-space projection (FOV-based) to calculate start position relative to camera view frustum
+  - Interpolation: Linear interpolation (lerp) with smoothstep easing for smooth animation
+- **Position Calculation**: Starts at camera position, slides forward along camera's forward vector in XZ plane
 - **Transition State**: Managed by instance system, tracks progress and direction
+
+#### Linear Interpolation (Lerp)
+
+**Lerp** (linear interpolation) smoothly transitions between two values by blending them based on a parameter `t` (typically 0.0 to 1.0).
+
+For scalars:
+
+```typescript
+lerp(a, b, t) = a + (b - a) * t
+```
+
+- When `t = 0.0`: result = `a` (start value)
+- When `t = 1.0`: result = `b` (end value)
+- When `t = 0.5`: result = midpoint between `a` and `b`
+
+For vectors (e.g., 3D positions):
+
+```typescript
+lerpVec3(a, b, t, out) {
+    out.x = a.x + (b.x - a.x) * t;
+    out.y = a.y + (b.y - a.y) * t;
+    out.z = a.z + (b.z - a.z) * t;
+}
+```
+
+**Usage in Instance Transitions:**
+
+- Character position smoothly transitions from start position to end position
+- `t` is derived from `transitionProgress` (0.0 to 1.0) using smoothstep for easing
+- Progress accumulates over fixed timestep: `progress += dt * direction / duration`
+- For reverse transition: `direction = -1.0`, so progress decreases from 1.0 → 0.0
+
+**Zero-Allocation Design:**
+
+- `lerpVec3` writes result into existing `out` object (no memory allocation)
+- Compliant with RULE M-1: No allocation in hot loops
 
 ### Instance Character Management
 

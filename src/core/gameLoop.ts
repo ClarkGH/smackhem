@@ -235,21 +235,28 @@ export class GameLoop {
         // Start reverse transition
         this.instance.isTransitioning = true;
         this.instance.transitionDirection = -1.0; // Reverse
+        this.instance.transitionProgress = 1.0; // Start from end position (where we are now)
         // Don't restore camera pitch - leave it at 0 degrees
 
-        // For reverse transition, swap start and end positions
-        // We want to go from current position (floor) back to below camera
-        // Since lerp goes from startPos (t=0) to endPos (t=1), and we're going backwards (t=1 to t=0),
-        // we need: startPos = below camera, endPos = current position (floor)
+        // For reverse transition, go from current position (forward) back to camera position
+        // Lerp: position = startPos + (endPos - startPos) * t
+        // Since progress goes 1.0 → 0.0 (and t = smoothstep(progress)):
+        // - When progress=1.0: t=1.0, position=endPos (we want current forward position)
+        // - When progress=0.0: t=0.0, position=startPos (we want camera position)
+        // Therefore: endPos = current position (forward), startPos = camera position
 
-        // Set end to current position (floor where circle is now)
+        // Set end to current position (where circle is now, forward from camera)
+        // This is where we START the reverse transition
         this.transitionEndPos.x = this.instanceCharacter.position.x;
         this.transitionEndPos.y = this.instanceCharacter.position.y;
         this.transitionEndPos.z = this.instanceCharacter.position.z;
 
-        // Set start to below camera (where we want to end up)
+        // Set start to camera position (where we want to end up)
+        // This is where we END the reverse transition
+        const circleSize = 0.5;
+        const floorY = circleSize / 2;
         this.transitionStartPos.x = this.camera.position.x;
-        this.transitionStartPos.y = this.camera.position.y - 5.0; // Below camera
+        this.transitionStartPos.y = floorY;
         this.transitionStartPos.z = this.camera.position.z;
 
         // After reverse transition completes, unpause will happen in updateSimulation
@@ -257,34 +264,22 @@ export class GameLoop {
     }
 
     private calculateTransitionPositions(): void {
-        // When pitch is 0, camera looks horizontally
-        // To place circle at bottom of screen, we need to go forward and down
-        // in view space, then transform to world space
-
+        // Circle starts at camera position (X/Z) and slides forward in the XZ plane
         // Use target pitch (0) for calculation since we're transitioning to it
         const forward = getCameraForward(this.camera.yaw, this.targetPitch);
-
-        // In view space with pitch=0: forward is forward, down is -Y (world up is view down when pitch=0)
-        // Place circle at bottom-center of screen:
-        // - Forward some distance (far enough to be in front, e.g., 3-5 units)
-        // - Down based on FOV to hit bottom edge of view frustum
-        const forwardDistance = 5.0; // Distance forward from camera
-        const fovHalf = this.camera.fov / 2; // Half of vertical FOV
-        // At distance d, bottom edge is at d * tan(fov/2) below center
-        const downDistance = forwardDistance * Math.tan(fovHalf) * 1.5; // 1.5x to ensure it's off-screen initially
-
-        // Transform from view space to world space
-        // Down in view space = -world Y (when pitch=0)
-        this.transitionStartPos.x = this.camera.position.x + forward.x * forwardDistance;
-        this.transitionStartPos.y = this.camera.position.y - downDistance; // Down in world space
-        this.transitionStartPos.z = this.camera.position.z + forward.z * forwardDistance;
-
-        // End position: floor plane at fixed offset from camera (further forward for visibility)
-        const offsetDistance = 5.0; // Increased from 2.0 to make circle more visible on floor
         const circleSize = 0.5; // Circle radius
-        this.transitionEndPos.x = this.camera.position.x + forward.x * offsetDistance;
-        this.transitionEndPos.y = circleSize / 2; // Half circle size above floor (quad is centered at Y=0)
-        this.transitionEndPos.z = this.camera.position.z + forward.z * offsetDistance;
+        const floorY = circleSize / 2; // Half circle size above floor (quad is centered at Y=0)
+
+        // Start position: Camera's X/Z position at floor level
+        this.transitionStartPos.x = this.camera.position.x;
+        this.transitionStartPos.y = floorY;
+        this.transitionStartPos.z = this.camera.position.z;
+
+        // End position: Forward along camera direction, at floor level
+        const forwardDistance = 3.0; // Distance to slide forward
+        this.transitionEndPos.x = this.camera.position.x + forward.x * forwardDistance;
+        this.transitionEndPos.y = floorY;
+        this.transitionEndPos.z = this.camera.position.z + forward.z * forwardDistance;
     }
 
     private computeTimeOfDay(simTime: number): number {
