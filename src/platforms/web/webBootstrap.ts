@@ -4,118 +4,29 @@ import { GameLoop } from '../../core/gameLoop';
 import WebGLRenderer from './webGLRenderer';
 import {
     World,
-    type Chunk,
-    CHUNK_SIZE,
     CHUNK_LOAD_RADIUS,
 } from '../../core/world';
-import { createAABB } from '../../core/math/aabb';
-import { createTranslationMatrix } from '../../core/math/mathHelpers';
 import WebClock from './webClock';
 import { createCamera } from '../../core/camera';
 import { WebInputService } from './webInputService';
 import { createDebugHUD } from './debugHUD';
 import type { Vec3 } from '../../types/common';
+import { WebAssetLoader } from './webAssetLoader';
 
 // PlatformServices interface moved to src/services/platform.ts
 // This export is kept for backward compatibility but should use the shared type
 
-// Simple seeded random number generator for deterministic chunk generation
-export const seededRandom = (seed: number): number => {
-    // Simple hash-based PRNG
-    const x = Math.sin(seed) * 10000;
-    return x - Math.floor(x);
-};
-
-// Generate a seed from chunk coordinates
-export const chunkSeed = (chunkX: number, chunkZ: number): number => (chunkX * 73856093) ^ (chunkZ * 19349663);
-
-// Create a chunk procedurally (platform-specific implementation)
-// This will eventually be replaced by asset loading
-export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer): Chunk => {
-    const chunkCenterX = chunkX * CHUNK_SIZE;
-    const chunkCenterZ = chunkZ * CHUNK_SIZE;
-
-    const floorTransform = createTranslationMatrix(chunkCenterX, 0, chunkCenterZ);
-    const floorMesh = renderer.createPlaneMesh(10);
-
-    const meshes: Chunk['meshes'] = [
-        // Floor (grayscale for lighting)
-        {
-            mesh: floorMesh,
-            transform: floorTransform,
-            color: { x: 0.4, y: 0.4, z: 0.4 },
-        },
-    ];
-
-    // Deterministic generation based on chunk coordinates
-    const seed = chunkSeed(chunkX, chunkZ);
-    const objectCount = Math.floor(seededRandom(seed) * 5) + 2; // 2-6 objects per chunk
-    for (let i = 0; i < objectCount; i += 1) {
-        const itemSeed = chunkSeed(chunkX + i, chunkZ + i * 7);
-        const offsetX = (seededRandom(itemSeed) - 0.5) * 8;
-        const offsetZSeed = chunkSeed(chunkX + i * 3, chunkZ + i * 11);
-        const offsetZ = (seededRandom(offsetZSeed) - 0.5) * 8;
-        const typeSeed = chunkSeed(chunkX + i * 5, chunkZ + i * 13);
-        const type = Math.floor(seededRandom(typeSeed) * 4);
-        const sizeSeed = chunkSeed(chunkX + i * 7, chunkZ + i * 17);
-        const size = 0.3 + seededRandom(sizeSeed) * 1.5; // 0.3 to 1.8
-
-        let mesh;
-        let yPos = size / 2;
-
-        switch (type) {
-            case 0: // Cube
-                mesh = renderer.createCubeMesh(size);
-                break;
-            case 1: // Pyramid
-                mesh = renderer.createPyramidMesh(size);
-                yPos = size * 0.6; // Adjust for pyramid height
-                break;
-            case 2: // Prism
-                mesh = renderer.createPrismMesh(size, size * 1.5, size * 0.8);
-                yPos = (size * 1.5) / 2;
-                break;
-            case 3: // Sphere
-                mesh = renderer.createSphereMesh(size / 2, 12);
-                break;
-            default:
-                mesh = renderer.createCubeMesh(size);
-        }
-
-        const transform = createTranslationMatrix(
-            chunkCenterX + offsetX,
-            yPos,
-            chunkCenterZ + offsetZ,
-        );
-
-        // Grayscale colors (will be lit by lighting system)
-        const graySeed = chunkSeed(chunkX + i * 19, chunkZ + i * 23);
-        const gray = 0.3 + seededRandom(graySeed) * 0.4; // 0.3 to 0.7
-        meshes.push({
-            mesh,
-            transform,
-            color: { x: gray, y: gray, z: gray },
-        });
-    }
-
-    const chunkId = World.getChunkID(chunkX, chunkZ);
-
-    return {
-        id: chunkId,
-        bounds: createAABB(
-            { x: chunkCenterX - 5, y: -1, z: chunkCenterZ - 5 },
-            { x: chunkCenterX + 5, y: 5, z: chunkCenterZ + 5 },
-        ),
-        meshes,
-    };
-};
+// Track chunks currently being loaded to avoid duplicate requests
+const pendingChunkLoads = new Set<string>();
 
 // Update active chunks based on player position (platform-specific chunk management)
-export const updateActiveChunks = (
+// Uses async chunk loading from JSON files
+export const updateActiveChunks = async (
     world: World,
     playerPosition: Vec3,
     renderer: Renderer,
-): void => {
+    assetLoader: WebAssetLoader,
+): Promise<void> => {
     const currentChunk = World.getChunkCoords(playerPosition);
     const chunksToLoad = World.getChunksInRadius(
         currentChunk.x,
@@ -129,14 +40,38 @@ export const updateActiveChunks = (
         shouldBeLoaded.add(World.getChunkID(chunk.x, chunk.z));
     });
 
-    // Load missing chunks
+    // Load missing chunks (parallel loading for performance)
+    const loadPromises: Promise<void>[] = [];
+
     chunksToLoad.forEach((chunk) => {
         const chunkId = World.getChunkID(chunk.x, chunk.z);
-        if (!world.activeChunks.has(chunkId)) {
-            const newChunk = createChunk(chunk.x, chunk.z, renderer);
-            world.addChunk(newChunk);
+
+        // Skip if already loaded or currently loading
+        if (world.activeChunks.has(chunkId) || pendingChunkLoads.has(chunkId)) {
+            return;
         }
+
+        // Mark as loading
+        pendingChunkLoads.add(chunkId);
+
+        // Load chunk asynchronously
+        const loadPromise = assetLoader
+            .loadChunk(chunkId, chunk.x, chunk.z, renderer)
+            .then((newChunk) => {
+                // Add chunk to world when loaded
+                world.addChunk(newChunk);
+                pendingChunkLoads.delete(chunkId);
+            })
+            .catch((error) => {
+                console.error(`Failed to load chunk ${chunkId}:`, error);
+                pendingChunkLoads.delete(chunkId);
+            });
+
+        loadPromises.push(loadPromise);
     });
+
+    // Wait for all chunks to load (non-blocking in game loop, but tracks completion)
+    await Promise.all(loadPromises);
 
     // Unload chunks outside radius
     const chunksToUnload: string[] = [];
@@ -148,10 +83,12 @@ export const updateActiveChunks = (
 
     chunksToUnload.forEach((chunkId) => {
         world.removeChunk(chunkId);
+        // Clean up pending load if chunk is being unloaded before it finishes loading
+        pendingChunkLoads.delete(chunkId);
     });
 };
 
-export const createWebPlatform = async (): Promise<PlatformServices & { canvas: HTMLCanvasElement }> => {
+export const createWebPlatform = async (): Promise<PlatformServices & { canvas: HTMLCanvasElement; assetLoader: WebAssetLoader }> => {
     // DOM setup
     const canvas = document.createElement('canvas');
     canvas.width = 800; // TODO: Variable width
@@ -161,6 +98,7 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
     const renderer = new WebGLRenderer(canvas);
     const input = new WebInputService(canvas);
     const clock = new WebClock();
+    const assetLoader = new WebAssetLoader('/chunks/');
 
     // Wireframe toggle (press '\' key)
     let wireframeEnabled = false;
@@ -177,6 +115,7 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
         clock,
         input,
         canvas,
+        assetLoader,
         getAspectRatio: () => canvas.width / canvas.height,
     };
 };
@@ -186,7 +125,7 @@ export const bootstrapWeb = (): void => {
     createWebPlatform().then((platform) => {
         const world = new World();
         const initialCamera = createCamera();
-        updateActiveChunks(world, initialCamera.position, platform.renderer);
+        updateActiveChunks(world, initialCamera.position, platform.renderer, platform.assetLoader);
 
         // Create debug HUD
         const debugHUD = createDebugHUD(platform.canvas);
@@ -205,8 +144,11 @@ export const bootstrapWeb = (): void => {
             gameLoop.update(platform.clock.getDeltaTime());
 
             // Update chunk loading/unloading based on player position
+            // Fire and forget - chunks will populate as they load
             const cameraPosition = gameLoop.getCameraPosition();
-            updateActiveChunks(world, cameraPosition, platform.renderer);
+            updateActiveChunks(world, cameraPosition, platform.renderer, platform.assetLoader).catch((error) => {
+                console.error('Error in updateActiveChunks:', error);
+            });
 
             gameLoop.render();
             requestAnimationFrame(loop);
