@@ -60,4 +60,4 @@ Minimalism is key, following YAGNI principles.
 - Debug and run via browser
 - You'll see an empty plane with the moon/sun
   - I've cut publicly testable pieces after reaching a certain point
-  - To add collision/field objects, create chunk JSON files in `public/chunks/` using offset-based naming (e.g., `10000_10000.json` for chunk `0,0`). See `public/chunks/10000_10000.json` for an example format with meshes, collision objects, and field definitions.
+  - To add collision/field objects, create chunk JSON files in `public/chunks/`. See [Data Formats](docs/data-formats.md) for chunk file format and naming conventions.
