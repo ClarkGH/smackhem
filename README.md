@@ -53,11 +53,11 @@ Minimalism is key, following YAGNI principles.
 10. Aseprite - Sprite creation
 11. [Documentation Overview](docs/INDEX.md)
 
-## How to run?
+## How to run? (Web)
 
 - Install dependencies (node/pnpm)
 - `$ pnpm install && pnpm build && pnpm vite`
 - Debug and run via browser
-- You'll seen an empty plane with the moon/sun
+- You'll see an empty plane with the moon/sun
   - I've cut publicly testable pieces after reaching a certain point
-  - For an idea of collision/field objects, refer back to bcba86c7ba54dd4380a11d6ee61fc7d7aaa4d271
+  - To add collision/field objects, create chunk JSON files in `public/chunks/` using offset-based naming (e.g., `10000_10000.json` for chunk `0,0`). See `public/chunks/10000_10000.json` for an example format with meshes, collision objects, and field definitions.
