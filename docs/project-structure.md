@@ -5,6 +5,7 @@
 - [Naming Conventions](#naming-conventions)
 - [Code Organization Principles](#code-organization-principles)
 - [Project Directory Structure](#project-directory-structure)
+- [Public Directory Structure](#public-directory-structure)
 - [Root Level Configuration](#root-level-configuration)
 - [Future Structure](#future-structure)
 - [Navigation](#navigation)
@@ -59,35 +60,55 @@ This pattern:
 ```text
 src/
 ├─ core/
-│  ├─ camera.ts           # 3D camera math and logic
-│  ├─ collision.ts        # Collision logic
-│  ├─ gameLoop.ts         # Game loop logic
-│  ├─ input.ts            # Player input logic
-│  ├─ party.ts            # Party Logic
-│  ├─ world.ts            # World and chunking logic
-│  └─ math/               # Shared engine math logic
-│     ├─ aabb.ts          # Axis aligned bounding box
-│     └─ mathHelpers.ts   # Matrix/vector/etc math helper methods
+│  ├─ camera.ts              # 3D camera math and logic
+│  ├─ collision.ts           # Collision logic
+│  ├─ gameLoop.ts            # Game loop logic
+│  ├─ input.ts               # Player input logic
+│  ├─ instance.ts            # Instance system (pause mode state)
+│  ├─ instanceCharacter.ts  # Instance character state
+│  ├─ party.ts               # Party logic
+│  ├─ world.ts               # World and chunking logic
+│  └─ math/                  # Shared engine math logic
+│     ├─ aabb.ts             # Axis aligned bounding box
+│     └─ mathHelpers.ts      # Matrix/vector/etc math helper methods
 ├─ services/
-│  ├─ renderer.ts         # Abstract Renderer interface
-│  ├─ input.ts            # Abstract Input service
-│  ├─ clock.ts            # Time service
-│  └─ assetLoader.ts      # Asset loading service
+│  ├─ renderer.ts            # Abstract Renderer interface
+│  ├─ input.ts               # Abstract Input service
+│  ├─ clock.ts               # Time service
+│  ├─ assetLoader.ts         # Asset loading service
+│  ├─ chunkLoader.ts         # Chunk JSON parsing and mesh creation
+│  └─ platform.ts           # Platform services interface
 ├─ platforms/
 │  ├─ web/
-│  │  ├─ webBootstrap.ts    # Bootstraps the webGL game engine
-│  │  ├─ webClock.ts        # Web platform clock implementation
-│  │  ├─ webGLRenderer.ts   # Renderer specifically for webGL
-│  │  └─ webInput.ts        # Input as it relates specifically to webGL
-│  └─ stub/
-│     ├─ nullRenderer.ts    # Stub renderer for testing/validation
-│     └─ nullRenderer.spec.ts # Tests for stub renderer
-│
+│  │  ├─ webBootstrap.ts     # Bootstraps the webGL game engine
+│  │  ├─ webClock.ts         # Web platform clock implementation
+│  │  ├─ webGLRenderer.ts    # Renderer specifically for webGL
+│  │  ├─ webInput.ts         # Web input state management
+│  │  ├─ webInputService.ts  # Web input service implementation
+│  │  ├─ webAssetLoader.ts   # Web asset loader (chunks, textures)
+│  │  └─ debugHUD.ts         # Debug HUD overlay
+│  ├─ stub/
+│  │  ├─ nullRenderer.ts     # Stub renderer for testing/validation
+│  │  ├─ nullRenderer.spec.ts # Tests for stub renderer
+│  │  ├─ stubBootstrap.ts     # Stub platform bootstrap
+│  │  ├─ stubClock.ts         # Stub clock implementation
+│  │  └─ stubInput.ts         # Stub input implementation
+│  └─ cpu/                    # CPU platform (future)
 ├─ types/
-│  └─ common.d.ts           # Common type definitions
-├─ index.html               # HTML entry point for web platform
-└─ main.ts                  # Entry point
+│  └─ common.d.ts            # Common type definitions
+├─ index.html                 # HTML entry point for web platform
+└─ main.ts                    # Entry point
 ```
+
+## Public Directory Structure
+
+```text
+public/
+└─ chunks/              # Chunk JSON files
+   └─ {fileX}_{fileZ}.json  # Offset-based naming (fileX = chunkX + 10000)
+```
+
+Chunk files use offset-based naming to prevent negative coordinates in filenames. See [Data Formats](data-formats.md) for details.
 
 ## Root Level Configuration
 
@@ -99,6 +120,7 @@ Root level configuration:
 - `vite.config.mts` - Vite build configuration
 - `LICENSE` - Project license
 - `README.md` - Project documentation
+- `docs/` - Project documentation directory
 
 ## Future Structure
 

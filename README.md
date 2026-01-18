@@ -25,13 +25,16 @@ It's been 5 years of studying 3D. I can now say I've "put a pin" on quaternions.
 ├─ /node_modules
 ├─ /src
 │  ├─ main.ts        # entrypoint
-│  ├─ core/          # engine core systems
-│  ├─ platforms/     # platform specific code
-│  ├─ services/      # services
+│  ├─ core/          # engine core systems (camera, collision, gameLoop, world, etc.)
+│  ├─ platforms/     # platform specific code (web, stub, cpu)
+│  ├─ services/      # services (renderer, input, clock, assetLoader, chunkLoader)
 │  └─ types/         # common types
+├─ /public           # static assets
+│  └─ /chunks/       # chunk JSON files (offset-based naming: 10000_10000.json)
+├─ /docs             # project documentation
 ├─ package.json
 ├─ tsconfig.json
-└─ vite.config.ts
+└─ vite.config.mts
 ```
 
 ## Tech Stack
@@ -49,3 +52,12 @@ Minimalism is key, following YAGNI principles.
 9. Target Platforms - Web -> Desktop -> Console(future).
 10. Aseprite - Sprite creation
 11. [Documentation Overview](docs/INDEX.md)
+
+## How to run?
+
+- Install dependencies (node/pnpm)
+- `$ pnpm install && pnpm build && pnpm vite`
+- Debug and run via browser
+- You'll seen an empty plane with the moon/sun
+  - I've cut publicly testable pieces after reaching a certain point
+  - For an idea of collision/field objects, refer back to bcba86c7ba54dd4380a11d6ee61fc7d7aaa4d271

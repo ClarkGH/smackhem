@@ -1,6 +1,6 @@
 # Lessons Learned
 
-Purpose of this document is to log the things the human has learned in the process of building this project. This document is enitirely human written.
+Purpose of this document is to log the things the human has learned in the process of building this project. This document is enitirely human written (Though it did fix my a/b outline attempt Go Men A Sai).
 
 ## How this relates to the wild world of sports
 
@@ -26,6 +26,9 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
 3. WIP: Moon light is currently overpowering sunlight. Has something to do with ambience formulae.
 4. Chunking. Seeded procedural generation being used first, before static files... was an incredibly helpful decision! I didn't make it, I think Gemini and ChatGPT did while I was researching and just ran with it. It made stubbing so much faster. If I make another engine I'll do it again.
 5. Sun and Moon. Moon and Sun confused me. I should not have built both at the same time while over-relying on cursor. It's a slippery slope. Removing the moon and slowly debugging just the sun after 2 days resolved the problem. As I recall, the moon just worked when I brought it back in.
+6. Proteus Rabbit-hole
+   - Proteus was a big inspiration
+   - All it has are a height field function, a sky state, a global lighting function, a handful of instance rules, and a renderer that draws up meshes, quads, and the sky.
 
 ## Patterns / Paradigms
 
@@ -38,3 +41,4 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
    - Vector based logic is going to be the new HOT thing with RAGs and etc.
 5. Lots of 3D engine principles and words I didn't know I had to learn
 6. Everything started with Typescript, which is a typed language. I'm working with Java and C++ at times as well, so this just bleeds more into pattern recognition.
+7. Just because cursor recommends something doesn't mean you should let it code it out. Stay in ask mode until the context is all there. Go to plan mode if you don't know what you're doing. Only use agent mode when confident.
