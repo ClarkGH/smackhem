@@ -5,6 +5,7 @@ export default defineConfig(({ mode }) => {
   
   return {
     root: 'src',
+    publicDir: '../public',
     build: {
       outDir: '../dist',
       emptyOutDir: true,

@@ -65,14 +65,28 @@ StaticMesh {
 - Player position determines active radius
 - Load:
   - Current chunk
-  - Adjacent chunks
-- Unload far chunks
+  - Adjacent chunks (within `CHUNK_LOAD_RADIUS`)
+- Unload far chunks (outside active radius)
+
+**Loading Implementation:**
+
+- Chunks are loaded **asynchronously** from JSON files via `fetch()`
+- Multiple chunks load in **parallel** using `Promise.all` for performance
+- Chunk loading is **non-blocking** in the game loop (fire-and-forget pattern)
+- Loaded chunks are **cached in memory** to avoid re-fetching/re-parsing
+- Pending chunk loads are tracked to avoid duplicate requests
+
+**Error Handling:**
+
+- Missing chunk files: System creates empty fallback chunk (floor plane only)
+- Invalid JSON: Logs error and creates empty fallback chunk
+- Network errors: Falls back to empty chunk creation
 
 This works identically on:
 
-- Web
-- Desktop
-- Console
+- Web (async `fetch()` with Promise-based loading)
+- Desktop (future: same async pattern)
+- Console (future: same async pattern)
 
 ### Chunk flow
 

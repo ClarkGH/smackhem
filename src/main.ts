@@ -25,8 +25,18 @@ const main = async () => {
     const world = new World();
 
     // Import chunk management function (platform-specific)
-    // eslint-disable-next-line no-shadow, no-unused-vars
-    let updateActiveChunks: (w: World, pos: { x: number; y: number; z: number }, r: PlatformServices['renderer']) => void;
+    // Type parameters are intentionally unused (they're for type checking only)
+    // eslint-disable-next-line no-shadow
+    let updateActiveChunks: (
+        // eslint-disable-next-line no-unused-vars
+        _w: World,
+        // eslint-disable-next-line no-unused-vars
+        _pos: { x: number; y: number; z: number },
+        // eslint-disable-next-line no-unused-vars
+        _r: PlatformServices['renderer'],
+        // eslint-disable-next-line no-unused-vars
+        _assetLoader?: any,
+    ) => Promise<void>;
 
     // __PLATFORM__ is a build-time define from Vite, not available at ESLint parse time
     // eslint-disable-next-line no-undef
@@ -42,7 +52,9 @@ const main = async () => {
 
     // Initialize world with initial camera position
     const initialCamera = createCamera();
-    updateActiveChunks(world, initialCamera.position, platform.renderer);
+    // Get assetLoader from platform if available (web platform)
+    const assetLoader = 'assetLoader' in platform ? (platform as { assetLoader: any }).assetLoader : undefined;
+    await updateActiveChunks(world, initialCamera.position, platform.renderer, assetLoader);
 
     // Create debug HUD (only for web platform)
     let debugHUD: {
@@ -77,8 +89,11 @@ const main = async () => {
         gameLoop.update(platform.clock.getDeltaTime());
 
         // Update chunk loading/unloading based on player position
+        // Fire and forget - chunks will populate as they load (non-blocking)
         const cameraPosition = gameLoop.getCameraPosition();
-        updateActiveChunks(world, cameraPosition, platform.renderer);
+        updateActiveChunks(world, cameraPosition, platform.renderer, assetLoader).catch((error) => {
+            console.error('Error in updateActiveChunks:', error);
+        });
 
         gameLoop.render();
         requestAnimationFrame(loop);
