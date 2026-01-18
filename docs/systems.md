@@ -74,6 +74,23 @@ This works identically on:
 - Desktop
 - Console
 
+### Chunk flow
+
+```mermaid
+flowchart TD
+    A[Player moves] --> B[Calculate chunk coords]
+    B --> C{Chunk loaded?}
+
+    C -- Yes --> G[Render chunk]
+
+    C -- No --> D[Load chunk file]
+    D --> E[Parse JSON]
+    E --> F[Convert to Chunk object]
+    F --> H[Create mesh handles]
+    H --> I[Store in world]
+    I --> G[Render chunk]
+```
+
 ## Geometry Rules (Intentional Constraints)
 
 - No Curves or Smooth Surfaces: The game will strictly use geometric shapes such as cubes, pyramids, prisms, and planes. This constraint is intentional to simplify the design and rendering pipeline, making it easier to batch objects and optimize performance.
