@@ -29,6 +29,8 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
 6. Proteus Rabbit-hole
    - Proteus was a big inspiration
    - All it has are a height field function, a sky state, a global lighting function, a handful of instance rules, and a renderer that draws up meshes, quads, and the sky.
+7. Cursor keeps conflating 2D and 3D classes
+   - At some point, I started confusing Cursor. Will need to review and re-organize... but I'm not sure if it's cursor's fault. We've entered territory where my application is becoming it's own unique beast, and the web scraper doesn't fully understand visual concepts well.
 
 ## Patterns / Paradigms
 
