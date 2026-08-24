@@ -507,6 +507,8 @@ export default class WebGLRenderer implements Renderer {
     beginFrame(): void {
         // Update viewport in case canvas was resized
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        // Always reset clear color to default gray (scene mode can override with clear())
+        this.gl.clearColor(160 / 255, 160 / 255, 160 / 255, 1);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     }
 
@@ -809,5 +811,18 @@ export default class WebGLRenderer implements Renderer {
 
         gl.bindVertexArray(null);
         gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
+    clear(r: number, g: number, b: number, a: number): void {
+        this.gl.clearColor(r, g, b, a);
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    }
+
+    getViewportWidth(): number {
+        return this.canvas.width;
+    }
+
+    getViewportHeight(): number {
+        return this.canvas.height;
     }
 }

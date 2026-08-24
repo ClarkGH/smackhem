@@ -32,6 +32,32 @@ export const perspective = (
     return { elements: e };
 };
 
+export const orthographic = (
+    left: number,
+    right: number,
+    bottom: number,
+    top: number,
+    near: number,
+    far: number,
+): Mat4 => {
+    const e = new Float32Array(16);
+
+    const rl = right - left;
+    const tb = top - bottom;
+    const fn = far - near;
+
+    e[0] = 2 / rl; // x-scale
+    e[5] = 2 / tb; // y-scale
+    e[10] = -2 / fn; // z-scale (negative for depth)
+    e[11] = 0;
+    e[12] = -(right + left) / rl; // x-translation
+    e[13] = -(top + bottom) / tb; // y-translation
+    e[14] = -(far + near) / fn; // z-translation
+    e[15] = 1;
+
+    return { elements: e };
+};
+
 // TODO: Low-priority -> manually set each C-array value for minor performance boost.
 export const matrixMultiply = (a: Mat4, b: Mat4): Mat4 => {
     // Variables based on AB = C formula

@@ -19,6 +19,8 @@ export class WebInputService implements Input {
 
     private pause: boolean = false;
 
+    private interact: boolean = false;
+
     constructor(canvas: HTMLCanvasElement) {
         this.coreState = createInputState();
         this.webState = createWebInputState();
@@ -29,6 +31,7 @@ export class WebInputService implements Input {
         const result = syncWebInput(this.coreState, this.webState);
         this.toggleDebugHUD = result.toggleDebugHUD;
         this.pause = result.pause;
+        this.interact = result.interact;
     }
 
     getIntent(): PlayerIntent {
@@ -52,6 +55,11 @@ export class WebInputService implements Input {
             intent.pause = true;
             // Reset after consuming (one-shot event)
             this.pause = false;
+        }
+        if (this.interact) {
+            intent.interact = true;
+            // Reset after consuming (one-shot event)
+            this.interact = false;
         }
         return intent;
     }

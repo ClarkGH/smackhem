@@ -22,6 +22,7 @@ import {
     quaternionApplyToVector,
     smoothstep,
     lerpVec3,
+    orthographic,
 } from './math/mathHelpers';
 import { World } from './world';
 import type { Vec3, Mat4 } from '../types/common';
@@ -34,6 +35,20 @@ import {
     createInstanceCharacter,
     type InstanceCharacter,
 } from './instanceCharacter';
+import {
+    createScene,
+    SCENE_TILE_SIZE,
+    SCENE_GRID_WIDTH,
+    SCENE_GRID_HEIGHT,
+    SCENE_WIDTH_PX,
+    SCENE_HEIGHT_PX,
+    SCENE_TRANSITION_DURATION,
+    type Scene,
+} from './scene';
+import {
+    createSceneCharacter,
+    type SceneCharacter,
+} from './sceneCharacter';
 
 const FIXED_DT = 1 / 60;
 
@@ -62,15 +77,23 @@ export class GameLoop {
 
     private isPaused = false;
 
-    private savedPitch = 0; // Store camera pitch before pause to restore on unpause
+    private savedPitch = 0;
 
-    private targetPitch = 0; // Target pitch for smooth transition
+    private targetPitch = 0;
 
     private isTransitioningPitch = false;
 
     private instance: Instance;
 
     private instanceCharacter: InstanceCharacter;
+
+    private scene: Scene;
+
+    private sceneCharacter: SceneCharacter;
+
+    private gameMode: 'world_3d' | 'scene_2d' = 'world_3d';
+
+    private savedCameraState: { position: Vec3; yaw: number; pitch: number } | null = null;
 
     private circleTexture: TextureHandle | null = null;
 
@@ -152,6 +175,10 @@ export class GameLoop {
 
     private readonly circleTransform: Mat4; // Pre-allocated for circle rendering
 
+    // Scene rendering matrices (pre-allocated)
+    private readonly sceneSpriteTransform: Mat4; // Pre-allocated for sprite
+    private readonly sceneOrthoProj: Mat4; // Pre-allocated orthographic projection
+
     // Mesh objects
     private readonly sunMesh;
 
@@ -189,6 +216,8 @@ export class GameLoop {
         this.moonMVP = identity();
         this.meshMVP = identity();
         this.circleTransform = identity();
+        this.sceneSpriteTransform = identity();
+        this.sceneOrthoProj = identity();
 
         // Mesh objects
         this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE, 16);
@@ -197,6 +226,10 @@ export class GameLoop {
         // Instance system
         this.instance = createInstance();
         this.instanceCharacter = createInstanceCharacter({ x: 0, y: 0, z: 0 });
+
+        // Scene system
+        this.scene = createScene();
+        this.sceneCharacter = createSceneCharacter({ x: 12, y: 9 }); // center of grid
 
         // Load circle texture asynchronously
         this.loadCircleTexture();
@@ -441,8 +474,51 @@ export class GameLoop {
     private updateSimulation(dt: number): void {
         const intent = this.input.getIntent();
 
-        // Handle pause toggle
-        if (intent.pause) {
+        // Handle scene entry/exit (interact key)
+        if (intent.interact) {
+            if (this.gameMode === 'world_3d') {
+                // Entry: world_3d → scene_2d
+                // Save camera state
+                this.savedCameraState = {
+                    position: { ...this.camera.position },
+                    yaw: this.camera.yaw,
+                    pitch: this.camera.pitch,
+                };
+                // Transition pitch to 0
+                this.targetPitch = 0;
+                this.isTransitioningPitch = true;
+                // Set game mode
+                this.gameMode = 'scene_2d';
+                // Initialize scene character to grid center
+                this.sceneCharacter = createSceneCharacter({ x: 12, y: 9 });
+                // Start scene transition
+                this.scene.isTransitioning = true;
+                this.scene.transitionDirection = 1.0;
+                this.scene.transitionProgress = 0.0;
+                this.scene.isActive = false;
+            } else if (this.gameMode === 'scene_2d') {
+                // Exit: scene_2d → world_3d
+                // Restore camera state
+                if (this.savedCameraState) {
+                    this.camera.position.x = this.savedCameraState.position.x;
+                    this.camera.position.y = this.savedCameraState.position.y;
+                    this.camera.position.z = this.savedCameraState.position.z;
+                    this.camera.yaw = this.savedCameraState.yaw;
+                    this.camera.pitch = this.savedCameraState.pitch;
+                    this.savedCameraState = null;
+                }
+                // Set game mode
+                this.gameMode = 'world_3d';
+                // Reset scene state
+                this.scene.isActive = false;
+                this.scene.isTransitioning = false;
+                this.scene.transitionProgress = 0.0;
+                this.isTransitioningPitch = false;
+            }
+        }
+
+        // Handle pause toggle (only in world_3d mode)
+        if (intent.pause && this.gameMode === 'world_3d') {
             if (this.isPaused) {
                 this.unpause();
             } else {
@@ -492,8 +568,8 @@ export class GameLoop {
             );
         }
 
-        // Update camera pitch transition (only when paused, going to 0)
-        if (this.isPaused && this.isTransitioningPitch) {
+        // Update camera pitch transition (when paused or in scene mode, going to 0)
+        if ((this.isPaused || this.gameMode === 'scene_2d') && this.isTransitioningPitch) {
             const pitchTransitionSpeed = 2.0; // radians per second
             const pitchDelta = (this.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
 
@@ -503,6 +579,22 @@ export class GameLoop {
                 this.isTransitioningPitch = false;
             } else {
                 this.camera.pitch += pitchDelta;
+            }
+        }
+
+        // Update scene transition
+        if (this.gameMode === 'scene_2d' && this.scene.isTransitioning) {
+            this.scene.transitionProgress += (dt * this.scene.transitionDirection) / SCENE_TRANSITION_DURATION;
+
+            // Clamp to [0, 1]
+            if (this.scene.transitionProgress >= 1.0) {
+                this.scene.transitionProgress = 1.0;
+                this.scene.isTransitioning = false;
+                this.scene.isActive = true;
+            } else if (this.scene.transitionProgress <= 0.0) {
+                this.scene.transitionProgress = 0.0;
+                this.scene.isTransitioning = false;
+                this.scene.isActive = false;
             }
         }
 
@@ -533,6 +625,46 @@ export class GameLoop {
 
         // Skip normal simulation updates when paused (except instance state above)
         if (this.isPaused) {
+            return;
+        }
+
+        // Skip camera updates when in scene mode (camera is frozen)
+        if (this.gameMode === 'scene_2d') {
+            // Scene movement (2D grid-based)
+            if (!this.scene.isPaused) {
+                const { x: moveX, y: moveY } = intent.move;
+
+                if (moveX !== 0 || moveY !== 0) {
+                    // Convert to grid movement (pixels per second)
+                    const moveSpeed = PLAYER_SPEED * dt;
+                    const newPxX = this.sceneCharacter.positionPx.x + moveX * moveSpeed;
+                    const newPxY = this.sceneCharacter.positionPx.y - moveY * moveSpeed; // invert Y for up/down
+
+                    // Convert pixel position to grid coordinates
+                    const gridX = Math.floor(newPxX / SCENE_TILE_SIZE);
+                    const gridY = Math.floor(newPxY / SCENE_TILE_SIZE);
+
+                    // Check collision and grid bounds
+                    if (gridX >= 0 && gridX < SCENE_GRID_WIDTH
+                        && gridY >= 0 && gridY < SCENE_GRID_HEIGHT) {
+                        const gridIndex = gridY * SCENE_GRID_WIDTH + gridX;
+                        const isWalkable = this.scene.collisionGrid[gridIndex] === 0;
+
+                        if (isWalkable) {
+                            // Update position
+                            this.sceneCharacter.positionPx.x = newPxX;
+                            this.sceneCharacter.positionPx.y = newPxY;
+                            this.sceneCharacter.positionGrid.x = gridX;
+                            this.sceneCharacter.positionGrid.y = gridY;
+                        }
+                    }
+
+                    // Clamp positionPx to stay within scene bounds (0-799, 0-599)
+                    this.sceneCharacter.positionPx.x = Math.max(0, Math.min(SCENE_WIDTH_PX - 1, this.sceneCharacter.positionPx.x));
+                    this.sceneCharacter.positionPx.y = Math.max(0, Math.min(SCENE_HEIGHT_PX - 1, this.sceneCharacter.positionPx.y));
+                }
+            }
+            // Skip normal simulation updates in scene mode
             return;
         }
 
@@ -587,6 +719,154 @@ export class GameLoop {
     render(): void {
         this.renderer.beginFrame();
 
+        // Scene mode rendering (2D overlay)
+        if (this.gameMode === 'scene_2d') {
+            // 1. Render frozen 3D world (normal 3D rendering, camera frozen)
+            const aspect = this.getAspectRatio();
+            const viewProj = getCameraMatrix(this.camera, aspect);
+
+            // PERFORMANCE: Reuse pre-allocated objects, zero allocations per frame
+            const timeOfDay = this.computeTimeOfDay(this.simulationTime);
+
+            this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);
+            this.computeSunDirection(timeOfDay, this.lightDirection);
+            this.computeLightColor(timeOfDay, this.sunElevation.value, this.lightColor);
+
+            const ambientIntensity = this.computeAmbientIntensity(this.sunElevation.value);
+            const moonAzimuth = { value: this.sunAzimuth.value + Math.PI };
+            const moonElevation = { value: -this.sunElevation.value };
+            this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
+
+            const sunVisibility = this.computeSunVisibility(timeOfDay);
+            const moonVisibility = this.computeMoonVisibility(timeOfDay);
+            const activeLightDirection = moonVisibility > sunVisibility ? this.moonLightDirection : this.lightDirection;
+
+            if (this.renderer.setLightDirection) {
+                this.renderer.setLightDirection(activeLightDirection);
+            }
+            if (this.renderer.setLightColor) {
+                this.renderer.setLightColor(this.lightColor);
+            }
+            if (this.renderer.setAmbientIntensity) {
+                this.renderer.setAmbientIntensity(ambientIntensity);
+            }
+
+            this.sunDirectionForPosition.x = this.lightDirection.x;
+            this.sunDirectionForPosition.y = this.lightDirection.y;
+            this.sunDirectionForPosition.z = this.lightDirection.z;
+
+            this.computeCelestialPosition(
+                this.sunDirectionForPosition,
+                this.CELESTIAL_DISTANCE,
+                this.camera.position,
+                this.sunPosition,
+            );
+
+            this.moonDirectionForPosition.x = this.moonLightDirection.x;
+            this.moonDirectionForPosition.y = this.moonLightDirection.y;
+            this.moonDirectionForPosition.z = this.moonLightDirection.z;
+
+            this.computeCelestialPosition(
+                this.moonDirectionForPosition,
+                this.CELESTIAL_DISTANCE,
+                this.camera.position,
+                this.moonPosition,
+            );
+            this.computeCelestialTransform(this.sunPosition, this.SUN_SIZE, this.sunTransform);
+            this.computeCelestialTransform(this.moonPosition, this.MOON_SIZE, this.moonTransform);
+
+            if (sunVisibility > 0) {
+                this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
+                this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
+                this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
+
+                matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
+                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
+            }
+
+            if (moonVisibility > 0) {
+                this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
+                this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
+                this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
+
+                matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
+                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
+            }
+
+            const visibleMeshes = this.world.getVisibleMeshes();
+            visibleMeshes.forEach((sm) => {
+                matrixMultiplyInto(viewProj, sm.transform, this.meshMVP);
+                this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
+            });
+
+            // 2. Render pink overlay (2D screen-space)
+            const width = this.renderer.getViewportWidth?.() ?? 800;
+            const height = this.renderer.getViewportHeight?.() ?? 600;
+
+            // Create orthographic projection for screen-space rendering
+            // Maps pixel coordinates (0-width, 0-height) directly to clip space
+            const orthoProj = orthographic(0, width, height, 0, 0.1, 100.0);
+            // Copy into pre-allocated matrix (reuse elements array)
+            const orthoElements = orthoProj.elements;
+            const sceneOrthoElements = this.sceneOrthoProj.elements;
+            for (let i = 0; i < 16; i += 1) {
+                sceneOrthoElements[i] = orthoElements[i];
+            }
+
+            // Render pink overlay using clear() if available, otherwise use a full-screen quad
+            if (this.renderer.clear) {
+                // Apply transition alpha for fade in/out
+                const alpha = smoothstep(this.scene.transitionProgress);
+                const pinkR = 1.0;
+                const pinkG = 0.41; // 105/255
+                const pinkB = 0.71; // 180/255
+                this.renderer.clear(pinkR * alpha, pinkG * alpha, pinkB * alpha, alpha);
+            }
+
+            // 3. Render scene sprite (2D screen-space)
+            if (this.circleTexture) {
+                // positionPx is already in pixel coordinates (0-799, 0-599)
+                const spriteSize = SCENE_TILE_SIZE; // 32x32 pixels
+                const posX = this.sceneCharacter.positionPx.x;
+                const posY = this.sceneCharacter.positionPx.y;
+
+                // Create model transform matrix: scale then translate
+                // For 2D screen-space: scale(spriteSize) * translate(posX, posY, 0.5)
+                // Build transform matrix directly (scale + translation)
+                const m = this.sceneSpriteTransform.elements;
+                // Scale by sprite size
+                m[0] = spriteSize; m[1] = 0; m[2] = 0; m[3] = 0;
+                m[4] = 0; m[5] = spriteSize; m[6] = 0; m[7] = 0;
+                m[8] = 0; m[9] = 0; m[10] = 1; m[11] = 0;
+                // Translate to screen position (Z = 0.5 for depth)
+                m[12] = posX; m[13] = posY; m[14] = 0.5; m[15] = 1;
+
+                // Multiply projection * model into meshMVP (reuse existing matrix)
+                matrixMultiplyInto(this.sceneOrthoProj, this.sceneSpriteTransform, this.meshMVP);
+                this.renderer.drawTexturedQuad(this.circleTexture, this.meshMVP, spriteSize);
+            }
+
+            // 4. Render debug HUD (if visible, same as normal)
+            if (this.debugHUD && this.debugHUDVisible) {
+                const rotation = quaternionFromYawPitch(this.camera.yaw, this.camera.pitch);
+                const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
+
+                this.debugHUD.render({
+                    cameraPosition: this.camera.position,
+                    cameraForward: forward,
+                    sunPosition: this.sunPosition,
+                    moonPosition: this.moonPosition,
+                    timeOfDay,
+                    yaw: this.camera.yaw,
+                    pitch: this.camera.pitch,
+                });
+            }
+
+            this.renderer.endFrame();
+            return;
+        }
+
+        // Normal 3D world rendering
         const aspect = this.getAspectRatio();
         const viewProj = getCameraMatrix(this.camera, aspect);
 

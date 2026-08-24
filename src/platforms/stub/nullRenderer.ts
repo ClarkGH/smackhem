@@ -122,4 +122,19 @@ export default class NullRenderer implements Renderer {
         this.lightColor = { x: 1, y: 1, z: 1 };
         this.ambientIntensity = 0.3;
     }
+
+    // Optional renderer extension methods
+    clear(_r: number, _g: number, _b: number, _a: number): void {
+        // Stub implementation - could track clear color state here
+    }
+
+    getViewportWidth(): number {
+        // Stub implementation - return default canvas width
+        return 800;
+    }
+
+    getViewportHeight(): number {
+        // Stub implementation - return default canvas height
+        return 600;
+    }
 }

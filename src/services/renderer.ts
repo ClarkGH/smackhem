@@ -26,4 +26,7 @@ export interface Renderer {
     setAmbientIntensity?(_intensity: number): void;
     loadTexture(_assetId: string): Promise<TextureHandle>;
     drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number): void;
+    clear?(_r: number, _g: number, _b: number, _a: number): void;
+    getViewportWidth?(): number;
+    getViewportHeight?(): number;
 }

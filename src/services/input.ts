@@ -4,6 +4,7 @@ export interface PlayerIntent {
     toggleCamera: boolean;
     toggleDebugHUD?: boolean;
     pause?: boolean;
+    interact?: boolean;
 }
 
 export interface Input {
