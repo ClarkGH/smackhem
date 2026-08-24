@@ -16,12 +16,15 @@
 
 Smackhem is a first-person geometric exploration engine designed with portability in mind. The engine core is platform-agnostic, allowing for easy porting to desktop, console, and native platforms by swapping backends.
 
+Clark, the current sole contributer, is a frontend software engineer first and has been working with Rust, Java, and C++ in his spare time. Trying to increase technical capabilities while diving into imposing and scary projects is the best place to fail and improve.
+
 ## Inspired by
 
-Cross Code was made with spit, grit, and javascript. It was ported to consoles and it's a great game. Since we're javascript developers, we're going to follow their path and do the same thing. We can use OpenGL like them, and do a 2.5D game, OUR WAY (cool emoji the kid's relate to here, or not).
 Remember Drakkhen? On the Amiga? The Super Nintendo? It's one of the most confusing games to pick up! But we think there's something there. We're taking inspiration and trying to see what we can do with the old magic.
 
-## Shared features
+Initial code is being built off of Typescript with porting to C++ in-mind. Cross Code was built with the same, but learning from their pain points when they started programming Alabaster Dawn. Using WebGL to start, the dev is attempting to build an engine that should port directly over to C++ (or so the dev naively hopes).
+
+## Open source code available to the public
 
 - Dungeons and dragons-esque stat blocks
 - Gear
@@ -35,6 +38,11 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It's one of the most confus
 - Quests
 - No walking into and drowning in bodies of water, disco dragon summons, or tombstone dogs allowed!
 - No Illegible Spells!
+
+## Private source code
+
+- OpenGL C++ engine
+- OpenGL source code notes and expansions
 
 ## The MVP Vision
 
@@ -60,10 +68,10 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It's one of the most confus
 - Character creation.
 - A plot.
 - Spells: Unlock, fire, ice, light, lightning, invisibility, poison cloud, acid spray, buff, debuff, shield, etc.. If we have time and the spell's not broken, we'll have a good amount!
-- Strengthen/upgrade system involving math formulae (Algebraic! Geometric!).
+- Strengthen/upgrade system involving math formulae.
 - Accessibility options.
 - Add some color for... reasons.
-- Port demo code to Godot, because "why not?". We're building for fun.
+- (Stretch - probably won't happen) Port demo code to Godot, because "why not?". We're building for fun.
 
 ## Navigation
 

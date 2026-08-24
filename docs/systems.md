@@ -130,7 +130,7 @@ For a cube of size `s`, centered at origin:
 ```typescript
 half = s / 2
 vertices = [
-    // 6 faces × 2 triangles × 3 vertices = 36 vertices
+    // 6 faces * 2 triangles * 3 vertices = 36 vertices
     // Each face: two triangles forming a square
     // Front face: (-h,-h,h), (h,-h,h), (h,h,h), (-h,-h,h), (h,h,h), (-h,h,h)
     // Back face: (-h,-h,-h), (-h,h,-h), (h,h,-h), (-h,-h,-h), (h,h,-h), (h,-h,-h)

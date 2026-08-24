@@ -33,11 +33,9 @@ If a feature cannot be described without referencing a specific platform, it mus
 
 ## Layer Boundaries (Hard Rule)
 
-The project is divided into three layers. Code may only depend downward.
+The project is divided into three layers. In the order of core, services, and backends. Code may only depend downward. Eg. The core engine source is services and backend agnostic.
 
-CORE  →  SERVICES  →  BACKENDS
-
-### Core (Portable Forever)
+### Core (Intentionally Portable)
 
 Allowed:
 
@@ -57,7 +55,7 @@ Forbidden:
 - Input devices (keyboard, mouse, gamepad)
 - Asset paths or fetch calls
 
-If code in `core/` references a platform concept, it is a violation.
+If code in `core/` references a platform concept, it is a violation of the intended architecture.
 
 ### Services (Abstract Interfaces)
 
@@ -127,11 +125,11 @@ Game logic must never adjust lighting values directly.
 
 Lighting:
 
-- Is grayscale only
+- Is grayscale only (subject to change)
 - Is derived from mesh data
 - Is applied in shaders
 
-Lighting must never be:
+Lighting must never be (for simplicity and to prevent headaches):
 
 - A gameplay mechanic
 - A world system
@@ -172,7 +170,9 @@ mouseDelta
 Every gameplay feature must be usable with:
 
 - Two sticks
-- Buttons
+- Directional inputs (e.g. wasd)
+- Conventional Inputs
+- Microsoft, Sony, keyboard, or default glyphs (stretch)
 
 If it requires a mouse or keyboard, it is invalid by default.
 
@@ -318,12 +318,12 @@ Could this exist unchanged on a console with no browser, no mouse, and no JIT?
 
 If the answer is:
 
-- Yes → proceed
-- No → redesign or isolate
+- Yes: proceed
+- No: redesign or isolate
 
 ## Closing Statement
 
-These rules are not about restriction — they are about freedom later.
+These rules are not about restriction, they are about freedom through discipline.
 
 If followed consistently:
 
@@ -331,7 +331,7 @@ If followed consistently:
 - Desktop is easy
 - Console is realistic
 
-Break them knowingly, not accidentally.
+Break them knowingly. With intent and not ignorance.
 
 ## Navigation
 

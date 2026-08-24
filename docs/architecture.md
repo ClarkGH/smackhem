@@ -45,7 +45,8 @@ These principles exist only to protect portability:
 3. Simulation is deterministic
 4. World data is pure data
 5. WebGL is one backend, not the engine
-If something violates these, it doesn't go in.
+
+If pending code violates these, it doesn't merge.
 
 ### Platform Strategy (High Level)
 
@@ -62,16 +63,16 @@ Tomorrow (Optional):
 - Console renderer
 
 Rule:
-The game should not know or care what GPU or input device exists.
+The engine source should not know or care what GPU or input device exists.
 
 ### Desktop & Console Porting Strategy
 
 **Approach: TypeScript Game Logic DSL + Native Renderer**
 We will port to desktop and console using a hybrid approach:
 
-- **Game logic stays in TypeScript** — all code in `core/` remains unchanged
-- **Renderer becomes native** — `platforms/native/` will implement the `Renderer` interface in C++
-- **Services bridge the gap** — clean interfaces allow TS ↔ C++ communication
+- **Game logic stays in TypeScript** - all code in `core/` remains unchanged
+- **Renderer becomes native** - `platforms/native/` will implement the `Renderer` interface in C++
+- **Services bridge the gap** - clean interfaces allow TS to C++ communication
 
 This strategy balances performance (native rendering) with development speed (TypeScript logic).
 
@@ -137,7 +138,7 @@ Core never directly manages renderer state. If core needs to affect renderer sta
 
 #### CONSTRAINT P-7: FFI Is an Implementation Detail, Not a Requirement
 
-The TypeScript ↔ Native boundary must be designed so that:
+The TypeScript to Native boundary must be designed so that:
 
 1. **FFI is preferred but not required**
    - Desktop: Use FFI (TypeScript calls C++ via FFI)
@@ -206,7 +207,7 @@ Since this is a learning project, we will transition gradually into native code:
 
 **Why This Timeline:**
 
-- **Learning**: Gradual transition allows learning each piece (TS → FFI → C++) incrementally
+- **Learning**: Gradual transition allows learning each piece (TS to FFI to C++) incrementally
 - **Validation**: FFI bridge validates that interfaces work correctly before committing to C++ port
 - **Risk Mitigation**: Architecture is proven before investing in full C++ conversion
 - **Flexibility**: Can ship desktop with FFI while console port is still future work
@@ -218,7 +219,7 @@ Console porting is explicitly a **future consideration**, not a requirement for 
 
 - **FFI-Friendly Interfaces**: Makes it possible to call C++ from TypeScript without complex bindings
 - **Serializable Data**: Ensures data can cross language boundaries safely
-- **Core Isolation**: Protects portability — core works on any platform
+- **Core Isolation**: Protects portability. E.g. core works on any platform
 - **Backend Mesh Creation**: Allows native optimizations (e.g., instancing, batching) without core changes
 - **No Memory Assumptions**: Works with garbage-collected TypeScript and manual C++ memory
 - **Encapsulated State**: Prevents core from depending on renderer implementation details
@@ -231,7 +232,7 @@ platforms/native/
 ├─ nativeRenderer.cpp      # C++ OpenGL/Vulkan renderer
 ├─ nativeRenderer.h        # Renderer interface (C-compatible)
 ├─ nativeBootstrap.cpp     # Platform initialization
-├─ ffiBridge.ts            # TypeScript ↔ C++ bridge
+├─ ffiBridge.ts            # TypeScript to C++ bridge
 └─ nativeInput.cpp         # Native input handling (future)
 ```
 
@@ -246,10 +247,10 @@ The greatest danger with the TypeScript + Native hybrid approach is letting the 
 
 These patterns indicate the boundary has been violated:
 
-- **TS starts doing collision checks** — collision should be native
-- **TS starts iterating entity arrays every frame** — entity management should be native
-- **TS starts managing transforms directly** — transform updates should be native
-- **TS owns too much temporal logic** — animation/physics should be native
+- **TS starts doing collision checks** - collision should be native
+- **TS starts iterating entity arrays every frame** - entity management should be native
+- **TS starts managing transforms directly** - transform updates should be native
+- **TS owns too much temporal logic** - animation/physics should be native
 
 If TypeScript is doing these things, performance will suffer and the architecture has regressed.
 
@@ -257,16 +258,16 @@ If TypeScript is doing these things, performance will suffer and the architectur
 
 **The Rule:**
 
-- **TypeScript requests** — "Move this entity", "Play this animation", "Check this collision"
-- **Native decides** — Native code performs the work, manages state, handles optimization
-- **TypeScript reacts** — TS receives results/events and makes gameplay decisions
+- **TypeScript requests** - "Move this entity", "Play this animation", "Check this collision"
+- **Native decides** - Native code performs the work, manages state, handles optimization
+- **TypeScript reacts** - TS receives results/events and makes gameplay decisions
 
 TypeScript is the decision-maker, not the executor. Native is the executor, not the decision-maker.
 
 #### Boundary Call Costs & Mitigations
 
 **The Problem:**
-Every call across the TypeScript ↔ Native boundary has a cost:
+Every call across the TypeScript to Native boundary has a cost:
 
 - `player.move(vec)` crossing into native code incurs marshalling overhead
 - Chatty APIs (many small calls) are expensive
@@ -297,16 +298,16 @@ Calling TypeScript every frame for everything is unnecessary and expensive. Diff
 
 ##### Separate Update Rates
 
-- **Rendering**: 60–120 Hz (native, no TS calls per frame)
-- **Gameplay logic**: 30–60 Hz (TS decision-making)
-- **AI / systems**: 10–20 Hz (TS high-level decisions)
+- **Rendering**: 60-120 Hz (native, no TS calls per frame)
+- **Gameplay logic**: 30-60 Hz (TS decision-making)
+- **AI / systems**: 10-20 Hz (TS high-level decisions)
 - **Event-driven scripting**: On-demand (TS reacts to events)
 
 **Implementation:**
 
 - Native renderer runs at display refresh rate independently
-- TypeScript game loop runs at fixed timestep (30–60 Hz)
-- AI systems tick at lower rates (10–20 Hz)
+- TypeScript game loop runs at fixed timestep (30-60 Hz)
+- AI systems tick at lower rates (10-20 Hz)
 - Events trigger TS callbacks as needed, not every frame
 
 #### Allocation Pressure
@@ -345,7 +346,7 @@ JavaScript engines are fast, but garbage collection still exists. Per-frame allo
 - Quest logic
 - Combat rules
 - Animation state selection (which animation, not how to play it)
-- Input interpretation (hardware → intent)
+- Input interpretation (hardware to intent)
 - Event orchestration
 
 **Native Responsibilities (Must):**
