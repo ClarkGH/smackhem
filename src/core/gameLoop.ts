@@ -138,9 +138,7 @@ export class GameLoop {
      */
 
     // Pre-allocated lighting calculation objects
-    private readonly lightColor: Vec3 = { x: 0, y: 0, z: 0 }; // TODO: Review. Sun light color?
-
-    private readonly lightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // TODO: Review. Sun light direction?
+    private readonly lightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // Direction from surface toward the sun
 
     private readonly sunAzimuth = { value: 0 }; // For spherical coordinate calculations
 
@@ -366,52 +364,6 @@ export class GameLoop {
         this.sphericalToDirection(azimuth.value, elevation.value, out);
     }
 
-    // PERFORMANCE: Writes into existing object to avoid allocation
-    private computeLightColor(
-        timeOfDay: number,
-        elevation: number,
-        out: Vec3,
-    ): void {
-        const sunVisibility = this.computeSunVisibility(timeOfDay);
-        const moonVisibility = this.computeMoonVisibility(timeOfDay);
-
-        // Compute sun color (elevation-based: white at zenith, red/orange at horizon)
-        const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
-        const t = normalizedElev;
-        let smoothT = 0;
-        if (t <= 0) {
-            smoothT = 0;
-        } else if (t >= 1) {
-            smoothT = 1;
-        } else {
-            smoothT = t * t * (3 - 2 * t); // Smoothstep function
-        }
-
-        const sunColorX = 0.8 + 0.2 * smoothT; // Red component: 1.0 at zenith, 0.8 at horizon
-        const sunColorY = 0.7 + 0.3 * smoothT; // Green component: 1.0 at zenith, 0.7 at horizon
-        const sunColorZ = 0.5 + 0.5 * smoothT; // Blue component: 1.0 at zenith, 0.5 at horizon (warmer)
-
-        // Moon color (cool blue)
-        const moonColorX = this.MOON_COLOR.x;
-        const moonColorY = this.MOON_COLOR.y;
-        const moonColorZ = this.MOON_COLOR.z;
-
-        // Blend between sun and moon colors based on visibility
-        const totalVisibility = sunVisibility + moonVisibility;
-        if (totalVisibility > 0) {
-            const sunWeight = sunVisibility / totalVisibility;
-            const moonWeight = moonVisibility / totalVisibility;
-            out.x = sunColorX * sunWeight + moonColorX * moonWeight;
-            out.y = sunColorY * sunWeight + moonColorY * moonWeight;
-            out.z = sunColorZ * sunWeight + moonColorZ * moonWeight;
-        } else {
-            // Fallback to moon color if no visibility
-            out.x = moonColorX;
-            out.y = moonColorY;
-            out.z = moonColorZ;
-        }
-    }
-
     // PERFORMANCE: Pure function, no allocations
     private computeAmbientIntensity(elevation: number): number {
         // Normalize elevation from [-1, 1] to [0, 1]
@@ -433,16 +385,15 @@ export class GameLoop {
     }
 
     // PERFORMANCE: Pure function, no allocations
-    private computeSunVisibility(timeOfDay: number): number {
-        const dayCenter = 0.5; // Noon is center of day
-        const dayWidth = 0.5; // Day spans 0.25 to 0.75 (half the cycle)
-        const dist = Math.abs(timeOfDay - dayCenter) * 2; // Distance from center, scaled
-        return Math.max(0, 1 - (dist / dayWidth)); // Fade from 1 at center to 0 at edges
-    }
-
-    // PERFORMANCE: Pure function, no allocations
-    private computeMoonVisibility(timeOfDay: number): number {
-        return 1 - this.computeSunVisibility(timeOfDay);
+    // Replaces computeSunVisibility/computeMoonVisibility. Each body's visibility now
+    // depends only on ITS OWN elevation, fading smoothly through the horizon band
+    // instead of being derived from the other body's time-of-day triangle. This is
+    // what lets the sun and moon fade independently and in sync with where they're
+    // actually drawn, instead of one snapping to full/zero based on the other.
+    private computeCelestialVisibility(elevation: number): number {
+        const FADE_BAND = 0.15; // how far above/below the horizon the fade extends
+        const t = Math.max(0, Math.min(1, (elevation + FADE_BAND) / (2 * FADE_BAND)));
+        return t * t * (3 - 2 * t); // smoothstep: no fade at the horizon, smooth ends
     }
 
     // PERFORMANCE: Writes into existing object to avoid allocation (complies with RULE M-1)
@@ -730,22 +681,32 @@ export class GameLoop {
 
             this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);
             this.computeSunDirection(timeOfDay, this.lightDirection);
-            this.computeLightColor(timeOfDay, this.sunElevation.value, this.lightColor);
 
             const ambientIntensity = this.computeAmbientIntensity(this.sunElevation.value);
             const moonAzimuth = { value: this.sunAzimuth.value + Math.PI };
             const moonElevation = { value: -this.sunElevation.value };
             this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
 
-            const sunVisibility = this.computeSunVisibility(timeOfDay);
-            const moonVisibility = this.computeMoonVisibility(timeOfDay);
-            const activeLightDirection = moonVisibility > sunVisibility ? this.moonLightDirection : this.lightDirection;
+            // Each body's visibility now comes from ITS OWN elevation, not the other
+            // body's time-of-day triangle - see computeCelestialVisibility for why.
+            const sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
+            const moonVisibility = this.computeCelestialVisibility(moonElevation.value);
 
-            if (this.renderer.setLightDirection) {
-                this.renderer.setLightDirection(activeLightDirection);
-            }
-            if (this.renderer.setLightColor) {
-                this.renderer.setLightColor(this.lightColor);
+            this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
+            this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
+            this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
+
+            this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
+            this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
+            this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
+
+            // Both bodies light the scene at once (weighted by their own visibility) -
+            // no more picking one direction and discarding the other.
+            if (this.renderer.setCelestialLighting) {
+                this.renderer.setCelestialLighting(
+                    { direction: this.lightDirection, color: this.sunColorWithVisibility },
+                    { direction: this.moonLightDirection, color: this.moonColorWithVisibility },
+                );
             }
             if (this.renderer.setAmbientIntensity) {
                 this.renderer.setAmbientIntensity(ambientIntensity);
@@ -776,19 +737,11 @@ export class GameLoop {
             this.computeCelestialTransform(this.moonPosition, this.MOON_SIZE, this.moonTransform);
 
             if (sunVisibility > 0) {
-                this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
-                this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
-                this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
-
                 matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
                 this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
             }
 
             if (moonVisibility > 0) {
-                this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
-                this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
-                this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
-
                 matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
                 this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
             }
@@ -878,22 +831,32 @@ export class GameLoop {
 
         this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);
         this.computeSunDirection(timeOfDay, this.lightDirection);
-        this.computeLightColor(timeOfDay, this.sunElevation.value, this.lightColor);
 
         const ambientIntensity = this.computeAmbientIntensity(this.sunElevation.value);
         const moonAzimuth = { value: this.sunAzimuth.value + Math.PI };
         const moonElevation = { value: -this.sunElevation.value };
         this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
 
-        const sunVisibility = this.computeSunVisibility(timeOfDay);
-        const moonVisibility = this.computeMoonVisibility(timeOfDay);
-        const activeLightDirection = moonVisibility > sunVisibility ? this.moonLightDirection : this.lightDirection;
+        // Each body's visibility now comes from ITS OWN elevation, not the other
+        // body's time-of-day triangle - see computeCelestialVisibility for why.
+        const sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
+        const moonVisibility = this.computeCelestialVisibility(moonElevation.value);
 
-        if (this.renderer.setLightDirection) {
-            this.renderer.setLightDirection(activeLightDirection);
-        }
-        if (this.renderer.setLightColor) {
-            this.renderer.setLightColor(this.lightColor);
+        this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
+        this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
+        this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
+
+        this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
+        this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
+        this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
+
+        // Both bodies light the scene at once (weighted by their own visibility) -
+        // no more picking one direction and discarding the other.
+        if (this.renderer.setCelestialLighting) {
+            this.renderer.setCelestialLighting(
+                { direction: this.lightDirection, color: this.sunColorWithVisibility },
+                { direction: this.moonLightDirection, color: this.moonColorWithVisibility },
+            );
         }
         if (this.renderer.setAmbientIntensity) {
             this.renderer.setAmbientIntensity(ambientIntensity);
@@ -924,19 +887,11 @@ export class GameLoop {
         this.computeCelestialTransform(this.moonPosition, this.MOON_SIZE, this.moonTransform);
 
         if (sunVisibility > 0) {
-            this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
-            this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
-            this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
-
             matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
             this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
         }
 
         if (moonVisibility > 0) {
-            this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
-            this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
-            this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
-
             matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
             this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
         }

@@ -24,6 +24,10 @@ export interface Renderer {
     setLightDirection?(_direction: Vec3): void;
     setLightColor?(_color: Vec3): void;
     setAmbientIntensity?(_intensity: number): void;
+    setCelestialLighting?(
+        _sun: { direction: Vec3; color: Vec3 },
+        _moon: { direction: Vec3; color: Vec3 },
+    ): void;
     loadTexture(_assetId: string): Promise<TextureHandle>;
     drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number): void;
     clear?(_r: number, _g: number, _b: number, _a: number): void;

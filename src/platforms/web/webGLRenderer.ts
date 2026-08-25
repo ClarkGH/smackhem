@@ -34,9 +34,13 @@ export default class WebGLRenderer implements Renderer {
 
     private quadVAO: WebGLVertexArrayObject | null = null;
 
-    private lightDirection: Vec3 = { x: -1, y: 0, z: 0 };
+    private sunDirection: Vec3 = { x: -1, y: 0, z: 0 };
 
-    private lightColor: Vec3 = { x: 1, y: 1, z: 1 };
+    private sunColor: Vec3 = { x: 0, y: 0, z: 0 };
+
+    private moonDirection: Vec3 = { x: 1, y: 0, z: 0 };
+
+    private moonColor: Vec3 = { x: 0, y: 0, z: 0 };
 
     private ambientIntensity: number = 0.3;
 
@@ -44,15 +48,19 @@ export default class WebGLRenderer implements Renderer {
         color: WebGLUniformLocation | null;
         transform: WebGLUniformLocation | null;
         normalMatrix: WebGLUniformLocation | null;
-        lightDirection: WebGLUniformLocation | null;
-        lightColor: WebGLUniformLocation | null;
+        sunDirection: WebGLUniformLocation | null;
+        sunColor: WebGLUniformLocation | null;
+        moonDirection: WebGLUniformLocation | null;
+        moonColor: WebGLUniformLocation | null;
         ambientIntensity: WebGLUniformLocation | null;
     } = {
             color: null,
             transform: null,
             normalMatrix: null,
-            lightDirection: null,
-            lightColor: null,
+            sunDirection: null,
+            sunColor: null,
+            moonDirection: null,
+            moonColor: null,
             ambientIntensity: null,
         };
 
@@ -106,8 +114,10 @@ export default class WebGLRenderer implements Renderer {
             precision mediump float;
             
             uniform vec3 u_color;
-            uniform vec3 u_lightDirection;
-            uniform vec3 u_lightColor;
+            uniform vec3 u_sunDirection;
+            uniform vec3 u_sunColor;
+            uniform vec3 u_moonDirection;
+            uniform vec3 u_moonColor;
             uniform float u_ambientIntensity;
             
             in vec3 v_normal;
@@ -116,19 +126,18 @@ export default class WebGLRenderer implements Renderer {
             out vec4 fragColor;
             
             void main() {
-                // Normalize light direction (should be normalized on CPU, but safety check)
-                // u_lightDirection points FROM light source TOWARD surface
-                vec3 lightDir = normalize(u_lightDirection);
+                // Both directions point FROM the surface TOWARD the respective body.
+                // u_sunColor / u_moonColor already have that body's own visibility
+                // (elevation-based fade) baked in on the CPU side, so a body below
+                // the horizon contributes (0,0,0) here with no branching needed.
+                vec3 sunDir = normalize(u_sunDirection);
+                vec3 moonDir = normalize(u_moonDirection);
                 
-                // Calculate diffuse lighting (Lambertian)
-                // Dot product with normal gives how aligned the surface is with light direction
-                float diff = max(dot(v_normal, lightDir), 0.0);
+                float sunDiff = max(dot(v_normal, sunDir), 0.0);
+                float moonDiff = max(dot(v_normal, moonDir), 0.0);
                 
-                // Combine ambient and diffuse
-                float lighting = u_ambientIntensity + diff * (1.0 - u_ambientIntensity);
-                
-                // Apply lighting to base color (grayscale)
-                vec3 finalColor = u_color * u_lightColor * lighting;
+                vec3 diffuse = sunDiff * u_sunColor + moonDiff * u_moonColor;
+                vec3 finalColor = u_color * (u_ambientIntensity + diffuse);
                 
                 fragColor = vec4(finalColor, 1.0);
             }
@@ -151,8 +160,10 @@ export default class WebGLRenderer implements Renderer {
             color: this.gl.getUniformLocation(this.program, 'u_color'),
             transform: this.gl.getUniformLocation(this.program, 'u_transform'),
             normalMatrix: this.gl.getUniformLocation(this.program, 'u_normalMatrix'),
-            lightDirection: this.gl.getUniformLocation(this.program, 'u_lightDirection'),
-            lightColor: this.gl.getUniformLocation(this.program, 'u_lightColor'),
+            sunDirection: this.gl.getUniformLocation(this.program, 'u_sunDirection'),
+            sunColor: this.gl.getUniformLocation(this.program, 'u_sunColor'),
+            moonDirection: this.gl.getUniformLocation(this.program, 'u_moonDirection'),
+            moonColor: this.gl.getUniformLocation(this.program, 'u_moonColor'),
             ambientIntensity: this.gl.getUniformLocation(this.program, 'u_ambientIntensity'),
         };
     }
@@ -537,23 +548,41 @@ export default class WebGLRenderer implements Renderer {
             this.gl.uniformMatrix4fv(this.uniformLocations.normalMatrix, false, this.identityMatrix.elements);
         }
 
-        // Set lighting uniforms (light direction is in world space, matching normals)
+        // Set lighting uniforms (directions are in world space, matching normals)
         // Using cached locations
-        if (this.uniformLocations.lightDirection) {
+        if (this.uniformLocations.sunDirection) {
             this.gl.uniform3f(
-                this.uniformLocations.lightDirection,
-                this.lightDirection.x,
-                this.lightDirection.y,
-                this.lightDirection.z,
+                this.uniformLocations.sunDirection,
+                this.sunDirection.x,
+                this.sunDirection.y,
+                this.sunDirection.z,
             );
         }
 
-        if (this.uniformLocations.lightColor) {
+        if (this.uniformLocations.sunColor) {
             this.gl.uniform3f(
-                this.uniformLocations.lightColor,
-                this.lightColor.x,
-                this.lightColor.y,
-                this.lightColor.z,
+                this.uniformLocations.sunColor,
+                this.sunColor.x,
+                this.sunColor.y,
+                this.sunColor.z,
+            );
+        }
+
+        if (this.uniformLocations.moonDirection) {
+            this.gl.uniform3f(
+                this.uniformLocations.moonDirection,
+                this.moonDirection.x,
+                this.moonDirection.y,
+                this.moonDirection.z,
+            );
+        }
+
+        if (this.uniformLocations.moonColor) {
+            this.gl.uniform3f(
+                this.uniformLocations.moonColor,
+                this.moonColor.x,
+                this.moonColor.y,
+                this.moonColor.z,
             );
         }
 
@@ -581,16 +610,18 @@ export default class WebGLRenderer implements Renderer {
         this.wireframe = enabled;
     }
 
-    setLightDirection(direction: Vec3): void {
-        this.lightDirection = direction;
-    }
-
-    setLightColor(color: Vec3): void {
-        this.lightColor = color;
-    }
-
     setAmbientIntensity(intensity: number): void {
         this.ambientIntensity = intensity;
+    }
+
+    setCelestialLighting(
+        sun: { direction: Vec3; color: Vec3 },
+        moon: { direction: Vec3; color: Vec3 },
+    ): void {
+        this.sunDirection = sun.direction;
+        this.sunColor = sun.color;
+        this.moonDirection = moon.direction;
+        this.moonColor = moon.color;
     }
 
     private initTextureShaders(): void {
@@ -784,14 +815,18 @@ export default class WebGLRenderer implements Renderer {
         }
 
         // Set lighting uniforms
+        // NOTE: this textured-quad path only takes a single light, so it approximates
+        // with the sun. It won't pick up moonlight at night the way drawMesh's shader
+        // now does - fine for the current circleTexture sprite use case, but flag this
+        // if textured quads ever need to match world lighting exactly at night.
         const lightDirectionLoc = gl.getUniformLocation(this.textureProgram, 'u_lightDirection');
         if (lightDirectionLoc) {
-            gl.uniform3f(lightDirectionLoc, this.lightDirection.x, this.lightDirection.y, this.lightDirection.z);
+            gl.uniform3f(lightDirectionLoc, this.sunDirection.x, this.sunDirection.y, this.sunDirection.z);
         }
 
         const lightColorLoc = gl.getUniformLocation(this.textureProgram, 'u_lightColor');
         if (lightColorLoc) {
-            gl.uniform3f(lightColorLoc, this.lightColor.x, this.lightColor.y, this.lightColor.z);
+            gl.uniform3f(lightColorLoc, this.sunColor.x, this.sunColor.y, this.sunColor.z);
         }
 
         const ambientIntensityLoc = gl.getUniformLocation(this.textureProgram, 'u_ambientIntensity');
