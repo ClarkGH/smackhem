@@ -23,7 +23,10 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
    - Remembering mesh direction in lighting is a key lesson learned.
    - Shaders were mismatched with the way the vertices and faces were wrapping.
    - Debugging was difficult, cursor's debug mode was minutely helpful, but killed performance and my memory. Don't think I'll rely on it.
-3. WIP: Moon light is currently overpowering sunlight. Has something to do with ambience formulae.
+3. Moon light was snapping and "overpowering" sunlight.
+   - The issue came from me trying to treat two different light sources as a singular one.
+   - To fix we blended the colors and added a band to give the sunset and sunrise some depth
+   - Currently it looks like there are still some inversions here and there on sunset (closer to the sun setting is darker than further away, which is strange). Overally it's better than it was.
 4. Chunking. Seeded procedural generation being used first, before static files... was an incredibly helpful decision! I didn't make it, I think Gemini and ChatGPT did while I was researching and just ran with it. It made stubbing so much faster. If I make another engine I'll do it again.
 5. Sun and Moon. Moon and Sun confused me. I should not have built both at the same time while over-relying on cursor. It's a slippery slope. Removing the moon and slowly debugging just the sun after 2 days resolved the problem. As I recall, the moon just worked when I brought it back in.
 6. Proteus Rabbit-hole
