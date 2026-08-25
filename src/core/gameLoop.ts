@@ -218,8 +218,8 @@ export class GameLoop {
         this.sceneOrthoProj = identity();
 
         // Mesh objects
-        this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE, 16);
-        this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE, 16);
+        this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE * 10, 16);
+        this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE * 10, 16);
 
         // Instance system
         this.instance = createInstance();
@@ -700,8 +700,6 @@ export class GameLoop {
             this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
             this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
 
-            // Both bodies light the scene at once (weighted by their own visibility) -
-            // no more picking one direction and discarding the other.
             if (this.renderer.setCelestialLighting) {
                 this.renderer.setCelestialLighting(
                     { direction: this.lightDirection, color: this.sunColorWithVisibility },
