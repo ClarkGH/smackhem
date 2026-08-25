@@ -835,10 +835,9 @@ export class GameLoop {
         const ambientIntensity = this.computeAmbientIntensity(this.sunElevation.value);
         const moonAzimuth = { value: this.sunAzimuth.value + Math.PI };
         const moonElevation = { value: -this.sunElevation.value };
+
         this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
 
-        // Each body's visibility now comes from ITS OWN elevation, not the other
-        // body's time-of-day triangle - see computeCelestialVisibility for why.
         const sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
         const moonVisibility = this.computeCelestialVisibility(moonElevation.value);
 
@@ -850,8 +849,6 @@ export class GameLoop {
         this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
         this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
 
-        // Both bodies light the scene at once (weighted by their own visibility) -
-        // no more picking one direction and discarding the other.
         if (this.renderer.setCelestialLighting) {
             this.renderer.setCelestialLighting(
                 { direction: this.lightDirection, color: this.sunColorWithVisibility },

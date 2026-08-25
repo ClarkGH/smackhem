@@ -8,9 +8,10 @@ Geometric 3D/2D game engine wrapper
 
 - Using Github issues as tasks
 - I did and am using AI
-  - Cursor Pro
+  - Cursor Pro (Short moment)
   - Gemini
   - ChatGPT
+  - Claude
 - Design document is the bread and butter of this project. For me, everything becomes easier when I write a design doc and keep it up to date.
 
 As this is hosted publicly, it's a hobby project.

@@ -151,12 +151,12 @@ The lighting system supports a deterministic sun/moon cycle that rotates light d
    - Sun at top (noon), moon at bottom (midnight)
 
 2. **Light Color**: Visibility-based blending (sun and moon colors)
-   - Grayscale RGB values
-   - Blends between warm sun tones (white at zenith, red/orange at horizon) and cool moon tones (cool blue)
+   - Blended RGB values
+   - Blends between warm sun tones (bright at zenith, warm at horizon) with cool moon tones (bluish tones)
    - Uses sun/moon visibility to weight the blend
    - Sun color transitions from white (zenith) to red/orange (horizon) based on sun elevation
    - Smooth interpolation via smoothstep function
-   - Note: Currently stays in cool colors a bit more than ideal (to be fine-tuned)
+   - Note: Horizon-based warmth not added, yet (to be fine-tuned)
 
 3. **Ambient Intensity**: Elevation-based transitions
    - Varies from 0.1 (dark night) to 0.5 (bright day) based on sun elevation
@@ -218,45 +218,45 @@ sphericalToDirection(moonAzimuth, moonElevation, moonLightDirection);
 
 **Light Direction Selection:**
 
-The system selects between sun and moon light directions based on visibility:
+The system blends sun and moon light directions from the surface, based on their visibility:
 
 ```typescript
-const sunVisibility = computeSunVisibility(timeOfDay); // 1.0 at noon, 0.0 at night
-const moonVisibility = computeMoonVisibility(timeOfDay); // 1.0 at midnight, 0.0 at noon
-const activeLightDirection = moonVisibility > sunVisibility ? moonLightDirection : lightDirection;
+private computeCelestialVisibility(elevation: number): number {
+    const FADE_BAND = 0.15;
+    const t = Math.max(0, Math.min(1, (elevation + FADE_BAND) / (2 * FADE_BAND)));
+    return t * t * (3 - 2 * t);
+}
+
+const sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
+const moonVisibility = this.computeCelestialVisibility(moonElevation.value);
 ```
 
 **Light Color (Visibility-Based Blending):**
 
-Light color blends between sun and moon colors based on visibility:
+The bodies visibility comes from their own elevation as we utilize a fade band.
+
+The fade band is the distance the fade extends from the horizon:
 
 ```typescript
-const sunVisibility = computeSunVisibility(timeOfDay);
-const moonVisibility = computeMoonVisibility(timeOfDay);
+const sunVisibility = computeCelestialVisibility(timeOfDay);
+const moonVisibility = computeCelestialVisibility(timeOfDay);
 
-// Compute sun color (elevation-based: white at zenith, red/orange at horizon)
-const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
-const smoothT = normalizedElev * normalizedElev * (3 - 2 * normalizedElev); // Smoothstep
+this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
+            this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
+            this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
 
-const sunColor = {
-    x: 0.8 + 0.2 * smoothT, // 1.0 at zenith, 0.8 at horizon
-    y: 0.7 + 0.3 * smoothT, // 1.0 at zenith, 0.7 at horizon
-    z: 0.5 + 0.5 * smoothT  // 1.0 at zenith, 0.5 at horizon (warmer)
-};
+            this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
+            this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
+            this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
 
-// Moon color (cool blue)
-const moonColor = { x: 0.4, y: 0.6, z: 0.9 };
-
-// Blend based on visibility
-const totalVisibility = sunVisibility + moonVisibility;
-const sunWeight = sunVisibility / totalVisibility;
-const moonWeight = moonVisibility / totalVisibility;
-
-lightColor = {
-    x: sunColor.x * sunWeight + moonColor.x * moonWeight,
-    y: sunColor.y * sunWeight + moonColor.y * moonWeight,
-    z: sunColor.z * sunWeight + moonColor.z * moonWeight
-};
+            // Both bodies light the scene at once (weighted by their own visibility) -
+            // no more picking one direction and discarding the other.
+            if (this.renderer.setCelestialLighting) {
+                this.renderer.setCelestialLighting(
+                    { direction: this.lightDirection, color: this.sunColorWithVisibility },
+                    { direction: this.moonLightDirection, color: this.moonColorWithVisibility },
+                );
+            }
 ```
 
 Note: Currently stays in cool colors a bit more than ideal (to be fine-tuned).
