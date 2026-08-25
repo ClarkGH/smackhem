@@ -18,6 +18,14 @@ export default class NullRenderer implements Renderer {
 
     private ambientIntensity: number = 0.3;
 
+    private sunDirection: Vec3 = { x: -1, y: 0, z: 0 };
+
+    private sunColor: Vec3 = { x: 0, y: 0, z: 0 };
+
+    private moonDirection: Vec3 = { x: 1, y: 0, z: 0 };
+
+    private moonColor: Vec3 = { x: 0, y: 0, z: 0 };
+
     private wireframeEnabled = false;
 
     private frameCount = 0;
@@ -92,6 +100,15 @@ export default class NullRenderer implements Renderer {
         this.ambientIntensity = _intensity;
     }
 
+    setCelestialLighting(
+        _sun: { direction: Vec3; color: Vec3 },
+        _moon: { direction: Vec3; color: Vec3 },
+    ): void {
+        this.sunDirection = _sun.direction;
+        this.sunColor = _sun.color;
+        this.moonDirection = _moon.direction;
+        this.moonColor = _moon.color;
+    }
     // Stub-specific utility methods for testing
     getFrameCount(): number {
         return this.frameCount;
@@ -111,6 +128,16 @@ export default class NullRenderer implements Renderer {
             color: { ...this.lightColor },
             ambient: this.ambientIntensity,
         };
+    }
+
+    getCelestialLightingState(): { ambientIntensity: number, sunDirection: Vec3, sunColor: Vec3, moonDirection: Vec3, moonColor: Vec3} {
+        return {
+            ambientIntensity: this.ambientIntensity,
+            sunDirection: { ...this.sunDirection },
+            sunColor: { ...this.sunColor },
+            moonDirection: { ...this.moonDirection },
+            moonColor: { ...this.moonColor }
+        }
     }
 
     reset(): void {

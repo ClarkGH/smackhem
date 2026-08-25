@@ -67,7 +67,7 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
         expect(renderer.getTextureCount()).toBe(2);
     });
 
-    it('supports optional lighting methods', () => {
+    it('supports singular lighting methods', () => {
         const direction = { x: 0.5, y: 0.5, z: -0.5 };
         const color = { x: 0.8, y: 0.9, z: 1.0 };
 
@@ -80,8 +80,28 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
         const state = renderer.getLightingState();
         expect(state.direction.x).toBe(direction.x);
         expect(state.direction.y).toBe(direction.y);
+        expect(state.direction.z).toBe(direction.z);
         expect(state.color.x).toBe(color.x);
         expect(state.ambient).toBe(0.4);
+    });
+
+    it('supports sun and moon lighting', () => {
+        const direction = { x: 0.5, y: 0.5, z: -0.5 };
+        const color = { x: 0.8, y: 0.9, z: 1.0 };
+        const sun = {direction, color}
+        const moon = {direction, color}     
+        
+        expect(() => {
+            renderer.setCelestialLighting?.(sun, moon);
+        }).not.toThrow();
+
+        const state = renderer.getCelestialLightingState();
+
+        expect(state.ambientIntensity).toBe(0.3);
+        expect(state.sunDirection).toEqual(direction);
+        expect(state.sunColor).toEqual(color);
+        expect(state.moonColor).toEqual(color);
+        expect(state.moonDirection).toEqual(direction);
     });
 
     it('tracks frame rendering', () => {
