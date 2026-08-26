@@ -61,6 +61,6 @@ Minimalism is key, following YAGNI principles.
 - Install dependencies (node/pnpm)
 - `$ pnpm install && pnpm build && pnpm vite`
 - Debug and run via browser
-- You'll see an empty plane with the moon/sun
-  - I've cut publicly testable pieces after reaching a certain point
-  - To add collision/field objects, create chunk JSON files in `public/chunks/`. See [Data Formats](docs/data-formats.md) for chunk file format and naming conventions.
+- There are assets not included
+  - To add collision/field objects, create chunk JSON files in `public/chunks/`. See [Data Formats](docs/data-formats.md) for chunk file format and naming conventions
+  - To add the missing `circle-sleep00.png` asset, add whatever png you want into `public/images` and rename it to match
