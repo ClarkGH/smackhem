@@ -95,7 +95,7 @@ export class GameLoop {
 
     private savedCameraState: { position: Vec3; yaw: number; pitch: number } | null = null;
 
-    private circleTexture: TextureHandle | null = null;
+    private partyMemberTexture1: TextureHandle | null = null;
 
     // Core objects
     private camera: Camera;
@@ -229,13 +229,14 @@ export class GameLoop {
         this.scene = createScene();
         this.sceneCharacter = createSceneCharacter({ x: 12, y: 9 }); // center of grid
 
-        // Load circle texture asynchronously
-        this.loadCircleTexture();
+        // Load party textures asynchronously
+        this.loadPartyTextures();
     }
 
-    private async loadCircleTexture(): Promise<void> {
+    // TODO: Load 4 different shapes that match from a list of choices.
+    private async loadPartyTextures(): Promise<void> {
         try {
-            this.circleTexture = await this.renderer.loadTexture('circle-sleep00');
+            this.partyMemberTexture1 = await this.renderer.loadTexture('circle-sleep00');
         } catch (error) {
             console.error('Failed to load circle texture:', error);
         }
@@ -775,7 +776,7 @@ export class GameLoop {
             }
 
             // 3. Render scene sprite (2D screen-space)
-            if (this.circleTexture) {
+            if (this.partyMemberTexture1) {
                 // positionPx is already in pixel coordinates (0-799, 0-599)
                 const spriteSize = SCENE_TILE_SIZE; // 32x32 pixels
                 const posX = this.sceneCharacter.positionPx.x;
@@ -794,7 +795,7 @@ export class GameLoop {
 
                 // Multiply projection * model into meshMVP (reuse existing matrix)
                 matrixMultiplyInto(this.sceneOrthoProj, this.sceneSpriteTransform, this.meshMVP);
-                this.renderer.drawTexturedQuad(this.circleTexture, this.meshMVP, spriteSize);
+                this.renderer.drawTexturedQuad(this.partyMemberTexture1, this.meshMVP, spriteSize);
             }
 
             // 4. Render debug HUD (if visible, same as normal)
@@ -897,9 +898,9 @@ export class GameLoop {
             this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
         });
 
-        // Render circle character when paused and active/transitioning
+        // Render lead party member when paused and active/transitioning
         if (this.isPaused && (this.instance.isTransitioning || this.instance.isActive)) {
-            if (this.circleTexture) {
+            if (this.partyMemberTexture1) {
                 // Calculate transform for circle (billboard at character position)
                 const pos = this.instanceCharacter.position;
                 const circleSize = 0.5; // Small size as specified
@@ -940,7 +941,7 @@ export class GameLoop {
                 // Multiply by view-projection matrix (use meshMVP as temporary, already rendered world meshes)
                 matrixMultiplyInto(viewProj, this.circleTransform, this.meshMVP);
                 // Render textured quad (no camera position needed - billboard calculated on CPU)
-                this.renderer.drawTexturedQuad(this.circleTexture, this.meshMVP, 1.0, toCamera);
+                this.renderer.drawTexturedQuad(this.partyMemberTexture1, this.meshMVP, 1.0, toCamera);
             }
             // Texture not loaded yet - could render placeholder here if needed
         }

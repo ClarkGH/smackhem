@@ -741,7 +741,7 @@ export default class WebGLRenderer implements Renderer {
         // Map asset ID to file path (backend-specific)
         // For now, assume asset ID is the filename without extension
         // Vite serves files from src/ at root, so use absolute path
-        const path = `/${assetId}.png`;
+        const path = `assets/images/${assetId}.png`;
 
         // Load image
         const response = await fetch(path);
