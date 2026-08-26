@@ -254,45 +254,28 @@ export class GameLoop {
         this.instance.transitionProgress = 0.0;
         this.instance.isActive = false;
 
-        // Calculate start and end positions for circle
         this.calculateTransitionPositions();
 
-        // Initialize character position to start position (so it's visible from the beginning)
         this.instanceCharacter.position.x = this.transitionStartPos.x;
         this.instanceCharacter.position.y = this.transitionStartPos.y;
         this.instanceCharacter.position.z = this.transitionStartPos.z;
     }
 
     private unpause(): void {
-        // Start reverse transition
         this.instance.isTransitioning = true;
-        this.instance.transitionDirection = -1.0; // Reverse
-        this.instance.transitionProgress = 1.0; // Start from end position (where we are now)
-        // Don't restore camera pitch - leave it at 0 degrees
+        this.instance.transitionDirection = -1.0;
+        this.instance.transitionProgress = 1.0;
 
-        // For reverse transition, go from current position (forward) back to camera position
-        // Lerp: position = startPos + (endPos - startPos) * t
-        // Since progress goes 1.0 → 0.0 (and t = smoothstep(progress)):
-        // - When progress=1.0: t=1.0, position=endPos (we want current forward position)
-        // - When progress=0.0: t=0.0, position=startPos (we want camera position)
-        // Therefore: endPos = current position (forward), startPos = camera position
-
-        // Set end to current position (where circle is now, forward from camera)
-        // This is where we START the reverse transition
         this.transitionEndPos.x = this.instanceCharacter.position.x;
         this.transitionEndPos.y = this.instanceCharacter.position.y;
         this.transitionEndPos.z = this.instanceCharacter.position.z;
 
-        // Set start to camera position (where we want to end up)
-        // This is where we END the reverse transition
         const circleSize = 0.5;
         const floorY = circleSize / 2;
+
         this.transitionStartPos.x = this.camera.position.x;
         this.transitionStartPos.y = floorY;
         this.transitionStartPos.z = this.camera.position.z;
-
-        // After reverse transition completes, unpause will happen in updateSimulation
-        // Keep isPaused = true until transition completes
     }
 
     private calculateTransitionPositions(): void {
@@ -429,7 +412,7 @@ export class GameLoop {
         // Handle scene entry/exit (interact key)
         if (intent.interact) {
             if (this.gameMode === 'world_3d') {
-                // Entry: world_3d → scene_2d
+                // Enter scene_2d
                 // Save camera state
                 this.savedCameraState = {
                     position: { ...this.camera.position },
@@ -449,7 +432,7 @@ export class GameLoop {
                 this.scene.transitionProgress = 0.0;
                 this.scene.isActive = false;
             } else if (this.gameMode === 'scene_2d') {
-                // Exit: scene_2d → world_3d
+                // Exit to world_3d
                 // Restore camera state
                 if (this.savedCameraState) {
                     this.camera.position.x = this.savedCameraState.position.x;
@@ -469,7 +452,7 @@ export class GameLoop {
             }
         }
 
-        // Handle pause toggle (only in world_3d mode)
+        // Handle pause toggle
         if (intent.pause && this.gameMode === 'world_3d') {
             if (this.isPaused) {
                 this.unpause();
