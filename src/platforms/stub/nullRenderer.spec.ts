@@ -119,6 +119,7 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
         const texture = await renderer.loadTexture('valid');
         const identityMatrix = identity();
         expect(() => renderer.drawTexturedQuad(texture, identityMatrix, 1.0)).not.toThrow();
+        expect(() => renderer.drawTexturedQuad(texture, identityMatrix, 1.0, {x: 0, y: 1, z: 0})).not.toThrow();
 
         const invalidTexture = { id: 'invalid-handle' };
         expect(() => renderer.drawTexturedQuad(invalidTexture, identityMatrix, 1.0))

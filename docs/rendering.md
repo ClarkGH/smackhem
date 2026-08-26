@@ -20,7 +20,7 @@
 - [2D Sprite Rendering (Instance Characters)](#2d-sprite-rendering-instance-characters)
   - [Renderer Interface Extension](#renderer-interface-extension-1)
   - [Implementation Details](#implementation-details)
-  - [Sprite Lighting (In Progress)](#sprite-lighting-in-progress)
+  - [Sprite Lighting](#sprite-lighting)
   - [Architecture](#architecture-1)
 - [Key Rule: gl.* never leaks upward](#key-rule-gl-never-leaks-upward)
 - [Navigation](#navigation)
@@ -328,7 +328,7 @@ The renderer supports 2D sprite rendering for instance characters (party members
 interface Renderer {
     // ... existing methods ...
     loadTexture(_assetId: string): Promise<TextureHandle>;
-    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number): void;
+    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number, _normal?: Vec3): void;
 }
 ```
 
@@ -341,19 +341,43 @@ interface Renderer {
 - **Positioning**: Sprites use 3D world positions (typically on floor plane, Y=0)
 - **Quad Geometry**: Unit quad on XZ plane (Y=0), scaled by size parameter
 
-### Sprite Lighting (In Progress)
+### Sprite Lighting
 
-**Current Status:**
+- Sprites are quads/billboards that are facing the camera directly. To light them correctly, the location they face from the camera needs to be drawn and normalized with the lighting.-
 
-- Sprites currently receive basic lighting (ambient + diffuse) using the same lighting parameters as world geometry
-- Lighting is applied in the texture fragment shader using a fixed vertical normal (0, 1, 0)
-- **Issue**: Sprites appear the same color as the floor plane because they use the same lighting calculation
+```typescript
+const toCamera = {
+    x: this.camera.position.x - pos.x,
+    y: 0,
+    z: this.camera.position.z - pos.z,
+};
+// ...normalized...
+const right = { x: -toCamera.z, y: 0, z: toCamera.x };
+const up = { x: 0, y: 1, z: 0 };
+```
+We draw them directly inside the shader to allow for redraws on the normalization.
+```typescript
+uniform vec3 u_normal;
+...
+void main() {
+    ...
+    vec3 normal = normalize(u_normal);
+    ...
+}
+```
 
-**Planned Enhancement:**
+The renderer will default to up or accept a normal param.
+```typescript
+drawTexturedQuad(texture: TextureHandle, transform: Mat4, size: number, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
+    ...
+    const normalLoc = gl.getUniformLocation(this.textureProgram, 'u_normal');
+    if (normalLoc) {
+        gl.uniform3f(normalLoc, normal.x, normal.y, normal.z);
+    }
+}
+```
 
-- Implement faux directional lighting specific to 2D sprites
-- May use different lighting calculations or sprite-specific shading to make characters stand out from the environment
-- Goal: Sprites should have visual distinction from the flat floor plane while still responding to the day/night cycle
+There are some coloring issues. These will be fine tuned for pre-alpha.
 
 ### Architecture
 

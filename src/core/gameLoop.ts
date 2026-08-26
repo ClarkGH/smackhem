@@ -940,7 +940,7 @@ export class GameLoop {
                 // Multiply by view-projection matrix (use meshMVP as temporary, already rendered world meshes)
                 matrixMultiplyInto(viewProj, this.circleTransform, this.meshMVP);
                 // Render textured quad (no camera position needed - billboard calculated on CPU)
-                this.renderer.drawTexturedQuad(this.circleTexture, this.meshMVP, 1.0);
+                this.renderer.drawTexturedQuad(this.circleTexture, this.meshMVP, 1.0, toCamera);
             }
             // Texture not loaded yet - could render placeholder here if needed
         }

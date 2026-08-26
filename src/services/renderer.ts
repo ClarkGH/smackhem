@@ -29,7 +29,7 @@ export interface Renderer {
         _moon: { direction: Vec3; color: Vec3 },
     ): void;
     loadTexture(_assetId: string): Promise<TextureHandle>;
-    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number): void;
+    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number, _normal?: Vec3): void;
     clear?(_r: number, _g: number, _b: number, _a: number): void;
     getViewportWidth?(): number;
     getViewportHeight?(): number;

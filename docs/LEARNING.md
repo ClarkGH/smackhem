@@ -27,7 +27,7 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
    - The issue came from me trying to treat two different light sources as a singular one.
    - To fix we blended the colors and added a band to give the sunset and sunrise some depth
    - Currently it looks like there are still some inversions here and there on sunset (closer to the sun setting is darker than further away, which is strange). Overall it's better than it was.
-   - 2D lighting had a different issue. The sprite has been updated to change color based on time of day. Same light pattern we used for blending with the meshes.
+   - 2D lighting had a different issue. The sprite has been updated to change color based on time of day. Same light pattern we used for blending with the meshes. Since the quad is standing upright and facing us, and not straight down like the plane, we needed the normalized vector in the drawn quad.
 4. Chunking. Seeded procedural generation being used first, before static files... was an incredibly helpful decision! I didn't make it, I think Gemini and ChatGPT did while I was researching and just ran with it. It made stubbing so much faster. If I make another engine I'll do it again.
 5. Sun and Moon. Moon and Sun confused me. I should not have built both at the same time while over-relying on cursor. It's a slippery slope. Removing the moon and slowly debugging just the sun after 2 days resolved the problem. As I recall, the moon just worked when I brought it back in.
 6. Proteus Rabbit-hole

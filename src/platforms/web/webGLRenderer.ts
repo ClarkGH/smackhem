@@ -648,11 +648,12 @@ export default class WebGLRenderer implements Renderer {
             precision mediump float;
             
             uniform sampler2D u_texture;
-            uniform vec3 u_sunDirection;
-            uniform vec3 u_sunColor;
-            uniform vec3 u_moonDirection;
-            uniform vec3 u_moonColor;
             uniform float u_ambientIntensity;
+            uniform vec3 u_normal;
+            uniform vec3 u_moonColor;
+            uniform vec3 u_moonDirection;
+            uniform vec3 u_sunColor;
+            uniform vec3 u_sunDirection;
             
             in vec2 v_texCoord;
             
@@ -663,7 +664,7 @@ export default class WebGLRenderer implements Renderer {
             vec3 textureColor = textureSample.rgb;
             float textureAlpha = textureSample.a;
 
-            vec3 normal = vec3(0, 1, 0); // Fixed vertical normal for billboard
+            vec3 normal = normalize(u_normal); // Fixed vertical normal for billboard
             vec3 sunDir = normalize(u_sunDirection);
             vec3 moonDir = normalize(u_moonDirection);
 
@@ -792,7 +793,7 @@ export default class WebGLRenderer implements Renderer {
     }
 
     // eslint-disable-next-line no-unused-vars
-    drawTexturedQuad(texture: TextureHandle, transform: Mat4, _size: number): void {
+    drawTexturedQuad(texture: TextureHandle, transform: Mat4, size: number, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
         const webglTexture = this.textures.get(texture.id);
         if (!webglTexture || !this.textureProgram || !this.quadVAO) {
             return;
@@ -845,6 +846,11 @@ export default class WebGLRenderer implements Renderer {
         const ambientIntensityLoc = gl.getUniformLocation(this.textureProgram, 'u_ambientIntensity');
         if (ambientIntensityLoc) {
             gl.uniform1f(ambientIntensityLoc, this.ambientIntensity);
+        }
+
+        const normalLoc = gl.getUniformLocation(this.textureProgram, 'u_normal');
+        if (normalLoc) {
+            gl.uniform3f(normalLoc, normal.x, normal.y, normal.z);
         }
 
         // Enable alpha blending for transparency
