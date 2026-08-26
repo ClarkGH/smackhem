@@ -648,8 +648,10 @@ export default class WebGLRenderer implements Renderer {
             precision mediump float;
             
             uniform sampler2D u_texture;
-            uniform vec3 u_lightDirection;
-            uniform vec3 u_lightColor;
+            uniform vec3 u_sunDirection;
+            uniform vec3 u_sunColor;
+            uniform vec3 u_moonDirection;
+            uniform vec3 u_moonColor;
             uniform float u_ambientIntensity;
             
             in vec2 v_texCoord;
@@ -657,16 +659,21 @@ export default class WebGLRenderer implements Renderer {
             out vec4 fragColor;
             
             void main() {
-                vec4 textureSample = texture(u_texture, v_texCoord);
-                vec3 textureColor = textureSample.rgb;
-                float textureAlpha = textureSample.a;
-                vec3 lightDir = normalize(u_lightDirection);
-                vec3 normal = vec3(0, 1, 0); // Fixed vertical normal for billboard
-                float diff = max(dot(normal, lightDir), 0.0); // Lambertian diffuse
-                float lighting = u_ambientIntensity + diff * (1.0 - u_ambientIntensity);
-                vec3 finalColor = textureColor * u_lightColor * lighting;
-                fragColor = vec4(finalColor, textureAlpha);
-            }
+            vec4 textureSample = texture(u_texture, v_texCoord);
+            vec3 textureColor = textureSample.rgb;
+            float textureAlpha = textureSample.a;
+
+            vec3 normal = vec3(0, 1, 0); // Fixed vertical normal for billboard
+            vec3 sunDir = normalize(u_sunDirection);
+            vec3 moonDir = normalize(u_moonDirection);
+
+            float sunDiff = max(dot(normal, sunDir), 0.0);
+            float moonDiff = max(dot(normal, moonDir), 0.0);
+            vec3 diffuse = sunDiff * u_sunColor + moonDiff * u_moonColor;
+
+            vec3 finalColor = textureColor * (u_ambientIntensity + diffuse);
+            fragColor = vec4(finalColor, textureAlpha);
+        }
         `;
 
         const vertexShader = this.compileShader(this.gl.VERTEX_SHADER, vertexShaderSource);
@@ -815,18 +822,24 @@ export default class WebGLRenderer implements Renderer {
         }
 
         // Set lighting uniforms
-        // NOTE: this textured-quad path only takes a single light, so it approximates
-        // with the sun. It won't pick up moonlight at night the way drawMesh's shader
-        // now does - fine for the current circleTexture sprite use case, but flag this
-        // if textured quads ever need to match world lighting exactly at night.
-        const lightDirectionLoc = gl.getUniformLocation(this.textureProgram, 'u_lightDirection');
-        if (lightDirectionLoc) {
-            gl.uniform3f(lightDirectionLoc, this.sunDirection.x, this.sunDirection.y, this.sunDirection.z);
+        const sunDirectionLoc = gl.getUniformLocation(this.textureProgram, 'u_sunDirection');
+        if (sunDirectionLoc) {
+            gl.uniform3f(sunDirectionLoc, this.sunDirection.x, this.sunDirection.y, this.sunDirection.z);
         }
 
-        const lightColorLoc = gl.getUniformLocation(this.textureProgram, 'u_lightColor');
-        if (lightColorLoc) {
-            gl.uniform3f(lightColorLoc, this.sunColor.x, this.sunColor.y, this.sunColor.z);
+        const sunColorLoc = gl.getUniformLocation(this.textureProgram, 'u_sunColor');
+        if (sunColorLoc) {
+            gl.uniform3f(sunColorLoc, this.sunColor.x, this.sunColor.y, this.sunColor.z);
+        }
+
+        const moonDirectionLoc = gl.getUniformLocation(this.textureProgram, 'u_moonDirection');
+        if (moonDirectionLoc) {
+            gl.uniform3f(moonDirectionLoc, this.moonDirection.x, this.moonDirection.y, this.moonDirection.z);
+        }
+
+        const moonColorLoc = gl.getUniformLocation(this.textureProgram, 'u_moonColor');
+        if (moonColorLoc) {
+            gl.uniform3f(moonColorLoc, this.moonColor.x, this.moonColor.y, this.moonColor.z);
         }
 
         const ambientIntensityLoc = gl.getUniformLocation(this.textureProgram, 'u_ambientIntensity');

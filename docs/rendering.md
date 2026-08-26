@@ -5,7 +5,7 @@
 - [Renderer Interface](#renderer-interface)
 - [WebGL Implementation](#webgl-implementation)
 - [Future Native Renderer](#future-native-renderer)
-- [Lighting System (Grayscale)](#lighting-system-grayscale)
+- [Lighting System](#lighting-system)
   - [Directional Light Direction](#directional-light-direction)
   - [Lambertian Diffuse Lighting](#lambertian-diffuse-lighting)
   - [Final Lighting Calculation](#final-lighting-calculation)
@@ -54,7 +54,7 @@ interface Renderer {
 - Different implementation
 - Game code unchanged
 
-## Lighting System (Grayscale)
+## Lighting System
 
 The rendering system uses grayscale directional lighting with ambient and diffuse components. All lighting calculations are performed in shaders using world-space normals.
 
@@ -78,7 +78,7 @@ diffuse = max(dotProduct, 0.0)
 
 The dot product between the surface normal and the negated light direction determines how much light hits the surface. Surfaces facing away from the light receive no diffuse lighting.
 
-### Final Lighting Calculation
+### Lighting Calculation
 
 Combines ambient and diffuse lighting:
 
@@ -148,7 +148,7 @@ The lighting system supports a deterministic sun/moon cycle that rotates light d
 1. **Light Direction**: Rotates around the Y axis (sun/moon arc across sky)
    - Computed from time of day (0-1 cycle)
    - Normalized 3D vector in world space
-   - Sun at top (noon), moon at bottom (midnight)
+   - Sun at peak (noon), moon at peak (midnight)
 
 2. **Light Color**: Visibility-based blending (sun and moon colors)
    - Blended RGB values
@@ -166,10 +166,15 @@ The lighting system supports a deterministic sun/moon cycle that rotates light d
 
 ```typescript
 interface Renderer {
-    // ... existing methods ...
+    // Single Light methods
     setLightDirection?(_direction: Vec3): void;
     setLightColor?(_color: Vec3): void;
+    // In-use light setters, utilizing celestial bodies overhead for light
     setAmbientIntensity?(_intensity: number): void;
+    setCelestialLighting?(
+        _sun: { direction: Vec3; color: Vec3 },
+        _moon: { direction: Vec3; color: Vec3 },
+    ): void;
 }
 ```
 
