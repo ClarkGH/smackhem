@@ -2,12 +2,14 @@
 
 Geometric 3D/2D game engine wrapper
 
+https://github.com/user-attachments/assets/2a368c70-b1f1-4053-99c2-1a7213b621e4
+
 ## Paradigms and Intent
 
 3D/2D "game engine" inspired by Drakkhen's exploration and Crosscode's use of web technologies. Since that's what I'm comfortable with, I figure it's the best first-step into putting a game I'm proud of up for other people to play. Working with 2D/3D paradigms mainly for fun and learning.
 
 - Using Github issues as tasks
-- I did and am using AI
+- I did and am using a variety of AI services
   - Cursor Pro (Short moment)
   - Gemini
   - ChatGPT
