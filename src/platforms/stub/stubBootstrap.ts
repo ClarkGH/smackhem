@@ -108,6 +108,10 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
  * Update active chunks based on player position (stub version)
  * Uses same logic as web platform for consistency
  */
+const pendingChunkLoads = new Set<string>();
+
+let lastPlayerChunk: { x: number; z: number } | null = null;
+
 export const updateActiveChunks = async (
     world: World,
     playerPosition: Vec3,
@@ -116,6 +120,17 @@ export const updateActiveChunks = async (
     _assetLoader?: any,
 ): Promise<void> => {
     const currentChunk = World.getChunkCoords(playerPosition);
+
+    if (
+        lastPlayerChunk
+        && lastPlayerChunk.x === currentChunk.x
+        && lastPlayerChunk.z === currentChunk.z
+    ) {
+        return;
+    }
+
+    lastPlayerChunk = currentChunk;
+
     const chunksToLoad = World.getChunksInRadius(
         currentChunk.x,
         currentChunk.z,

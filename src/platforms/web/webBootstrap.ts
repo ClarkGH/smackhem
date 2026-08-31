@@ -18,6 +18,8 @@ import { WebAssetLoader } from './webAssetLoader';
 
 // Track chunks currently being loaded to avoid duplicate requests
 const pendingChunkLoads = new Set<string>();
+// Keep track of 1pv camera chunk location.
+let lastPlayerChunk: { x: number; z: number } | null = null;
 
 // Update active chunks based on player position (platform-specific chunk management)
 // Uses async chunk loading from JSON files
@@ -28,6 +30,17 @@ export const updateActiveChunks = async (
     assetLoader: WebAssetLoader,
 ): Promise<void> => {
     const currentChunk = World.getChunkCoords(playerPosition);
+
+    if (
+        lastPlayerChunk
+        && lastPlayerChunk.x === currentChunk.x
+        && lastPlayerChunk.z === currentChunk.z
+    ) {
+        return;
+    }
+
+    lastPlayerChunk = currentChunk;
+
     const chunksToLoad = World.getChunksInRadius(
         currentChunk.x,
         currentChunk.z,
