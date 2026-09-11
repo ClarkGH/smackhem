@@ -101,6 +101,7 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
             { x: chunkCenterX + 5, y: 5, z: chunkCenterZ + 5 },
         ),
         meshes,
+        hasContent: true
     };
 };
 

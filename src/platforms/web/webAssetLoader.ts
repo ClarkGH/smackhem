@@ -85,9 +85,7 @@ export class WebAssetLoader implements AssetLoader {
         const fileZ = chunkZ + WebAssetLoader.CHUNK_COORD_OFFSET;
         // Temporary: override to use chunk 0,0's offset file for all chunks
         // TODO: Remove these two lines and use fileX/fileZ above when implementing per-chunk file loading
-        const tempFileX = 0 + WebAssetLoader.CHUNK_COORD_OFFSET;
-        const tempFileZ = 0 + WebAssetLoader.CHUNK_COORD_OFFSET;
-        const path = `${this.basePath}${tempFileX}_${tempFileZ}.json`;
+        const path = `${this.basePath}${fileX}_${fileZ}.json`;
 
         try {
             const response = await fetch(path);

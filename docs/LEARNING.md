@@ -38,14 +38,14 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
    - Proteus was a big inspiration
    - All it has are a height field function, a sky state, a global lighting function, a handful of instance rules, and a renderer that draws up meshes, quads, and the sky
 7. Cursor/Claude conflate 2D and 3D classes
-   - At some point, I started confusing Cursor. Will need to review and re-organize... but I'm not sure if it's cursor's fault. We've entered territory where my application is becoming it's own unique beast, and the web scraper doesn't fully understand visual concepts well
+   - At some point, I started confusing Cursor. Will need to review and re-organize... but I'm not sure if it's cursor's fault. We've entered territory where my application is becoming it's own unique beast, and the web scraper doesn't or didn't fully understand visual concepts well. I don't blame it for not reading my mind
 
 ## Patterns / Paradigms
 
 1. Nitty gritty formula exploration
 2. Design principles for memory and performance
    - I've known this, but it's best to get this written. This should be a given for anyone with a CS degree, but sometimes you SHOULD mutates objects/arrays instead of doing the crazy bloated React dev crap. React does React things, Vue does Vue things, do not extrapolate FE rules onto all Javascript code
-3. Cursor's ask mode is extremely helpful
+3. Cursor's ask mode was extremely helpful for brainstorming
 4. Vector and Matrix math
    - Matrix multiplication is common in SE, using it is strength-building
    - Vector based logic is going to be the new HOT thing with RAGs and etc
@@ -56,3 +56,5 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
    - I used to get frustrated due to personal elitisms gained from listening to elitists. I have "repented"
    - I just shoved in AirBNB's styleguide instead of building my own, took some changing as some patterns were more memory efficient and AirBnB set them for React/Vue. My belief that, knowing to say "hell no" to the linter, then overriding rules with why is strengthened
    - Best advice: FIND THE TRADEOFFS, DON'T DO THINGS BECAUSE OF RIGID PATTERNS. BREAK PATTERNS WITH EXPLICIT REASON
+9. Versioning the json map chunk files was a phenomenally prescient decision. I don't remember if I made it intentionally or it was recommended by an agent. Either way, it's already evolving pre-alpha and it's going to make migrating easier.
+   - E.G. Version 1 had bounds set in the file, that is now determined in-code. We may have non-traversable chunk-pieces in the future, but the initial establishing hard coded ones was a naive plan.
