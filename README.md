@@ -10,11 +10,12 @@ https://github.com/user-attachments/assets/2a368c70-b1f1-4053-99c2-1a7213b621e4
 
 - Using Github issues as tasks
 - I did and am using a variety of AI services
+  - AI causes more problems than solutions without a human quality bottleneck. Absolutely have to understand every line of code and the why. It is never worth allowing all the hard work and repetition to go to others when you're the one who wants to get good at doing it
   - Cursor Pro (Short moment)
   - Gemini
   - ChatGPT
   - Claude
-- Design document is the bread and butter of this project. For me, everything becomes easier when I write a design doc and keep it up to date.
+- Design document is the bread and butter of this project. For me, everything becomes easier when I write a design doc and keep it up to date
 
 As this is hosted publicly, it's a hobby project.
 
@@ -44,15 +45,15 @@ It's been 5 years of studying 3D. I can now say I've "put a pin" on quaternions.
 
 Minimalism is key, following YAGNI principles.
 
-1. WebGL 2.0/HTML5 - Web-based engine for 3D model rendering.
-2. Typescript - Language of choice.
-3. Vite - Building/Bundling.
+1. WebGL 2.0/HTML5 - Web-based engine for 3D model rendering
+2. Typescript - Language of choice
+3. Vite - Building/Bundling
 4. Vitest - Unit testing
-5. ESLint/Prettier/AirBnB - Formatting.
-6. Node.js/pnpm - Package management.
-7. JSON - Map/Chunk/Asset metadata.
+5. ESLint/Prettier/AirBnB - Formatting
+6. Node.js/pnpm - Package management
+7. JSON - Map/Chunk/Asset metadata
 8. Math - Custom Vec2/Vec3/Mat4
-9. Target Platforms - Web -> Desktop -> Console(future).
+9. Target Platforms - Web -> Desktop -> Console(future)
 10. Aseprite - Sprite creation
 11. [Documentation Overview](docs/INDEX.md)
 

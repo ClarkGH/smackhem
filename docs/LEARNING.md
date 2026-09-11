@@ -1,10 +1,14 @@
 # Lessons Learned
 
-Purpose of this document is to log the things the human has learned in the process of building this project. This document is enitirely human written (Though it did fix my a/b outline attempt Go Men A Sai).
+Purpose of this document is to log the things learned in the process of building this project.
 
 ## How this relates to the wild world of sports
 
-I'm a floor cleaning robot, bumping into walls, and I learn. I'm confident enough now to know that it doesn't matter what your side project is as long as you learn from it, and you can relate it to your career.
+I'm a floor cleaning robot, bumping into walls, and I learn. I'm confident enough now to know that it doesn't matter what your side project is as long as you learn from it, and you can relate it to your career. Through learning frustrations, remember grace, forgive yourself, do better.
+
+My pattern:
+
+Practice -> Learn -> Forget -> Get Frustrated -> Practice -> Relearn -> Forget -> Intuit Patterns
 
 It's important that I stay flexible, as the world changes so must I. Learned helplessness is the enemy. If people have no confidence in you, do not lose confidence in yourself.
 
@@ -17,34 +21,38 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
 ## Roadblocks / Lessons
 
 1. 3D Camera rotation.
-   - Getting the yaw/pitch to accurately change was a hurdle.
-   - Mismatching formulae and misunderstanding where the problem was took a lot of trial and error to debug. Think more practice should be done with the formulae, but for a first engine... Just using them correctly is good enough.
+   - Getting the yaw/pitch to accurately change was a hurdle
+   - Mismatching formulae and misunderstanding where the problem was took a lot of trial and error to debug. Think more practice should be done with the formulae, but for a first engine... Just using them correctly is good enough
 2. Meshing and Lighting.
-   - Remembering mesh direction in lighting is a key lesson learned.
-   - Shaders were mismatched with the way the vertices and faces were wrapping.
-   - Debugging was difficult, cursor's debug mode was minutely helpful, but killed performance and my memory. Don't think I'll rely on it.
+   - Remembering mesh direction in lighting is a key lesson learned
+   - Shaders were mismatched with the way the vertices and faces were wrapping
+   - Debugging was difficult, cursor's debug mode was minutely helpful, but killed performance and my memory. Don't think I'll rely on it
 3. Moon light was snapping and "overpowering" sunlight.
-   - The issue came from me trying to treat two different light sources as a singular one.
+   - The issue came from me trying to treat two different light sources as a singular one
    - To fix we blended the colors and added a band to give the sunset and sunrise some depth
-   - Currently it looks like there are still some inversions here and there on sunset (closer to the sun setting is darker than further away, which is strange). Overall it's better than it was.
-   - 2D lighting had a different issue. The sprite has been updated to change color based on time of day. Same light pattern we used for blending with the meshes. Since the quad is standing upright and facing us, and not straight down like the plane, we needed the normalized vector in the drawn quad.
-4. Chunking. Seeded procedural generation being used first, before static files... was an incredibly helpful decision! I didn't make it, I think Gemini and ChatGPT did while I was researching and just ran with it. It made stubbing so much faster. If I make another engine I'll do it again.
-5. Sun and Moon. Moon and Sun confused me. I should not have built both at the same time while over-relying on cursor. It's a slippery slope. Removing the moon and slowly debugging just the sun after 2 days resolved the problem. As I recall, the moon just worked when I brought it back in.
+   - Currently it looks like there are still some inversions here and there on sunset (closer to the sun setting is darker than further away, which is strange). Overall it's better than it was
+   - 2D lighting had a different issue. The sprite has been updated to change color based on time of day. Same light pattern we used for blending with the meshes. Since the quad is standing upright and facing us, and not straight down like the plane, we needed the normalized vector in the drawn quad
+4. Chunking. Seeded procedural generation being used first, before static files... was an incredibly helpful decision! I didn't make it, I think Gemini and ChatGPT did while I was researching and just ran with it. It made stubbing so much faster. If I make another engine I'll do it again
+5. Sun and Moon. Moon and Sun confused me. I should not have built both at the same time while over-relying on cursor. It's a slippery slope. Removing the moon and slowly debugging just the sun after 2 days resolved the problem. As I recall, the moon just worked when I brought it back in
 6. Proteus Rabbit-hole
    - Proteus was a big inspiration
-   - All it has are a height field function, a sky state, a global lighting function, a handful of instance rules, and a renderer that draws up meshes, quads, and the sky.
-7. Cursor keeps conflating 2D and 3D classes
-   - At some point, I started confusing Cursor. Will need to review and re-organize... but I'm not sure if it's cursor's fault. We've entered territory where my application is becoming it's own unique beast, and the web scraper doesn't fully understand visual concepts well.
+   - All it has are a height field function, a sky state, a global lighting function, a handful of instance rules, and a renderer that draws up meshes, quads, and the sky
+7. Cursor/Claude conflate 2D and 3D classes
+   - At some point, I started confusing Cursor. Will need to review and re-organize... but I'm not sure if it's cursor's fault. We've entered territory where my application is becoming it's own unique beast, and the web scraper doesn't fully understand visual concepts well
 
 ## Patterns / Paradigms
 
-1. Nitty gritty formula exploration.
-2. Design principles for memory and performance.
-   - I've known this, but it's best to get this written. This should be a given for anyone with a CS degree, but sometimes you SHOULD mutates objects/arrays instead of doing the crazy bloated React dev crap. React does React things, Vue does Vue things, do not extrapolate FE rules onto all Javascript code.
-3. Cursor's ask mode is extremely helpful.
-4. Vector and Quaternion math.
+1. Nitty gritty formula exploration
+2. Design principles for memory and performance
+   - I've known this, but it's best to get this written. This should be a given for anyone with a CS degree, but sometimes you SHOULD mutates objects/arrays instead of doing the crazy bloated React dev crap. React does React things, Vue does Vue things, do not extrapolate FE rules onto all Javascript code
+3. Cursor's ask mode is extremely helpful
+4. Vector and Matrix math
    - Matrix multiplication is common in SE, using it is strength-building
-   - Vector based logic is going to be the new HOT thing with RAGs and etc.
+   - Vector based logic is going to be the new HOT thing with RAGs and etc
 5. Lots of 3D engine principles and words I didn't know I had to learn
-6. Everything started with Typescript, which is a typed language. I'm working with Java and C++ at times as well, so this just bleeds more into pattern recognition.
-7. Just because cursor recommends something doesn't mean you should let it code it out. Stay in ask mode until the context is all there. Go to plan mode if you don't know what you're doing. Only use agent mode when confident.
+6. Everything started with Typescript, which is a typed language. I'm working with Java and C++ at times as well, so this just bleeds more into pattern recognition
+7. Just because cursor recommends something doesn't mean you should let it code it out. Stay in ask mode until the context is all there. Go to plan mode if you don't know what you're doing. Only use agent mode when confident
+8. Forgetting code is natural, intuiting where to go is a better skill than remembering rigid rulesets.
+   - I used to get frustrated due to personal elitisms gained from listening to elitists. I have "repented"
+   - I just shoved in AirBNB's styleguide instead of building my own, took some changing as some patterns were more memory efficient and AirBnB set them for React/Vue. My belief that, knowing to say "hell no" to the linter, then overriding rules with why is strengthened
+   - Best advice: FIND THE TRADEOFFS, DON'T DO THINGS BECAUSE OF RIGID PATTERNS. BREAK PATTERNS WITH EXPLICIT REASON
