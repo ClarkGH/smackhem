@@ -53,6 +53,7 @@ export default class WebGLRenderer implements Renderer {
         moonDirection: WebGLUniformLocation | null;
         moonColor: WebGLUniformLocation | null;
         ambientIntensity: WebGLUniformLocation | null;
+        isLightSource: WebGLUniformLocation | null;
     } = {
             color: null,
             transform: null,
@@ -62,6 +63,7 @@ export default class WebGLRenderer implements Renderer {
             moonDirection: null,
             moonColor: null,
             ambientIntensity: null,
+            isLightSource: null,
         };
 
     private identityMatrix: Mat4;
@@ -119,6 +121,7 @@ export default class WebGLRenderer implements Renderer {
             uniform vec3 u_moonDirection;
             uniform vec3 u_moonColor;
             uniform float u_ambientIntensity;
+            uniform float u_isLightSource; // 1.0 if object is self-illuminated, 0.0 otherwise
             
             in vec3 v_normal;
             in vec3 v_position;
@@ -126,6 +129,11 @@ export default class WebGLRenderer implements Renderer {
             out vec4 fragColor;
             
             void main() {
+                if (u_isLightSource > 0.5) {
+                    fragColor = vec4(u_color, 1.0);
+                    return;
+                }
+
                 // Both directions point FROM the surface TOWARD the respective body.
                 // u_sunColor / u_moonColor already have that body's own visibility
                 // (elevation-based fade) baked in on the CPU side, so a body below
@@ -165,6 +173,7 @@ export default class WebGLRenderer implements Renderer {
             moonDirection: this.gl.getUniformLocation(this.program, 'u_moonDirection'),
             moonColor: this.gl.getUniformLocation(this.program, 'u_moonColor'),
             ambientIntensity: this.gl.getUniformLocation(this.program, 'u_ambientIntensity'),
+            isLightSource: this.gl.getUniformLocation(this.program, 'u_isLightSource'),
         };
     }
 
@@ -523,7 +532,7 @@ export default class WebGLRenderer implements Renderer {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     }
 
-    drawMesh(mesh: MeshHandle, transform: Mat4, color: Vec3): void {
+        drawMesh(mesh: MeshHandle, transform: Mat4, color: Vec3): void {
         const webglMesh = this.meshes.get(mesh.id);
         if (!webglMesh || !this.program) {
             return;
@@ -531,6 +540,15 @@ export default class WebGLRenderer implements Renderer {
 
         this.gl.useProgram(this.program);
         this.gl.bindVertexArray(webglMesh.vao);
+
+        // Detect if the mesh is a light source by inspecting its identifier string
+        // (Adjust the keywords 'sun' or 'moon' if your mesh IDs use different naming)
+        const isPlanetLight = mesh.id.toLowerCase().includes('sun') || mesh.id.toLowerCase().includes('moon');
+
+        // Set the light source uniform toggle
+        if (this.uniformLocations.isLightSource) {
+            this.gl.uniform1f(this.uniformLocations.isLightSource, isPlanetLight ? 1.0 : 0.0);
+        }
 
         // Set color uniform (using cached location)
         if (this.uniformLocations.color) {
@@ -600,6 +618,7 @@ export default class WebGLRenderer implements Renderer {
 
         this.gl.bindVertexArray(null);
     }
+
 
     // eslint-disable-next-line class-methods-use-this
     endFrame(): void {
