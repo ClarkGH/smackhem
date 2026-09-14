@@ -237,7 +237,7 @@ Game logic never sees devices.
 
 ## Instance System
 
-The instance system manages the 2D mode where party members, NPCs, and enemies are displayed as 2D sprites in either a frozen 3D scene, or a 2D instance.
+The instance system manages the 2D mode where party members, NPCs, and enemies are displayed as 2D sprites in either a frozen 3D scene, as orthographic 3D billboards; or a sidescrolling 2D scene.
 
 ### Instance System Architecture
 
@@ -271,7 +271,7 @@ interface InstanceCharacter {
 
 #### Linear Interpolation (Lerp)
 
-**Lerp** (linear interpolation) smoothly transitions between two values by blending them based on a parameter `t` (typically 0.0 to 1.0).
+**Lerp** (linear interpolation) smoothly transitions between two values by blending them based on a parameter `t` (typically 0.0 to 1.0). Used to smoothly animate from starting to end position. In layman's terms it's giving the sliding effect.
 
 For scalars:
 

@@ -3,6 +3,7 @@ import type { Input } from '../services/input';
 import {
     createCamera,
     getCameraMatrix,
+    INSTANCE_CHARACTER_SIZE,
     PLAYER_SPEED,
     PLAYER_HEIGHT,
     PLAYER_RADIUS,
@@ -270,7 +271,7 @@ export class GameLoop {
         this.transitionEndPos.y = this.instanceCharacter.position.y;
         this.transitionEndPos.z = this.instanceCharacter.position.z;
 
-        const circleSize = 0.5;
+        const circleSize = INSTANCE_CHARACTER_SIZE;
         const floorY = circleSize / 2;
 
         this.transitionStartPos.x = this.camera.position.x;
@@ -530,6 +531,20 @@ export class GameLoop {
                 this.scene.transitionProgress = 0.0;
                 this.scene.isTransitioning = false;
                 this.scene.isActive = false;
+
+                // Return to 3D world state
+                this.gameMode = 'world_3d';
+                this.isTransitioningPitch = false;
+
+                // Restore Camera State
+                if (this.savedCameraState) {
+                    this.camera.position.x = this.savedCameraState.position.x;
+                    this.camera.position.y = this.savedCameraState.position.y;
+                    this.camera.position.z = this.savedCameraState.position.z;
+                    this.camera.yaw = this.savedCameraState.yaw;
+                    this.camera.pitch = this.savedCameraState.pitch;
+                    this.savedCameraState = null;
+                }
             }
         }
 
@@ -539,22 +554,29 @@ export class GameLoop {
             const { x: moveX, y: moveY } = intent.move;
 
             if (moveX !== 0 || moveY !== 0) {
-                // Use camera yaw at pitch 0 (horizontal forward/right vectors for XZ plane movement)
                 const forward = getCameraForward(this.camera.yaw, 0);
                 const right = getCameraRight(this.camera.yaw);
 
-                // Calculate movement in XZ plane (Y stays at floor level)
                 const moveDistance = PLAYER_SPEED * dt;
-                const movement = {
+                const proposedMovement = {
                     x: (forward.x * moveY + right.x * moveX) * moveDistance,
                     y: 0,
                     z: (forward.z * moveY + right.z * moveX) * moveDistance,
                 };
 
-                // Update instance character position (Y remains at circleSize/2 for floor level)
-                this.instanceCharacter.position.x += movement.x;
-                this.instanceCharacter.position.z += movement.z;
-                // Y stays constant at floor level (circleSize / 2)
+                const worldAABBs = this.world.getCollidableAABBs();
+                const resolvedMovement = resolveCollision(
+                    this.instanceCharacter.position,
+                    proposedMovement,
+                    worldAABBs,
+                    INSTANCE_CHARACTER_SIZE,       // height
+                    INSTANCE_CHARACTER_SIZE / 2,   // radius
+                    this.collisionContext,
+                );
+
+                this.instanceCharacter.position.x += resolvedMovement.x;
+                this.instanceCharacter.position.z += resolvedMovement.z;
+                // Y stays constant at floor level (INSTANCE_CHARACTER_SIZE / 2)
             }
         }
 
@@ -720,12 +742,12 @@ export class GameLoop {
 
             if (sunVisibility > 0) {
                 matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
-                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
+                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility, true);
             }
 
             if (moonVisibility > 0) {
                 matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
-                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
+                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility, true);
             }
 
             const visibleMeshes = this.world.getVisibleMeshes();
@@ -867,12 +889,12 @@ export class GameLoop {
 
         if (sunVisibility > 0) {
             matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
-            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
+            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility, true);
         }
 
         if (moonVisibility > 0) {
             matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
-            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
+            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility, true);
         }
 
         const visibleMeshes = this.world.getVisibleMeshes();

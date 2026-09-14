@@ -20,6 +20,7 @@ export class WebInputService implements Input {
     private pause: boolean = false;
 
     private interact: boolean = false;
+    private pendingInteract: boolean = false;
 
     constructor(canvas: HTMLCanvasElement) {
         this.coreState = createInputState();
@@ -32,6 +33,10 @@ export class WebInputService implements Input {
         this.toggleDebugHUD = result.toggleDebugHUD;
         this.pause = result.pause;
         this.interact = result.interact;
+
+        if (result.interact) {
+            this.pendingInteract = true;
+        };
     }
 
     getIntent(): PlayerIntent {
@@ -60,6 +65,7 @@ export class WebInputService implements Input {
             intent.interact = true;
             // Reset after consuming (one-shot event)
             this.interact = false;
+            this.pendingInteract = false;
         }
         return intent;
     }

@@ -64,10 +64,6 @@ export class ChunkLoader {
             throw new Error('Chunk JSON missing required \'id\' field');
         }
 
-        if (!Array.isArray(data.bounds) || data.bounds.length !== 6) {
-            throw new Error('Chunk JSON \'bounds\' must be array of 6 numbers [minX, minY, minZ, maxX, maxY, maxZ]');
-        }
-
         if (!Array.isArray(data.meshes)) {
             throw new Error('Chunk JSON \'meshes\' must be an array');
         }
@@ -241,14 +237,15 @@ export class ChunkLoader {
         // Create bounds AABB from JSON bounds array
         // Create bounds AABB from JSON bounds array
         const bounds = createAABB(
-            { x: chunkJSON.bounds[0], y: chunkJSON.bounds[1], z: chunkJSON.bounds[2] },
-            { x: chunkJSON.bounds[3], y: chunkJSON.bounds[4], z: chunkJSON.bounds[5] },
+            { x: chunkCenterX - CHUNK_SIZE / 2, y: -1, z: chunkCenterZ - CHUNK_SIZE / 2 },
+            { x: chunkCenterX + CHUNK_SIZE / 2, y: 5, z: chunkCenterZ + CHUNK_SIZE / 2 },
         );
 
         return {
             id: chunkJSON.id,
             bounds,
             meshes,
+            hasContent: true,
         };
     }
 
@@ -279,6 +276,7 @@ export class ChunkLoader {
                     color: { x: 0.4, y: 0.4, z: 0.4 },
                 },
             ],
+            hasContent: false,
         };
     }
 

@@ -1,6 +1,6 @@
-import { MeshHandle } from '../services/renderer';
+import { MeshHandle, Renderer } from '../services/renderer';
 import { Mat4, Vec3 } from '../types/common';
-import { type AABB } from './math/aabb';
+import { type AABB, createAABB } from './math/aabb';
 import { extractPosition } from './math/mathHelpers';
 import { getMeshAABB } from './collision';
 
@@ -8,6 +8,9 @@ export type ChunkID = string;
 
 export const CHUNK_SIZE = 10; // Size of each chunk in world units
 export const CHUNK_LOAD_RADIUS = 6; // Load chunks within this radius
+
+const WORLD_WALL_HEIGHT = 20;
+const WORLD_WALL_THICKNESS = 1;
 
 export interface StaticMesh {
     mesh: MeshHandle;
@@ -19,6 +22,7 @@ export interface Chunk {
     id: ChunkID;
     bounds: AABB;
     meshes: StaticMesh[];
+    hasContent: boolean; // Either there's map data or a tech demo without boundaries.
 }
 
 export class World {
@@ -28,7 +32,6 @@ export class World {
 
     private _collidableAABBsBuffer: AABB[] = [];
 
-    // UTILITY: Helper to generate a coordinate-based ID (e.g., "0,0")
     static getChunkID(x: number, z: number): ChunkID {
         return `${x},${z}`;
     }
@@ -37,7 +40,10 @@ export class World {
         this.activeChunks.set(chunk.id, chunk);
     }
 
-    removeChunk(chunkId: ChunkID) {
+    removeChunk(chunkId: ChunkID, renderer?: Renderer) {
+        const chunk = this.activeChunks.get(chunkId);
+        if (!chunk) return;
+
         this.activeChunks.delete(chunkId);
     }
 
@@ -74,24 +80,59 @@ export class World {
     }
 
     // TODO: Add other mesh types to the collision system
-    // Get collidable AABBs from active chunks
-    // Filter meshes to only include cubes (not planes/floors)
     getCollidableAABBs(): AABB[] {
-        // Clear buffer and reuse
         this._collidableAABBsBuffer.length = 0;
 
         this.activeChunks.forEach((chunk) => {
             chunk.meshes.forEach((mesh) => {
-                // Filter out floor meshes - cubes are at y > 0.1, floors are at y = 0
                 const position = extractPosition(mesh.transform);
                 if (position.y > 0.1) {
-                    // This is a cube mesh (size 1)
                     const meshAABB = getMeshAABB(mesh, 1);
                     this._collidableAABBsBuffer.push(meshAABB);
                 }
             });
         });
 
+        // Boundary walls: only real chunks project an edge (invisible wall). If nothing has
+        // loaded, or everything loaded is a createEmptyChunk fallback, this
+        // loop contributes nothing and the world is open in every direction.
+        this.activeChunks.forEach((chunk) => {
+            if (!chunk.hasContent) return;
+
+            const [chunkX, chunkZ] = chunk.id.split(',').map(Number);
+            const neighbors: Array<[number, number, 'north' | 'south' | 'east' | 'west']> = [
+                [chunkX, chunkZ + 1, 'north'],
+                [chunkX, chunkZ - 1, 'south'],
+                [chunkX + 1, chunkZ, 'east'],
+                [chunkX - 1, chunkZ, 'west'],
+            ];
+
+            neighbors.forEach(([nx, nz, side]) => {
+                const neighbor = this.activeChunks.get(World.getChunkID(nx, nz));
+                const neighborIsReal = neighbor?.hasContent ?? false;
+                if (!neighborIsReal) {
+                    this._collidableAABBsBuffer.push(this.getEdgeWall(chunk, side));
+                }
+            });
+        });
+
         return this._collidableAABBsBuffer;
+    }
+
+    private getEdgeWall(chunk: Chunk, side: 'north' | 'south' | 'east' | 'west'): AABB {
+        const t = WORLD_WALL_THICKNESS;
+        const h = WORLD_WALL_HEIGHT;
+        const { min, max } = chunk.bounds;
+
+        switch (side) {
+            case 'north':
+                return createAABB({ x: min.x, y: -1, z: max.z - t }, { x: max.x, y: h, z: max.z + t });
+            case 'south':
+                return createAABB({ x: min.x, y: -1, z: min.z - t }, { x: max.x, y: h, z: min.z + t });
+            case 'east':
+                return createAABB({ x: max.x - t, y: -1, z: min.z }, { x: max.x + t, y: h, z: max.z });
+            default: // 'west'
+                return createAABB({ x: min.x - t, y: -1, z: min.z }, { x: min.x + t, y: h, z: max.z });
+        }
     }
 }
