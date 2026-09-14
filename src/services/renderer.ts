@@ -13,7 +13,7 @@ export interface TextureHandle {
 
 export interface Renderer {
     beginFrame(): void;
-    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3): void;
+    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3, u_isLightSource?: boolean): void;
     endFrame(): void;
     setWireframe(_enabled: boolean): void;
     createPlaneMesh(_size: number): MeshHandle;

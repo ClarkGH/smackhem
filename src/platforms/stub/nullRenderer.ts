@@ -35,7 +35,7 @@ export default class NullRenderer implements Renderer {
         // Stub implementation - could track frame stats here
     }
 
-    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3): void {
+    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3, _isLightSource?: boolean): void {
         // Stub implementation - could validate mesh handle here
         // Could track draw calls for testing
     }

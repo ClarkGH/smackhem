@@ -728,12 +728,12 @@ export class GameLoop {
 
             if (sunVisibility > 0) {
                 matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
-                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
+                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility, true);
             }
 
             if (moonVisibility > 0) {
                 matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
-                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
+                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility, true);
             }
 
             const visibleMeshes = this.world.getVisibleMeshes();
@@ -875,12 +875,12 @@ export class GameLoop {
 
         if (sunVisibility > 0) {
             matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
-            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
+            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility, true);
         }
 
         if (moonVisibility > 0) {
             matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
-            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
+            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility, true);
         }
 
         const visibleMeshes = this.world.getVisibleMeshes();

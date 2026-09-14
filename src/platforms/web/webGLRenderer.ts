@@ -532,7 +532,7 @@ export default class WebGLRenderer implements Renderer {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     }
 
-        drawMesh(mesh: MeshHandle, transform: Mat4, color: Vec3): void {
+    drawMesh(mesh: MeshHandle, transform: Mat4, color: Vec3, isLightSource: boolean = false): void {
         const webglMesh = this.meshes.get(mesh.id);
         if (!webglMesh || !this.program) {
             return;
@@ -547,7 +547,7 @@ export default class WebGLRenderer implements Renderer {
 
         // Set the light source uniform toggle
         if (this.uniformLocations.isLightSource) {
-            this.gl.uniform1f(this.uniformLocations.isLightSource, isPlanetLight ? 1.0 : 0.0);
+            this.gl.uniform1f(this.uniformLocations.isLightSource, isLightSource ? 1.0 : 0.0);
         }
 
         // Set color uniform (using cached location)
