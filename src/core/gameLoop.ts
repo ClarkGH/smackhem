@@ -531,6 +531,20 @@ export class GameLoop {
                 this.scene.transitionProgress = 0.0;
                 this.scene.isTransitioning = false;
                 this.scene.isActive = false;
+
+                // Return to 3D world state
+                this.gameMode = 'world_3d';
+                this.isTransitioningPitch = false;
+
+                // Restore Camera State
+                if (this.savedCameraState) {
+                    this.camera.position.x = this.savedCameraState.position.x;
+                    this.camera.position.y = this.savedCameraState.position.y;
+                    this.camera.position.z = this.savedCameraState.position.z;
+                    this.camera.yaw = this.savedCameraState.yaw;
+                    this.camera.pitch = this.savedCameraState.pitch;
+                    this.savedCameraState = null;
+                }
             }
         }
 
