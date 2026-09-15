@@ -1,7 +1,7 @@
 import type { Renderer } from './renderer';
 import type { Chunk, StaticMesh } from '../core/world';
 import type { Vec3 } from '../types/common';
-import { createAABB } from '../core/math/aabb';
+import { AABB, createAABB } from '../core/math/aabb';
 import { createTranslationMatrix } from '../core/math/mathHelpers';
 import { CHUNK_SIZE } from '../core/world';
 
@@ -80,15 +80,23 @@ export class ChunkLoader {
         chunkCenterX: number,
         chunkCenterZ: number,
         renderer: Renderer,
-    ): StaticMesh[] {
+    ): {
+        meshes: StaticMesh[];
+        collisionAABBs: AABB[];
+    } {
         const meshes: StaticMesh[] = [];
+        const collisionAABBs: AABB[] = [];
 
         // Batch creation: iterate through all meshes and create them together
         meshesJSON.forEach((meshJSON) => {
             try {
-                const staticMesh = this.createMeshFromJSON(meshJSON, chunkCenterX, chunkCenterZ, renderer);
-                if (staticMesh) {
-                    meshes.push(staticMesh);
+                const result = this.createMeshFromJSON(meshJSON, chunkCenterX, chunkCenterZ, renderer);
+                if (result) {
+                    meshes.push(result.mesh);
+
+                    if (result.collisionAABB) {
+                        collisionAABBs.push(result.collisionAABB);
+                    }
                 }
             } catch (error) {
                 console.error(`Failed to create mesh of type '${meshJSON.type}':`, error);
@@ -100,9 +108,9 @@ export class ChunkLoader {
                     color: meshJSON.color || [0.5, 0.5, 0.5],
                 };
                 try {
-                    const staticMesh = this.createMeshFromJSON(fallbackMesh, chunkCenterX, chunkCenterZ, renderer);
-                    if (staticMesh) {
-                        meshes.push(staticMesh);
+                    const result = this.createMeshFromJSON(fallbackMesh, chunkCenterX, chunkCenterZ, renderer);
+                    if (result) {
+                        meshes.push(result.mesh);
                     }
                 } catch (fallbackError) {
                     console.error('Fallback mesh creation also failed:', fallbackError);
@@ -110,7 +118,10 @@ export class ChunkLoader {
             }
         });
 
-        return meshes;
+        return {
+            meshes,
+            collisionAABBs,
+        };
     }
 
     /**
@@ -121,7 +132,7 @@ export class ChunkLoader {
         chunkCenterX: number,
         chunkCenterZ: number,
         renderer: Renderer,
-    ): StaticMesh | null {
+    ): { mesh: StaticMesh; collisionAABB: AABB | null } | null {
         // Parse position (relative to chunk center)
         const posArray = Array.isArray(meshJSON.pos) ? meshJSON.pos : [0, 0, 0];
         const worldX = chunkCenterX + (posArray[0] || 0);
@@ -197,10 +208,15 @@ export class ChunkLoader {
         // Create transform matrix (translation only for now)
         const transform = createTranslationMatrix(worldX, yPos, worldZ);
 
-        return {
+        const staticMesh: StaticMesh = {
             mesh: meshHandle,
             transform,
             color,
+        }
+
+        return {
+            mesh: staticMesh,
+            collisionAABB: null,
         };
     }
 
@@ -222,7 +238,7 @@ export class ChunkLoader {
         const chunkCenterZ = chunkZ * CHUNK_SIZE;
 
         // Batch create all meshes for this chunk
-        const meshes = this.createMeshesFromJSON(chunkJSON.meshes, chunkCenterX, chunkCenterZ, renderer);
+        const { meshes, collisionAABBs } = this.createMeshesFromJSON(chunkJSON.meshes, chunkCenterX, chunkCenterZ, renderer);
 
         // Debug: Check what meshes were created
         console.log(`Chunk ${chunkX},${chunkZ}: Created ${meshes.length} meshes from ${chunkJSON.meshes.length} JSON meshes`);
@@ -245,6 +261,7 @@ export class ChunkLoader {
             id: chunkJSON.id,
             bounds,
             meshes,
+            collisionAABBs,
             hasContent: true,
         };
     }
@@ -276,6 +293,7 @@ export class ChunkLoader {
                     color: { x: 0.4, y: 0.4, z: 0.4 },
                 },
             ],
+            collisionAABBs: [],
             hasContent: false,
         };
     }

@@ -71,65 +71,41 @@ export interface DebugHUD {
 export class GameLoop {
     // State variables
     private simulationTime = 0;
-
     private debugHUDVisible = false;
-
     private accumulator = 0;
-
     private isPaused = false;
-
     private savedPitch = 0;
-
     private targetPitch = 0;
-
     private isTransitioningPitch = false;
-
     private instance: Instance;
-
     private instanceCharacter: InstanceCharacter;
-
     private scene: Scene;
-
     private sceneCharacter: SceneCharacter;
-
     private gameMode: 'world_3d' | 'scene_2d' = 'world_3d';
-
     private savedCameraState: { position: Vec3; yaw: number; pitch: number } | null = null;
-
     private partyMemberTexture1: TextureHandle | null = null;
 
     // Core objects
     private camera: Camera;
-
     private collisionContext: CollisionContext;
 
     // Dependencies
     private renderer: Renderer;
-
     private input: Input;
-
     private world: World;
-
     private getAspectRatio: () => number;
-
     private debugHUD?: DebugHUD;
 
     // Constants
     private readonly DAY_LENGTH_SECONDS = 120; // 2 minutes per full cycle (configurable)
-
     private readonly HORIZON_THRESHOLD = 0.0; // Elevation threshold for horizon (radians)
-
     private readonly DECLINATION_OFFSET = 0.0; // Seasonal tilt offset (for future use, currently 0)
-
     private readonly SUN_SIZE = 0.5; // Radius of sun orb (sphere)
-
     private readonly MOON_SIZE = 0.4; // Radius of moon orb (sphere)
-
     private readonly SUN_COLOR: Vec3 = { x: 1.0, y: 0.85, z: 0.2 }; // Golden yellow
-
     private readonly MOON_COLOR: Vec3 = { x: 0.4, y: 0.6, z: 0.9 }; // Cool blue
-
     private readonly CELESTIAL_DISTANCE: number; // Computed from camera.far
+    private readonly WALL_DEBUG_COLOR: Vec3 = { x: 1, y: 0, z:0 }; // Color of the wall debug mesh
 
     /*
      * PERFORMANCE:
@@ -140,36 +116,25 @@ export class GameLoop {
 
     // Pre-allocated lighting calculation objects
     private readonly lightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // Direction from surface toward the sun
-
     private readonly sunAzimuth = { value: 0 }; // For spherical coordinate calculations
-
     private readonly sunElevation = { value: 0 }; // For spherical coordinate calculations
 
     // Pre-allocated sun objects
     private readonly sunPosition: Vec3 = { x: 0, y: 0, z: 0 };
-
     private readonly sunColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
-
     private readonly sunDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated light direction for sun positioning
-
     private readonly sunTransform: Mat4;
 
     // Pre-allocated moon objects
     private readonly moonPosition: Vec3 = { x: 0, y: 0, z: 0 };
-
     private readonly moonLightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // For moon (opposite of sun)
-
     private readonly moonColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
-
     private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated moon direction for moon positioning
-
     private readonly moonTransform: Mat4;
 
     // Pre-allocated MVP matrices
     private readonly sunMVP: Mat4;
-
     private readonly moonMVP: Mat4;
-
     private readonly meshMVP: Mat4;
 
     private readonly circleTransform: Mat4; // Pre-allocated for circle rendering
@@ -180,12 +145,15 @@ export class GameLoop {
 
     // Mesh objects
     private readonly sunMesh;
-
     private readonly moonMesh;
+    private readonly wallDebugMesh;
+
+    // Pre-allocated scratch fields
+    private readonly wallDebugTransform: Mat4 = identity();
+    private readonly wallDebugMVP: Mat4 = identity();
 
     // Pre-allocated Vec3 objects for transition calculations
     private readonly transitionStartPos: Vec3 = { x: 0, y: 0, z: 0 };
-
     private readonly transitionEndPos: Vec3 = { x: 0, y: 0, z: 0 };
 
     constructor(
@@ -221,6 +189,7 @@ export class GameLoop {
         // Mesh objects
         this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE * 10, 16);
         this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE * 10, 16);
+        this.wallDebugMesh = renderer.createCubeMesh(1);
 
         // Instance system
         this.instance = createInstance();
@@ -283,7 +252,7 @@ export class GameLoop {
         // Circle starts at camera position (X/Z) and slides forward in the XZ plane
         // Use target pitch (0) for calculation since we're transitioning to it
         const forward = getCameraForward(this.camera.yaw, this.targetPitch);
-        const circleSize = 0.5; // Circle radius
+        const circleSize = INSTANCE_CHARACTER_SIZE; // Circle radius
         const floorY = circleSize / 2; // Half circle size above floor (quad is centered at Y=0)
 
         // Start position: Camera's X/Z position at floor level
@@ -405,6 +374,41 @@ export class GameLoop {
         o[4] = 0; o[5] = size; o[6] = 0; o[7] = 0;
         o[8] = 0; o[9] = 0; o[10] = size; o[11] = 0;
         o[12] = position.x; o[13] = position.y; o[14] = position.z; o[15] = 1;
+    }
+
+    // Same column-major layout as computeCelestialTransform, just per-axis scale
+    // instead of uniform - a scaled-and-translated box instead of a scaled sphere.
+    private computeScaledTransform(
+        center: Vec3,
+        scale: Vec3,
+        out: Mat4,
+    ): void {
+        const o = out.elements;
+
+        o[0] = scale.x; o[1] = 0; o[2] = 0; o[3] = 0;
+        o[4] = 0; o[5] = scale.y; o[6] = 0; o[7] = 0;
+        o[8] = 0; o[9] = 0; o[10] = scale.z; o[11] = 0;
+        o[12] = center.x; o[13] = center.y; o[14] = center.z; o[15] = 1;
+    }
+
+    private renderBoundaryWireframe(viewProj: Mat4): void {
+        if (!this.renderer.getWireframeEnabled?.()) return;
+
+        this.world.getBoundaryWallAABBs().forEach((wall) => {
+            const center = {
+                x: (wall.min.x + wall.max.x) / 2,
+                y: (wall.min.y + wall.max.y) / 2,
+                z: (wall.min.z + wall.max.z) / 2,
+            };
+            const scale = {
+                x: wall.max.x - wall.min.x,
+                y: wall.max.y - wall.min.y,
+                z: wall.max.z - wall.min.z,
+            };
+            this.computeScaledTransform(center, scale, this.wallDebugTransform);
+            matrixMultiplyInto(viewProj, this.wallDebugTransform, this.wallDebugMVP);
+            this.renderer.drawMesh(this.wallDebugMesh, this.wallDebugMVP, this.WALL_DEBUG_COLOR, true);
+        });
     }
 
     private updateSimulation(dt: number): void {
@@ -693,7 +697,9 @@ export class GameLoop {
             const moonElevation = { value: -this.sunElevation.value };
             this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
 
-            // Each body's visibility now comes from ITS OWN elevation, not the other
+            this.renderBoundaryWireframe(viewProj);
+
+            // Each body's visibility comes from ITS OWN elevation, not the other
             // body's time-of-day triangle - see computeCelestialVisibility for why.
             const sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
             const moonVisibility = this.computeCelestialVisibility(moonElevation.value);
@@ -832,6 +838,8 @@ export class GameLoop {
         const timeOfDay = this.isPaused
             ? this.computeTimeOfDay(this.simulationTime)
             : this.computeTimeOfDay(this.simulationTime);
+        
+        this.renderBoundaryWireframe(viewProj);
 
         this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);
         this.computeSunDirection(timeOfDay, this.lightDirection);
@@ -908,7 +916,7 @@ export class GameLoop {
             if (this.partyMemberTexture1) {
                 // Calculate transform for circle (billboard at character position)
                 const pos = this.instanceCharacter.position;
-                const circleSize = 0.5; // Small size as specified
+                const circleSize = INSTANCE_CHARACTER_SIZE; // Small size as specified
 
                 // Calculate billboard orientation (face camera, stay vertical)
                 const toCamera = {

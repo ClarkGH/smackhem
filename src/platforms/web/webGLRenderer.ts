@@ -541,10 +541,6 @@ export default class WebGLRenderer implements Renderer {
         this.gl.useProgram(this.program);
         this.gl.bindVertexArray(webglMesh.vao);
 
-        // Detect if the mesh is a light source by inspecting its identifier string
-        // (Adjust the keywords 'sun' or 'moon' if your mesh IDs use different naming)
-        const isPlanetLight = mesh.id.toLowerCase().includes('sun') || mesh.id.toLowerCase().includes('moon');
-
         // Set the light source uniform toggle
         if (this.uniformLocations.isLightSource) {
             this.gl.uniform1f(this.uniformLocations.isLightSource, isLightSource ? 1.0 : 0.0);
@@ -619,10 +615,13 @@ export default class WebGLRenderer implements Renderer {
         this.gl.bindVertexArray(null);
     }
 
-
     // eslint-disable-next-line class-methods-use-this
     endFrame(): void {
         // Present frame (WebGL handles this automatically)
+    }
+
+    getWireframeEnabled(): boolean {
+        return this.wireframe;
     }
 
     setWireframe(enabled: boolean): void {

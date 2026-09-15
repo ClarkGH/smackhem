@@ -33,4 +33,6 @@ export interface Renderer {
     clear?(_r: number, _g: number, _b: number, _a: number): void;
     getViewportWidth?(): number;
     getViewportHeight?(): number;
+    setWireframe(_enabled: boolean): void;
+    getWireframeEnabled?(): boolean;
 }

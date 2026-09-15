@@ -140,6 +140,10 @@ export default class NullRenderer implements Renderer {
         }
     }
 
+    getWireframeEnabled(): boolean {
+        return this.wireframeEnabled;
+    }
+
     reset(): void {
         this.meshCounter = 0;
         this.textureCounter = 0;

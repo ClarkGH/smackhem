@@ -21,6 +21,7 @@ export interface StaticMesh {
 export interface Chunk {
     id: ChunkID;
     bounds: AABB;
+    collisionAABBs: AABB[];
     meshes: StaticMesh[];
     hasContent: boolean; // Either there's map data or a tech demo without boundaries.
 }
@@ -117,6 +118,32 @@ export class World {
         });
 
         return this._collidableAABBsBuffer;
+    }
+
+    // Expose wall AABBs
+    getBoundaryWallAABBs(): AABB[] {
+        const walls: AABB[] = [];
+
+        this.activeChunks.forEach((chunk) => {
+            if (!chunk.hasContent) return;
+
+            const [chunkX, chunkZ] = chunk.id.split(',').map(Number);
+            const neighbors: Array<[number, number, 'north' | 'south' | 'east' | 'west']> = [
+                [chunkX, chunkZ + 1, 'north'],
+                [chunkX, chunkZ - 1, 'south'],
+                [chunkX + 1, chunkZ, 'east'],
+                [chunkX - 1, chunkZ, 'west'],
+            ];
+
+            neighbors.forEach(([nx, nz, side]) => {
+                const neighbor = this.activeChunks.get(World.getChunkID(nx, nz));
+                if (!(neighbor?.hasContent ?? false)) {
+                    walls.push(this.getEdgeWall(chunk, side));
+                }
+            });
+        });
+
+        return walls;
     }
 
     private getEdgeWall(chunk: Chunk, side: 'north' | 'south' | 'east' | 'west'): AABB {

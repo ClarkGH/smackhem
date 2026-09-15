@@ -73,7 +73,7 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
             case 3: // Sphere
                 mesh = renderer.createSphereMesh(size / 2, 12);
                 break;
-            default:
+            default: // Cube for now, TODO: consider error block
                 mesh = renderer.createCubeMesh(size);
         }
 
@@ -96,12 +96,10 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
 
     return {
         id: chunkId,
-        bounds: createAABB(
-            { x: chunkCenterX - 5, y: -1, z: chunkCenterZ - 5 },
-            { x: chunkCenterX + 5, y: 5, z: chunkCenterZ + 5 },
-        ),
+        bounds: createAABB({ x: chunkCenterX - 5, y: -1, z: chunkCenterZ - 5 }, { x: chunkCenterX + 5, y: 5, z: chunkCenterZ + 5 }),
+        collisionAABBs: [],
         meshes,
-        hasContent: true
+        hasContent: true,
     };
 };
 
