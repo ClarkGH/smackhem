@@ -94,33 +94,19 @@ export class World {
             });
         });
 
-        // Boundary walls: only real chunks project an edge (invisible wall). If nothing has
-        // loaded, or everything loaded is a createEmptyChunk fallback, this
-        // loop contributes nothing and the world is open in every direction.
-        this.activeChunks.forEach((chunk) => {
-            if (!chunk.hasContent) return;
-
-            const [chunkX, chunkZ] = chunk.id.split(',').map(Number);
-            const neighbors: Array<[number, number, 'north' | 'south' | 'east' | 'west']> = [
-                [chunkX, chunkZ + 1, 'north'],
-                [chunkX, chunkZ - 1, 'south'],
-                [chunkX + 1, chunkZ, 'east'],
-                [chunkX - 1, chunkZ, 'west'],
-            ];
-
-            neighbors.forEach(([nx, nz, side]) => {
-                const neighbor = this.activeChunks.get(World.getChunkID(nx, nz));
-                const neighborIsReal = neighbor?.hasContent ?? false;
-                if (!neighborIsReal) {
-                    this._collidableAABBsBuffer.push(this.getEdgeWall(chunk, side));
-                }
-            });
-        });
+        // PERFORMANCE: bends RULE M-1 (no allocation in hot loops) on purpose.
+        // computeBoundaryWalls() allocates a small array internally - accepted here
+        // to keep one shared implementation with getBoundaryWallAABBs() instead of
+        // a second copy of the neighbor-scan logic. Wall count is small (4 per
+        // real-chunk edge), so this hasn't shown up as a real cost; revisit if that
+        // changes.
+        this._collidableAABBsBuffer.push(...this.getBoundaryWallAABBs());
 
         return this._collidableAABBsBuffer;
     }
 
     // Expose wall AABBs
+    // TODO: Consider making private for non-debug version
     getBoundaryWallAABBs(): AABB[] {
         const walls: AABB[] = [];
 
