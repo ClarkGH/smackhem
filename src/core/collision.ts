@@ -1,11 +1,9 @@
 import type { Vec3 } from '../types/common';
-import type { StaticMesh } from './world';
 import {
     createAABB,
     type AABB,
     aabbIntersects,
 } from './math/aabb';
-import { extractPosition } from './math/mathHelpers';
 
 export interface CollisionContext {
     newPos: Vec3;

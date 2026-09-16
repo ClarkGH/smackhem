@@ -20,6 +20,7 @@ export class WebInputService implements Input {
     private pause: boolean = false;
 
     private interact: boolean = false;
+
     private pendingInteract: boolean = false;
 
     constructor(canvas: HTMLCanvasElement) {
@@ -36,7 +37,7 @@ export class WebInputService implements Input {
 
         if (result.interact) {
             this.pendingInteract = true;
-        };
+        }
     }
 
     getIntent(): PlayerIntent {

@@ -216,11 +216,11 @@ export class ChunkLoader {
             mesh: meshHandle,
             transform,
             color,
-        }
+        };
 
         let collisionAABB: AABB | null = null;
 
-        if (meshJSON.type === 'cube' || meshJSON.type === 'prism' ) {
+        if (meshJSON.type === 'cube' || meshJSON.type === 'prism') {
             collisionAABB = createAABB(
                 {
                     x: worldX - scaleX / 2,

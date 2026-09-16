@@ -89,9 +89,9 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
     it('supports sun and moon lighting', () => {
         const direction = { x: 0.5, y: 0.5, z: -0.5 };
         const color = { x: 0.8, y: 0.9, z: 1.0 };
-        const sun = {direction, color}
-        const moon = {direction, color}     
-        
+        const sun = { direction, color };
+        const moon = { direction, color };
+
         expect(() => {
             renderer.setCelestialLighting?.(sun, moon);
         }).not.toThrow();
@@ -120,7 +120,7 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
         const texture = await renderer.loadTexture('valid');
         const identityMatrix = identity();
         expect(() => renderer.drawTexturedQuad(texture, identityMatrix, 1.0)).not.toThrow();
-        expect(() => renderer.drawTexturedQuad(texture, identityMatrix, 1.0, {x: 0, y: 1, z: 0})).not.toThrow();
+        expect(() => renderer.drawTexturedQuad(texture, identityMatrix, 1.0, { x: 0, y: 1, z: 0 })).not.toThrow();
 
         const invalidTexture = { id: 'invalid-handle' };
         expect(() => renderer.drawTexturedQuad(invalidTexture, identityMatrix, 1.0))

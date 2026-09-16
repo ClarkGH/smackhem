@@ -109,6 +109,7 @@ export default class NullRenderer implements Renderer {
         this.moonDirection = _moon.direction;
         this.moonColor = _moon.color;
     }
+
     // Stub-specific utility methods for testing
     getFrameCount(): number {
         return this.frameCount;
@@ -136,8 +137,8 @@ export default class NullRenderer implements Renderer {
             sunDirection: { ...this.sunDirection },
             sunColor: { ...this.sunColor },
             moonDirection: { ...this.moonDirection },
-            moonColor: { ...this.moonColor }
-        }
+            moonColor: { ...this.moonColor },
+        };
     }
 
     getWireframeEnabled(): boolean {

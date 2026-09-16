@@ -29,6 +29,3 @@ export const createScene = (): Scene => {
         collisionGrid,
     };
 };
-
-
-

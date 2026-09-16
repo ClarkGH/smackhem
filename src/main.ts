@@ -11,7 +11,7 @@ const createPlatform = async (): Promise<PlatformServices> => {
     // __PLATFORM__ is a build-time define from Vite, not available at ESLint parse time
     // eslint-disable-next-line no-undef
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
-        const { default: createStubPlatform} = (await import('./platforms/stub/stubBootstrap.js')).default;
+        const { default: createStubPlatform } = (await import('./platforms/stub/stubBootstrap.js')).default;
         return createStubPlatform();
     }
 

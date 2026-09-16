@@ -71,41 +71,67 @@ export interface DebugHUD {
 export class GameLoop {
     // State variables
     private simulationTime = 0;
+
     private debugHUDVisible = false;
+
     private accumulator = 0;
+
     private isPaused = false;
+
     private savedPitch = 0;
+
     private targetPitch = 0;
+
     private isTransitioningPitch = false;
+
     private instance: Instance;
+
     private instanceCharacter: InstanceCharacter;
+
     private scene: Scene;
+
     private sceneCharacter: SceneCharacter;
+
     private gameMode: 'world_3d' | 'scene_2d' = 'world_3d';
+
     private savedCameraState: { position: Vec3; yaw: number; pitch: number } | null = null;
+
     private partyMemberTexture1: TextureHandle | null = null;
 
     // Core objects
     private camera: Camera;
+
     private collisionContext: CollisionContext;
 
     // Dependencies
     private renderer: Renderer;
+
     private input: Input;
+
     private world: World;
+
     private getAspectRatio: () => number;
+
     private debugHUD?: DebugHUD;
 
     // Constants
     private readonly DAY_LENGTH_SECONDS = 120; // 2 minutes per full cycle (configurable)
+
     private readonly HORIZON_THRESHOLD = 0.0; // Elevation threshold for horizon (radians)
+
     private readonly DECLINATION_OFFSET = 0.0; // Seasonal tilt offset (for future use, currently 0)
+
     private readonly SUN_SIZE = 0.5; // Radius of sun orb (sphere)
+
     private readonly MOON_SIZE = 0.4; // Radius of moon orb (sphere)
+
     private readonly SUN_COLOR: Vec3 = { x: 1.0, y: 0.85, z: 0.2 }; // Golden yellow
+
     private readonly MOON_COLOR: Vec3 = { x: 0.4, y: 0.6, z: 0.9 }; // Cool blue
+
     private readonly CELESTIAL_DISTANCE: number; // Computed from camera.far
-    private readonly WALL_DEBUG_COLOR: Vec3 = { x: 1, y: 0, z:0 }; // Color of the wall debug mesh
+
+    private readonly WALL_DEBUG_COLOR: Vec3 = { x: 1, y: 0, z: 0 }; // Color of the wall debug mesh
 
     /*
      * PERFORMANCE:
@@ -116,44 +142,60 @@ export class GameLoop {
 
     // Pre-allocated lighting calculation objects
     private readonly lightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // Direction from surface toward the sun
+
     private readonly sunAzimuth = { value: 0 }; // For spherical coordinate calculations
+
     private readonly sunElevation = { value: 0 }; // For spherical coordinate calculations
 
     // Pre-allocated sun objects
     private readonly sunPosition: Vec3 = { x: 0, y: 0, z: 0 };
+
     private readonly sunColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
+
     private readonly sunDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated light direction for sun positioning
+
     private readonly sunTransform: Mat4;
 
     // Pre-allocated moon objects
     private readonly moonPosition: Vec3 = { x: 0, y: 0, z: 0 };
+
     private readonly moonLightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // For moon (opposite of sun)
+
     private readonly moonColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
+
     private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated moon direction for moon positioning
+
     private readonly moonTransform: Mat4;
 
     // Pre-allocated MVP matrices
     private readonly sunMVP: Mat4;
+
     private readonly moonMVP: Mat4;
+
     private readonly meshMVP: Mat4;
 
     private readonly circleTransform: Mat4; // Pre-allocated for circle rendering
 
     // Scene rendering matrices (pre-allocated)
     private readonly sceneSpriteTransform: Mat4; // Pre-allocated for sprite
+
     private readonly sceneOrthoProj: Mat4; // Pre-allocated orthographic projection
 
     // Mesh objects
     private readonly sunMesh;
+
     private readonly moonMesh;
+
     private readonly wallDebugMesh;
 
     // Pre-allocated scratch fields
     private readonly wallDebugTransform: Mat4 = identity();
+
     private readonly wallDebugMVP: Mat4 = identity();
 
     // Pre-allocated Vec3 objects for transition calculations
     private readonly transitionStartPos: Vec3 = { x: 0, y: 0, z: 0 };
+
     private readonly transitionEndPos: Vec3 = { x: 0, y: 0, z: 0 };
 
     constructor(
@@ -573,8 +615,8 @@ export class GameLoop {
                     this.instanceCharacter.position,
                     proposedMovement,
                     worldAABBs,
-                    INSTANCE_CHARACTER_SIZE,       // height
-                    INSTANCE_CHARACTER_SIZE / 2,   // radius
+                    INSTANCE_CHARACTER_SIZE, // height
+                    INSTANCE_CHARACTER_SIZE / 2, // radius
                     this.collisionContext,
                 );
 
@@ -838,7 +880,7 @@ export class GameLoop {
         const timeOfDay = this.isPaused
             ? this.computeTimeOfDay(this.simulationTime)
             : this.computeTimeOfDay(this.simulationTime);
-        
+
         this.renderBoundaryWireframe(viewProj);
 
         this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);

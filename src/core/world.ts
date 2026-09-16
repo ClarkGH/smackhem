@@ -39,7 +39,7 @@ export class World {
         this.activeChunks.set(chunk.id, chunk);
     }
 
-    removeChunk(chunkId: ChunkID, renderer?: Renderer) {
+    removeChunk(chunkId: ChunkID) {
         const chunk = this.activeChunks.get(chunkId);
         if (!chunk) return;
 
