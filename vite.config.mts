@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       open: true,
     },
     esbuild: {
-      target: 'es2020',
+      target: 'esnext',
     },
     define: {
       __PLATFORM__: JSON.stringify(platform),
