@@ -55,7 +55,6 @@ export class WebAssetLoader implements AssetLoader {
      * Where fileX = chunkX + CHUNK_COORD_OFFSET, fileZ = chunkZ + CHUNK_COORD_OFFSET
      * This ensures all filenames are non-negative (e.g., chunk -1,0 becomes file 9999_10000.json)
      *
-     * For now, all chunks load from 0_0.json file (same file reused for all chunks).
      * Chunks are positioned at their correct world coordinates even though they use the same mesh data.
      *
      * @param chunkId - Chunk ID in format "{chunkX},{chunkZ}" (e.g., "0,0", "-1,2")
@@ -75,17 +74,25 @@ export class WebAssetLoader implements AssetLoader {
             return this.chunkCache.get(chunkId)!;
         }
 
-        // Apply offset to chunk coordinates to generate non-negative filenames
-        // This prevents negative coordinates in filenames (e.g., chunk -1,0 becomes file 9999_10000.json)
-        // For now, all chunks load from the same file (chunk 0,0's offset file: 10000_10000.json)
-        // Future: remove the temporary override below to load per-chunk files
-        // eslint-disable-next-line no-unused-vars
         const fileX = chunkX + WebAssetLoader.CHUNK_COORD_OFFSET;
-        // eslint-disable-next-line no-unused-vars
         const fileZ = chunkZ + WebAssetLoader.CHUNK_COORD_OFFSET;
-        // Temporary: override to use chunk 0,0's offset file for all chunks
-        // TODO: Remove these two lines and use fileX/fileZ above when implementing per-chunk file loading
         const path = `${this.basePath}${fileX}_${fileZ}.json`;
+
+        // Pre-flight check: Does the file exist AND is it actually a JSON file?
+        const fileExists = await fetch(path, { method: 'HEAD' })
+            .then(res => {
+                const isOk = res.ok;
+                const contentType = res.headers.get('content-type') || '';
+                // If Vite serves an HTML 404 fallback page, the content-type will contain 'text/html'
+                return isOk && contentType.includes('application/json');
+            })
+            .catch(() => false);
+
+        if (!fileExists) {
+            const emptyChunk = this.chunkLoader.createEmptyChunk(chunkX, chunkZ, renderer);
+            this.chunkCache.set(chunkId, emptyChunk);
+            return emptyChunk;
+        }
 
         try {
             const response = await fetch(path);
@@ -103,7 +110,7 @@ export class WebAssetLoader implements AssetLoader {
             return chunk;
         } catch (error) {
             // Error loading chunk - create empty fallback
-            // console.warn(`Unavailable chunk ${chunkId} from ${path}:`, error);
+            console.error(`Unavailable chunk ${chunkId} from ${path}:`, error);
             const emptyChunk = this.chunkLoader.createEmptyChunk(chunkX, chunkZ, renderer);
             this.chunkCache.set(chunkId, emptyChunk);
             return emptyChunk;
