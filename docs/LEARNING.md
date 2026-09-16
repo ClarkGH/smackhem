@@ -39,6 +39,7 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
    - All it has are a height field function, a sky state, a global lighting function, a handful of instance rules, and a renderer that draws up meshes, quads, and the sky
 7. Cursor/Claude conflate 2D and 3D classes
    - At some point, I started confusing Cursor. Will need to review and re-organize... but I'm not sure if it's cursor's fault. We've entered territory where my application is becoming it's own unique beast, and the web scraper doesn't or didn't fully understand visual concepts well. I don't blame it for not reading my mind
+8. Nvidia driver updates may break webGL if you don't restart your computer. I learned this the hard way. Thought I broke my app.
 
 ## Patterns / Paradigms
 

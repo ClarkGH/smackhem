@@ -89,14 +89,6 @@ export class WebAssetLoader implements AssetLoader {
 
         try {
             const response = await fetch(path);
-
-            if (!response.ok) {
-                // Chunk file not found - create empty fallback chunk
-                const emptyChunk = this.chunkLoader.createEmptyChunk(chunkX, chunkZ, renderer);
-                this.chunkCache.set(chunkId, emptyChunk);
-                return emptyChunk;
-            }
-
             const jsonText = await response.text();
 
             // Load and parse chunk - chunkX/chunkZ are used for positioning meshes at correct world coords
@@ -111,7 +103,7 @@ export class WebAssetLoader implements AssetLoader {
             return chunk;
         } catch (error) {
             // Error loading chunk - create empty fallback
-            console.error(`Failed to load chunk ${chunkId} from ${path}:`, error);
+            // console.warn(`Unavailable chunk ${chunkId} from ${path}:`, error);
             const emptyChunk = this.chunkLoader.createEmptyChunk(chunkX, chunkZ, renderer);
             this.chunkCache.set(chunkId, emptyChunk);
             return emptyChunk;
