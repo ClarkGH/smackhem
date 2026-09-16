@@ -111,6 +111,10 @@ export class ChunkLoader {
                     const result = this.createMeshFromJSON(fallbackMesh, chunkCenterX, chunkCenterZ, renderer);
                     if (result) {
                         meshes.push(result.mesh);
+
+                        if (result.collisionAABB) {
+                            collisionAABBs.push(result.collisionAABB);
+                        }
                     }
                 } catch (fallbackError) {
                     console.error('Fallback mesh creation also failed:', fallbackError);
@@ -214,9 +218,54 @@ export class ChunkLoader {
             color,
         }
 
+        let collisionAABB: AABB | null = null;
+
+        if (meshJSON.type === 'cube' || meshJSON.type === 'prism' ) {
+            collisionAABB = createAABB(
+                {
+                    x: worldX - scaleX / 2,
+                    y: worldY,
+                    z: worldZ - scaleZ / 2,
+                },
+                {
+                    x: worldX + scaleX / 2,
+                    y: worldY + scaleY,
+                    z: worldZ + scaleZ / 2,
+                },
+            );
+        } else if (meshJSON.type === 'pyramid') {
+            collisionAABB = createAABB(
+                {
+                    x: worldX - scaleX / 2,
+                    y: worldY,
+                    z: worldZ - scaleX / 2,
+                },
+                {
+                    x: worldX + scaleX / 2,
+                    y: worldY + scaleX,
+                    z: worldZ + scaleX / 2,
+                },
+            );
+        } else if (meshJSON.type === 'sphere') {
+            const radius = scaleX / 2;
+
+            collisionAABB = createAABB(
+                {
+                    x: worldX - radius,
+                    y: worldY,
+                    z: worldZ - radius,
+                },
+                {
+                    x: worldX + radius,
+                    y: worldY + radius * 2,
+                    z: worldZ + radius,
+                },
+            );
+        }
+
         return {
             mesh: staticMesh,
-            collisionAABB: null,
+            collisionAABB,
         };
     }
 

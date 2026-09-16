@@ -1,8 +1,6 @@
 import { MeshHandle, Renderer } from '../services/renderer';
 import { Mat4, Vec3 } from '../types/common';
 import { type AABB, createAABB } from './math/aabb';
-import { extractPosition } from './math/mathHelpers';
-import { getMeshAABB } from './collision';
 
 export type ChunkID = string;
 
@@ -83,15 +81,14 @@ export class World {
     // TODO: Add other mesh types to the collision system
     getCollidableAABBs(): AABB[] {
         this._collidableAABBsBuffer.length = 0;
-
+        
+        // TODO: Review allocation in hot path, consider optimizing later
         this.activeChunks.forEach((chunk) => {
-            chunk.meshes.forEach((mesh) => {
-                const position = extractPosition(mesh.transform);
-                if (position.y > 0.1) {
-                    const meshAABB = getMeshAABB(mesh, 1);
-                    this._collidableAABBsBuffer.push(meshAABB);
-                }
-            });
+            this._collidableAABBsBuffer.push(...chunk.collisionAABBs);
+
+            const boundaryAABBs = this.getBoundaryWallAABBs();
+
+            this._collidableAABBsBuffer.push(...boundaryAABBs);
         });
 
         // PERFORMANCE: bends RULE M-1 (no allocation in hot loops) on purpose.

@@ -62,25 +62,6 @@ export const updatePlayerAABB = (
     out.max.z = position.z + radius;
 };
 
-// Extract AABB from a mesh transform
-// For cubes: extract position from transform, create AABB with size based on mesh type
-export const getMeshAABB = (mesh: StaticMesh, meshSize: number): AABB => {
-    const position = extractPosition(mesh.transform);
-    const halfSize = meshSize / 2;
-    return createAABB(
-        {
-            x: position.x - halfSize,
-            y: position.y - halfSize,
-            z: position.z - halfSize,
-        },
-        {
-            x: position.x + halfSize,
-            y: position.y + halfSize,
-            z: position.z + halfSize,
-        },
-    );
-};
-
 export const checkCollision = (
     playerAABB: AABB,
     worldAABB: AABB,
