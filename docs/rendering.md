@@ -27,6 +27,8 @@
 
 ## Renderer Interface
 
+The renderer explicitly owns rendering.
+
 ```typescript
 interface Renderer {
   beginFrame(): void;
