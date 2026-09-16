@@ -81,23 +81,13 @@ export class World {
     // TODO: Add other mesh types to the collision system
     getCollidableAABBs(): AABB[] {
         this._collidableAABBsBuffer.length = 0;
-        
-        // TODO: Review allocation in hot path, consider optimizing later
+
         this.activeChunks.forEach((chunk) => {
             this._collidableAABBsBuffer.push(...chunk.collisionAABBs);
-
-            const boundaryAABBs = this.getBoundaryWallAABBs();
-
-            this._collidableAABBsBuffer.push(...boundaryAABBs);
         });
 
-        // PERFORMANCE: bends RULE M-1 (no allocation in hot loops) on purpose.
-        // computeBoundaryWalls() allocates a small array internally - accepted here
-        // to keep one shared implementation with getBoundaryWallAABBs() instead of
-        // a second copy of the neighbor-scan logic. Wall count is small (4 per
-        // real-chunk edge), so this hasn't shown up as a real cost; revisit if that
-        // changes.
-        this._collidableAABBsBuffer.push(...this.getBoundaryWallAABBs());
+        const boundaryAABBs = this.getBoundaryWallAABBs();
+        this._collidableAABBsBuffer.push(...boundaryAABBs);
 
         return this._collidableAABBsBuffer;
     }

@@ -48,9 +48,11 @@ Each chunk is:
 
 ```typescript
 Chunk {
-  id: string;
+  id: ChunkID;
   bounds: AABB;
+  collisionAABBs: AABB[];
   meshes: StaticMesh[];
+  hasContent: boolean;
 }
 
 StaticMesh {
