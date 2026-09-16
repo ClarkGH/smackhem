@@ -18,6 +18,7 @@
     "@types/node": "^25.9.7",
     "@typescript-eslint/eslint-plugin": "^8.70.0",
     "@typescript-eslint/parser": "^8.70.0",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "^7.32.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-import-resolver-typescript": "^4.4.5",

@@ -15,6 +15,9 @@ node_modules/
 # Build output
 dist/
 
+# Test coverage
+coverage/
+
 # Vite cache
 .vite/
 
