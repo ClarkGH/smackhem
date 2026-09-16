@@ -24,13 +24,12 @@ For development/testing, all chunks currently load from `10000_10000.json` (same
 - If something "happens," it belongs in TypeScript/native code
 - All mesh data is static geometry definition only
 
-#### Phase 1: Inline Chunk Format (Current)
+#### Version 2: Inline Chunk Format (Current)
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "id": "0,0",
-  "bounds": [0, 0, 0, 10, 5, 10],
   "meshes": [
     { 
       "type": "plane", 
@@ -52,10 +51,13 @@ For development/testing, all chunks currently load from `10000_10000.json` (same
 
 **Required Fields:**
 
-- `version` (number): Schema version number (currently `1`). Required for schema evolution tracking.
+- `version` (number): Schema version number. Required for schema evolution tracking. E.G. Version 1 had bounds set in the file, that is now determined in-code. We may have non-traversable chunk-pieces in the future, but the initial establishing hard coded ones was a naive plan.
 - `id` (string): Chunk identifier in format `"{chunkX},{chunkZ}"` (e.g., `"0,0"`, `"-1,2"`)
-- `bounds` (number[6]): Axis-aligned bounding box `[minX, minY, minZ, maxX, maxY, maxZ]`
 - `meshes` (array): Array of mesh definitions
+
+**Deprecated Fields**
+
+- `bounds` (number[6]): Axis-aligned bounding box `[minX, minY, minZ, maxX, maxY, maxZ]`
 
 **Mesh Object Fields:**
 
@@ -87,7 +89,6 @@ Mesh Y positions are automatically adjusted based on mesh type to ensure proper 
 {
   "version": 1,
   "id": "0,0",
-  "bounds": [0, 0, 0, 10, 5, 10],
   "meshes": [
     {
       "type": "plane",

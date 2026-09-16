@@ -48,9 +48,11 @@ Each chunk is:
 
 ```typescript
 Chunk {
-  id: string;
+  id: ChunkID;
   bounds: AABB;
+  collisionAABBs: AABB[];
   meshes: StaticMesh[];
+  hasContent: boolean;
 }
 
 StaticMesh {
@@ -197,6 +199,8 @@ vertices = [
 
 ### Prism Mesh
 
+We may revisit and remove prisms/cubes down the line, as cubes and prisms use the same drawing tools.
+
 For a rectangular prism of width `w`, height `h`, depth `d`:
 
 ```typescript
@@ -237,7 +241,7 @@ Game logic never sees devices.
 
 ## Instance System
 
-The instance system manages the 2D mode where party members, NPCs, and enemies are displayed as 2D sprites in either a frozen 3D scene, or a 2D instance.
+The instance system manages the 2D mode where party members, NPCs, and enemies are displayed as 2D sprites in either a frozen 3D scene, as orthographic 3D billboards; or a sidescrolling 2D scene.
 
 ### Instance System Architecture
 
@@ -271,7 +275,7 @@ interface InstanceCharacter {
 
 #### Linear Interpolation (Lerp)
 
-**Lerp** (linear interpolation) smoothly transitions between two values by blending them based on a parameter `t` (typically 0.0 to 1.0).
+**Lerp** (linear interpolation) smoothly transitions between two values by blending them based on a parameter `t` (typically 0.0 to 1.0). Used to smoothly animate from starting to end position. In layman's terms it's giving the sliding effect.
 
 For scalars:
 
@@ -299,6 +303,7 @@ lerpVec3(a, b, t, out) {
 - `t` is derived from `transitionProgress` (0.0 to 1.0) using smoothstep for easing
 - Progress accumulates over fixed timestep: `progress += dt * direction / duration`
 - For reverse transition: `direction = -1.0`, so progress decreases from 1.0 → 0.0
+- TODO: When a sprite spawns or transitions forward, if the sprite hits collision the animation should reverse and return to the 3d game mode.
 
 **Zero-Allocation Design:**
 

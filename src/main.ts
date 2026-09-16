@@ -11,12 +11,12 @@ const createPlatform = async (): Promise<PlatformServices> => {
     // __PLATFORM__ is a build-time define from Vite, not available at ESLint parse time
     // eslint-disable-next-line no-undef
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
-        const createStubPlatform = (await import('./platforms/stub/stubBootstrap')).default;
+        const { default: createStubPlatform } = (await import('./platforms/stub/stubBootstrap.js')).default;
         return createStubPlatform();
     }
 
     // Default to web
-    const { createWebPlatform } = await import('./platforms/web/webBootstrap');
+    const { createWebPlatform } = await import('./platforms/web/webBootstrap.js');
     return createWebPlatform();
 };
 
@@ -42,11 +42,11 @@ const main = async () => {
     // eslint-disable-next-line no-undef
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
         // Stub platform chunk management (deterministic, same as web)
-        const { updateActiveChunks: stubUpdateActiveChunks } = await import('./platforms/stub/stubBootstrap');
+        const { updateActiveChunks: stubUpdateActiveChunks } = await import('./platforms/stub/stubBootstrap.js');
         updateActiveChunks = stubUpdateActiveChunks;
     } else {
         // Default to web platform chunk management
-        const { updateActiveChunks: webUpdateActiveChunks } = await import('./platforms/web/webBootstrap');
+        const { updateActiveChunks: webUpdateActiveChunks } = await import('./platforms/web/webBootstrap.js');
         updateActiveChunks = webUpdateActiveChunks;
     }
 

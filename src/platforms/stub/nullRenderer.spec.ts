@@ -10,6 +10,7 @@ import { World } from '../../core/world';
 import StubInput from './stubInput';
 import StubClock from './stubClock';
 import { identity } from '../../core/math/mathHelpers';
+import { createChunk } from './stubBootstrap';
 
 describe('NullRenderer - Portability Validation (RULE P-1)', () => {
     let renderer: NullRenderer;
@@ -88,9 +89,9 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
     it('supports sun and moon lighting', () => {
         const direction = { x: 0.5, y: 0.5, z: -0.5 };
         const color = { x: 0.8, y: 0.9, z: 1.0 };
-        const sun = {direction, color}
-        const moon = {direction, color}     
-        
+        const sun = { direction, color };
+        const moon = { direction, color };
+
         expect(() => {
             renderer.setCelestialLighting?.(sun, moon);
         }).not.toThrow();
@@ -119,7 +120,7 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
         const texture = await renderer.loadTexture('valid');
         const identityMatrix = identity();
         expect(() => renderer.drawTexturedQuad(texture, identityMatrix, 1.0)).not.toThrow();
-        expect(() => renderer.drawTexturedQuad(texture, identityMatrix, 1.0, {x: 0, y: 1, z: 0})).not.toThrow();
+        expect(() => renderer.drawTexturedQuad(texture, identityMatrix, 1.0, { x: 0, y: 1, z: 0 })).not.toThrow();
 
         const invalidTexture = { id: 'invalid-handle' };
         expect(() => renderer.drawTexturedQuad(invalidTexture, identityMatrix, 1.0))
@@ -136,6 +137,69 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
         expect(renderer.getMeshCount()).toBe(0);
         expect(renderer.getTextureCount()).toBe(0);
         expect(renderer.getFrameCount()).toBe(0);
+    });
+});
+
+describe('StubPlatform - Chunk streaming smoke test', () => {
+    let renderer: NullRenderer;
+    let input: StubInput;
+    let clock: StubClock;
+    let world: World;
+    let gameLoop: GameLoop;
+
+    beforeEach(() => {
+        renderer = new NullRenderer();
+        input = new StubInput();
+        clock = new StubClock();
+        world = new World();
+        globalThis.requestAnimationFrame = () => 0;
+
+        // A small real chunk grid, built the same way the stub platform builds
+        // it during actual play - not a hand-rolled fixture that could drift
+        // from what createChunk actually produces.
+        [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([x, z]) => {
+            world.addChunk(createChunk(x, z, renderer));
+        });
+
+        gameLoop = new GameLoop(renderer, input, world, () => 16 / 9);
+        clock.setFixedDeltaTime(1 / 60);
+    });
+
+    it('runs update/render cleanly with real chunks and boundary walls loaded', () => {
+        expect(() => {
+            for (let i = 0; i < 60; i += 1) {
+                clock.update();
+                input.update();
+                gameLoop.update(clock.getDeltaTime());
+                gameLoop.render();
+            }
+        }).not.toThrow();
+    });
+
+    it('runs cleanly while walking toward the boundary', () => {
+        input.setMove(0, 1); // forward, toward wherever a wall might be
+
+        expect(() => {
+            for (let i = 0; i < 300; i += 1) { // enough frames to reach an edge chunk
+                clock.update();
+                input.update();
+                gameLoop.update(clock.getDeltaTime());
+                gameLoop.render();
+            }
+        }).not.toThrow();
+    });
+
+    it('runs cleanly with wireframe mode active', () => {
+        renderer.setWireframe(true);
+
+        expect(() => {
+            for (let i = 0; i < 30; i += 1) {
+                clock.update();
+                input.update();
+                gameLoop.update(clock.getDeltaTime());
+                gameLoop.render();
+            }
+        }).not.toThrow();
     });
 });
 

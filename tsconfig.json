@@ -1,19 +1,18 @@
 {
     "compilerOptions": {
-      "target": "ES2020",
-      "module": "ESNext",
-      "moduleResolution": "Node",
+      "target": "es2022",
+      "module": "nodenext",
+      "moduleResolution": "nodenext",
       "strict": true,
       "jsx": "preserve",
       "esModuleInterop": true,
       "skipLibCheck": true,
       "forceConsistentCasingInFileNames": true,
-      "outDir": "dist",
+      "outDir": "./dist",
       "sourceMap": true,
-      "baseUrl": "./",
-      "paths": {},
+      "paths": {"src/*": ["./src/*"]},
+      "rootDir": "./src", 
       "types": ["vite/client"]
     },
-    "include": ["src"]
+    "include": ["src/**/*"]
   }
-  

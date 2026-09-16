@@ -35,7 +35,7 @@ export default class NullRenderer implements Renderer {
         // Stub implementation - could track frame stats here
     }
 
-    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3): void {
+    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3, _isLightSource?: boolean): void {
         // Stub implementation - could validate mesh handle here
         // Could track draw calls for testing
     }
@@ -109,6 +109,7 @@ export default class NullRenderer implements Renderer {
         this.moonDirection = _moon.direction;
         this.moonColor = _moon.color;
     }
+
     // Stub-specific utility methods for testing
     getFrameCount(): number {
         return this.frameCount;
@@ -136,8 +137,12 @@ export default class NullRenderer implements Renderer {
             sunDirection: { ...this.sunDirection },
             sunColor: { ...this.sunColor },
             moonDirection: { ...this.moonDirection },
-            moonColor: { ...this.moonColor }
-        }
+            moonColor: { ...this.moonColor },
+        };
+    }
+
+    getWireframeEnabled(): boolean {
+        return this.wireframeEnabled;
     }
 
     reset(): void {

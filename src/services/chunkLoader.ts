@@ -1,7 +1,7 @@
 import type { Renderer } from './renderer';
 import type { Chunk, StaticMesh } from '../core/world';
 import type { Vec3 } from '../types/common';
-import { createAABB } from '../core/math/aabb';
+import { AABB, createAABB } from '../core/math/aabb';
 import { createTranslationMatrix } from '../core/math/mathHelpers';
 import { CHUNK_SIZE } from '../core/world';
 
@@ -64,10 +64,6 @@ export class ChunkLoader {
             throw new Error('Chunk JSON missing required \'id\' field');
         }
 
-        if (!Array.isArray(data.bounds) || data.bounds.length !== 6) {
-            throw new Error('Chunk JSON \'bounds\' must be array of 6 numbers [minX, minY, minZ, maxX, maxY, maxZ]');
-        }
-
         if (!Array.isArray(data.meshes)) {
             throw new Error('Chunk JSON \'meshes\' must be an array');
         }
@@ -84,15 +80,23 @@ export class ChunkLoader {
         chunkCenterX: number,
         chunkCenterZ: number,
         renderer: Renderer,
-    ): StaticMesh[] {
+    ): {
+        meshes: StaticMesh[];
+        collisionAABBs: AABB[];
+    } {
         const meshes: StaticMesh[] = [];
+        const collisionAABBs: AABB[] = [];
 
         // Batch creation: iterate through all meshes and create them together
         meshesJSON.forEach((meshJSON) => {
             try {
-                const staticMesh = this.createMeshFromJSON(meshJSON, chunkCenterX, chunkCenterZ, renderer);
-                if (staticMesh) {
-                    meshes.push(staticMesh);
+                const result = this.createMeshFromJSON(meshJSON, chunkCenterX, chunkCenterZ, renderer);
+                if (result) {
+                    meshes.push(result.mesh);
+
+                    if (result.collisionAABB) {
+                        collisionAABBs.push(result.collisionAABB);
+                    }
                 }
             } catch (error) {
                 console.error(`Failed to create mesh of type '${meshJSON.type}':`, error);
@@ -104,9 +108,13 @@ export class ChunkLoader {
                     color: meshJSON.color || [0.5, 0.5, 0.5],
                 };
                 try {
-                    const staticMesh = this.createMeshFromJSON(fallbackMesh, chunkCenterX, chunkCenterZ, renderer);
-                    if (staticMesh) {
-                        meshes.push(staticMesh);
+                    const result = this.createMeshFromJSON(fallbackMesh, chunkCenterX, chunkCenterZ, renderer);
+                    if (result) {
+                        meshes.push(result.mesh);
+
+                        if (result.collisionAABB) {
+                            collisionAABBs.push(result.collisionAABB);
+                        }
                     }
                 } catch (fallbackError) {
                     console.error('Fallback mesh creation also failed:', fallbackError);
@@ -114,7 +122,10 @@ export class ChunkLoader {
             }
         });
 
-        return meshes;
+        return {
+            meshes,
+            collisionAABBs,
+        };
     }
 
     /**
@@ -125,7 +136,7 @@ export class ChunkLoader {
         chunkCenterX: number,
         chunkCenterZ: number,
         renderer: Renderer,
-    ): StaticMesh | null {
+    ): { mesh: StaticMesh; collisionAABB: AABB | null } | null {
         // Parse position (relative to chunk center)
         const posArray = Array.isArray(meshJSON.pos) ? meshJSON.pos : [0, 0, 0];
         const worldX = chunkCenterX + (posArray[0] || 0);
@@ -201,10 +212,60 @@ export class ChunkLoader {
         // Create transform matrix (translation only for now)
         const transform = createTranslationMatrix(worldX, yPos, worldZ);
 
-        return {
+        const staticMesh: StaticMesh = {
             mesh: meshHandle,
             transform,
             color,
+        };
+
+        let collisionAABB: AABB | null = null;
+
+        if (meshJSON.type === 'cube' || meshJSON.type === 'prism') {
+            collisionAABB = createAABB(
+                {
+                    x: worldX - scaleX / 2,
+                    y: worldY,
+                    z: worldZ - scaleZ / 2,
+                },
+                {
+                    x: worldX + scaleX / 2,
+                    y: worldY + scaleY,
+                    z: worldZ + scaleZ / 2,
+                },
+            );
+        } else if (meshJSON.type === 'pyramid') {
+            collisionAABB = createAABB(
+                {
+                    x: worldX - scaleX / 2,
+                    y: worldY,
+                    z: worldZ - scaleX / 2,
+                },
+                {
+                    x: worldX + scaleX / 2,
+                    y: worldY + scaleX,
+                    z: worldZ + scaleX / 2,
+                },
+            );
+        } else if (meshJSON.type === 'sphere') {
+            const radius = scaleX / 2;
+
+            collisionAABB = createAABB(
+                {
+                    x: worldX - radius,
+                    y: worldY,
+                    z: worldZ - radius,
+                },
+                {
+                    x: worldX + radius,
+                    y: worldY + radius * 2,
+                    z: worldZ + radius,
+                },
+            );
+        }
+
+        return {
+            mesh: staticMesh,
+            collisionAABB,
         };
     }
 
@@ -226,7 +287,7 @@ export class ChunkLoader {
         const chunkCenterZ = chunkZ * CHUNK_SIZE;
 
         // Batch create all meshes for this chunk
-        const meshes = this.createMeshesFromJSON(chunkJSON.meshes, chunkCenterX, chunkCenterZ, renderer);
+        const { meshes, collisionAABBs } = this.createMeshesFromJSON(chunkJSON.meshes, chunkCenterX, chunkCenterZ, renderer);
 
         // Debug: Check what meshes were created
         console.log(`Chunk ${chunkX},${chunkZ}: Created ${meshes.length} meshes from ${chunkJSON.meshes.length} JSON meshes`);
@@ -241,14 +302,16 @@ export class ChunkLoader {
         // Create bounds AABB from JSON bounds array
         // Create bounds AABB from JSON bounds array
         const bounds = createAABB(
-            { x: chunkJSON.bounds[0], y: chunkJSON.bounds[1], z: chunkJSON.bounds[2] },
-            { x: chunkJSON.bounds[3], y: chunkJSON.bounds[4], z: chunkJSON.bounds[5] },
+            { x: chunkCenterX - CHUNK_SIZE / 2, y: -1, z: chunkCenterZ - CHUNK_SIZE / 2 },
+            { x: chunkCenterX + CHUNK_SIZE / 2, y: 5, z: chunkCenterZ + CHUNK_SIZE / 2 },
         );
 
         return {
             id: chunkJSON.id,
             bounds,
             meshes,
+            collisionAABBs,
+            hasContent: true,
         };
     }
 
@@ -279,6 +342,8 @@ export class ChunkLoader {
                     color: { x: 0.4, y: 0.4, z: 0.4 },
                 },
             ],
+            collisionAABBs: [],
+            hasContent: false,
         };
     }
 
