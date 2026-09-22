@@ -11,7 +11,7 @@ export interface Scene {
     transitionProgress: number; // 0.0 to 1.0
     transitionDirection: number; // 1.0 forward, -1.0 reverse
     isPaused: boolean; // scene-specific pause
-    collisionGrid: Uint8Array; // 25x19 = 475 bytes, tile-based (0 = walkable, 1 = solid)
+    collisionGrid: Uint8Array; // 25x18.75 = 469 bytes, tile-based (0 = walkable, 1 = solid)
 }
 
 export const createScene = (): Scene => {
