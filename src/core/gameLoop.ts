@@ -65,6 +65,7 @@ export interface DebugHUD {
         pitch?: number;
         gameMode?: string;
         instancePosition?: Vec3;
+        currentChunk?: { x: number; z: number; hasContent: boolean };
     }) => void;
     toggle: () => void;
     isVisible: () => boolean;
@@ -724,6 +725,10 @@ export class GameLoop {
     render(): void {
         this.renderer.beginFrame();
 
+        // Chunk debug data
+        const currentChunkCoords = World.getChunkCoords(this.camera.position);
+        const currentChunkData = this.world.activeChunks.get(World.getChunkID(currentChunkCoords.x, currentChunkCoords.z));
+
         // Scene mode rendering (2D overlay)
         if (this.gameMode === 'scene_2d') {
             // 1. Render frozen 3D world (normal 3D rendering, camera frozen)
@@ -870,6 +875,11 @@ export class GameLoop {
                     instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
                         ? this.instanceCharacter.position
                         : undefined,
+                    currentChunk: {
+                        x: currentChunkCoords.x,
+                        z: currentChunkCoords.z,
+                        hasContent: currentChunkData?.hasContent ?? false,
+                    },
                 });
             }
 
@@ -1023,6 +1033,11 @@ export class GameLoop {
                 instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
                     ? this.instanceCharacter.position
                     : undefined,
+                currentChunk: {
+                    x: currentChunkCoords.x,
+                    z: currentChunkCoords.z,
+                    hasContent: currentChunkData?.hasContent ?? false,
+                },
             });
         }
 
