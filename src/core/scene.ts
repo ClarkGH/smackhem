@@ -1,8 +1,8 @@
 export const SCENE_TILE_SIZE = 32; // pixels per tile
 export const SCENE_GRID_WIDTH = 25; // 800px / 32px
-export const SCENE_GRID_HEIGHT = 19; // 600px / 32px
-export const SCENE_WIDTH_PX = 800; // matches canvas
-export const SCENE_HEIGHT_PX = 600; // matches canvas
+export const SCENE_GRID_HEIGHT = 18.75; // 600px / 32px
+export const SCENE_WIDTH_PX = SCENE_GRID_WIDTH * SCENE_TILE_SIZE; // matches canvas
+export const SCENE_HEIGHT_PX = Math.round(SCENE_GRID_HEIGHT * SCENE_TILE_SIZE); // matches canvas
 export const SCENE_TRANSITION_DURATION = 1.0; // seconds
 
 export interface Scene {
@@ -11,7 +11,7 @@ export interface Scene {
     transitionProgress: number; // 0.0 to 1.0
     transitionDirection: number; // 1.0 forward, -1.0 reverse
     isPaused: boolean; // scene-specific pause
-    collisionGrid: Uint8Array; // 25x19 = 475 bytes, tile-based (0 = walkable, 1 = solid)
+    collisionGrid: Uint8Array; // 25x18.75 = 469 bytes, tile-based (0 = walkable, 1 = solid)
 }
 
 export const createScene = (): Scene => {
@@ -29,6 +29,3 @@ export const createScene = (): Scene => {
         collisionGrid,
     };
 };
-
-
-

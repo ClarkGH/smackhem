@@ -1,11 +1,9 @@
 import type { Vec3 } from '../types/common';
-import type { StaticMesh } from './world';
 import {
     createAABB,
     type AABB,
     aabbIntersects,
 } from './math/aabb';
-import { extractPosition } from './math/mathHelpers';
 
 export interface CollisionContext {
     newPos: Vec3;
@@ -60,25 +58,6 @@ export const updatePlayerAABB = (
     out.max.x = position.x + radius;
     out.max.y = centerY + height;
     out.max.z = position.z + radius;
-};
-
-// Extract AABB from a mesh transform
-// For cubes: extract position from transform, create AABB with size based on mesh type
-export const getMeshAABB = (mesh: StaticMesh, meshSize: number): AABB => {
-    const position = extractPosition(mesh.transform);
-    const halfSize = meshSize / 2;
-    return createAABB(
-        {
-            x: position.x - halfSize,
-            y: position.y - halfSize,
-            z: position.z - halfSize,
-        },
-        {
-            x: position.x + halfSize,
-            y: position.y + halfSize,
-            z: position.z + halfSize,
-        },
-    );
 };
 
 export const checkCollision = (

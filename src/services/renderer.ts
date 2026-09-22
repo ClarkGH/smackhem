@@ -13,9 +13,8 @@ export interface TextureHandle {
 
 export interface Renderer {
     beginFrame(): void;
-    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3): void;
+    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3, u_isLightSource?: boolean): void;
     endFrame(): void;
-    setWireframe(_enabled: boolean): void;
     createPlaneMesh(_size: number): MeshHandle;
     createCubeMesh(_size: number): MeshHandle;
     createPyramidMesh(_size: number): MeshHandle;
@@ -33,4 +32,6 @@ export interface Renderer {
     clear?(_r: number, _g: number, _b: number, _a: number): void;
     getViewportWidth?(): number;
     getViewportHeight?(): number;
+    setWireframe(_enabled: boolean): void;
+    getWireframeEnabled?(): boolean;
 }

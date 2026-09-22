@@ -20,6 +20,7 @@ export interface Camera {
 export const PLAYER_HEIGHT = 1.6;
 export const PLAYER_RADIUS = 0.3; // Player collision radius (half-width)
 export const PLAYER_SPEED = 10.0; // units per second
+export const INSTANCE_CHARACTER_SIZE = 0.5; // Billboard diameter while we work with circle; also its collision.
 
 export const INITIAL_PLAYER_POSITION: Vec3 = { x: 0, y: PLAYER_HEIGHT, z: 2 };
 

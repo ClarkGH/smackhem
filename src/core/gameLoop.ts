@@ -3,6 +3,7 @@ import type { Input } from '../services/input';
 import {
     createCamera,
     getCameraMatrix,
+    INSTANCE_CHARACTER_SIZE,
     PLAYER_SPEED,
     PLAYER_HEIGHT,
     PLAYER_RADIUS,
@@ -13,6 +14,8 @@ import {
 import {
     resolveCollision,
     createCollisionContext,
+    updatePlayerAABB,
+    checkCollision,
     type CollisionContext,
 } from './collision';
 import {
@@ -62,6 +65,9 @@ export interface DebugHUD {
         timeOfDay?: number;
         yaw?: number;
         pitch?: number;
+        gameMode?: string;
+        instancePosition?: Vec3;
+        currentChunk?: { x: number; z: number; hasContent: boolean };
     }) => void;
     toggle: () => void;
     isVisible: () => boolean;
@@ -130,6 +136,8 @@ export class GameLoop {
 
     private readonly CELESTIAL_DISTANCE: number; // Computed from camera.far
 
+    private readonly WALL_DEBUG_COLOR: Vec3 = { x: 1, y: 0, z: 0 }; // Color of the wall debug mesh
+
     /*
      * PERFORMANCE:
      * All objects are pre-allocated and reused every frame.
@@ -175,12 +183,20 @@ export class GameLoop {
 
     // Scene rendering matrices (pre-allocated)
     private readonly sceneSpriteTransform: Mat4; // Pre-allocated for sprite
+
     private readonly sceneOrthoProj: Mat4; // Pre-allocated orthographic projection
 
     // Mesh objects
     private readonly sunMesh;
 
     private readonly moonMesh;
+
+    private readonly wallDebugMesh;
+
+    // Pre-allocated scratch fields
+    private readonly wallDebugTransform: Mat4 = identity();
+
+    private readonly wallDebugMVP: Mat4 = identity();
 
     // Pre-allocated Vec3 objects for transition calculations
     private readonly transitionStartPos: Vec3 = { x: 0, y: 0, z: 0 };
@@ -220,6 +236,7 @@ export class GameLoop {
         // Mesh objects
         this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE * 10, 16);
         this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE * 10, 16);
+        this.wallDebugMesh = renderer.createCubeMesh(1);
 
         // Instance system
         this.instance = createInstance();
@@ -240,6 +257,26 @@ export class GameLoop {
         } catch (error) {
             console.error('Failed to load circle texture:', error);
         }
+    }
+
+    // Check if we're going to collide or move through AABB while transitioning to an instance
+    private isInstanceTransitionPositionBlocked(position: Vec3): boolean {
+        updatePlayerAABB(
+            position,
+            INSTANCE_CHARACTER_SIZE,
+            INSTANCE_CHARACTER_SIZE / 2,
+            this.collisionContext.playerAABB,
+        );
+
+        const worldAABBs = this.world.getCollidableAABBs();
+
+        for (let i = 0; i < worldAABBs.length; i += 1) {
+            if (checkCollision(this.collisionContext.playerAABB, worldAABBs[i])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private pause(): void {
@@ -270,7 +307,7 @@ export class GameLoop {
         this.transitionEndPos.y = this.instanceCharacter.position.y;
         this.transitionEndPos.z = this.instanceCharacter.position.z;
 
-        const circleSize = 0.5;
+        const circleSize = INSTANCE_CHARACTER_SIZE;
         const floorY = circleSize / 2;
 
         this.transitionStartPos.x = this.camera.position.x;
@@ -282,7 +319,7 @@ export class GameLoop {
         // Circle starts at camera position (X/Z) and slides forward in the XZ plane
         // Use target pitch (0) for calculation since we're transitioning to it
         const forward = getCameraForward(this.camera.yaw, this.targetPitch);
-        const circleSize = 0.5; // Circle radius
+        const circleSize = INSTANCE_CHARACTER_SIZE; // Circle radius
         const floorY = circleSize / 2; // Half circle size above floor (quad is centered at Y=0)
 
         // Start position: Camera's X/Z position at floor level
@@ -406,6 +443,41 @@ export class GameLoop {
         o[12] = position.x; o[13] = position.y; o[14] = position.z; o[15] = 1;
     }
 
+    // Same column-major layout as computeCelestialTransform, just per-axis scale
+    // instead of uniform - a scaled-and-translated box instead of a scaled sphere.
+    private computeScaledTransform(
+        center: Vec3,
+        scale: Vec3,
+        out: Mat4,
+    ): void {
+        const o = out.elements;
+
+        o[0] = scale.x; o[1] = 0; o[2] = 0; o[3] = 0;
+        o[4] = 0; o[5] = scale.y; o[6] = 0; o[7] = 0;
+        o[8] = 0; o[9] = 0; o[10] = scale.z; o[11] = 0;
+        o[12] = center.x; o[13] = center.y; o[14] = center.z; o[15] = 1;
+    }
+
+    private renderBoundaryWireframe(viewProj: Mat4): void {
+        if (!this.renderer.getWireframeEnabled?.()) return;
+
+        this.world.getBoundaryWallAABBs().forEach((wall) => {
+            const center = {
+                x: (wall.min.x + wall.max.x) / 2,
+                y: (wall.min.y + wall.max.y) / 2,
+                z: (wall.min.z + wall.max.z) / 2,
+            };
+            const scale = {
+                x: wall.max.x - wall.min.x,
+                y: wall.max.y - wall.min.y,
+                z: wall.max.z - wall.min.z,
+            };
+            this.computeScaledTransform(center, scale, this.wallDebugTransform);
+            matrixMultiplyInto(viewProj, this.wallDebugTransform, this.wallDebugMVP);
+            this.renderer.drawMesh(this.wallDebugMesh, this.wallDebugMVP, this.WALL_DEBUG_COLOR, true);
+        });
+    }
+
     private updateSimulation(dt: number): void {
         const intent = this.input.getIntent();
 
@@ -474,23 +546,15 @@ export class GameLoop {
         // Update instance state transition (only when paused)
         if (this.isPaused && this.instance.isTransitioning) {
             // Update transition progress using fixed timestep
-            this.instance.transitionProgress += (dt * this.instance.transitionDirection) / TRANSITION_DURATION;
+            this.instance.transitionProgress += (
+                dt * this.instance.transitionDirection
+            ) / TRANSITION_DURATION;
 
             // Clamp to [0, 1]
             if (this.instance.transitionProgress >= 1.0) {
                 this.instance.transitionProgress = 1.0;
-                this.instance.isTransitioning = false;
-                if (this.instance.transitionDirection > 0) {
-                    this.instance.isActive = true;
-                }
             } else if (this.instance.transitionProgress <= 0.0) {
                 this.instance.transitionProgress = 0.0;
-                this.instance.isTransitioning = false;
-                if (this.instance.transitionDirection < 0) {
-                    this.instance.isActive = false;
-                    // Reverse transition complete, actually unpause now
-                    this.isPaused = false;
-                }
             }
 
             // Calculate current position via interpolation
@@ -501,6 +565,34 @@ export class GameLoop {
                 smoothT,
                 this.instanceCharacter.position,
             );
+
+            // If moving forward and the character hits an AABB,
+            // reverse the transition and return to the previous state.
+            if (
+                this.instance.transitionDirection > 0
+                && this.isInstanceTransitionPositionBlocked(this.instanceCharacter.position)
+            ) {
+                this.instance.transitionDirection = -1.0;
+                this.instance.isActive = false;
+            }
+
+            // Forward transition complete
+            if (
+                this.instance.transitionProgress >= 1.0
+                && this.instance.transitionDirection > 0
+            ) {
+                this.instance.isTransitioning = false;
+                this.instance.isActive = true;
+            }
+
+            // Reverse transition complete
+            if (this.instance.transitionProgress <= 0.0) {
+                this.instance.isTransitioning = false;
+                this.instance.isActive = false;
+
+                // Reverse transition complete, actually unpause now
+                this.isPaused = false;
+            }
         }
 
         // Update camera pitch transition (when paused or in scene mode, going to 0)
@@ -530,6 +622,20 @@ export class GameLoop {
                 this.scene.transitionProgress = 0.0;
                 this.scene.isTransitioning = false;
                 this.scene.isActive = false;
+
+                // Return to 3D world state
+                this.gameMode = 'world_3d';
+                this.isTransitioningPitch = false;
+
+                // Restore Camera State
+                if (this.savedCameraState) {
+                    this.camera.position.x = this.savedCameraState.position.x;
+                    this.camera.position.y = this.savedCameraState.position.y;
+                    this.camera.position.z = this.savedCameraState.position.z;
+                    this.camera.yaw = this.savedCameraState.yaw;
+                    this.camera.pitch = this.savedCameraState.pitch;
+                    this.savedCameraState = null;
+                }
             }
         }
 
@@ -539,22 +645,29 @@ export class GameLoop {
             const { x: moveX, y: moveY } = intent.move;
 
             if (moveX !== 0 || moveY !== 0) {
-                // Use camera yaw at pitch 0 (horizontal forward/right vectors for XZ plane movement)
                 const forward = getCameraForward(this.camera.yaw, 0);
                 const right = getCameraRight(this.camera.yaw);
 
-                // Calculate movement in XZ plane (Y stays at floor level)
                 const moveDistance = PLAYER_SPEED * dt;
-                const movement = {
+                const proposedMovement = {
                     x: (forward.x * moveY + right.x * moveX) * moveDistance,
                     y: 0,
                     z: (forward.z * moveY + right.z * moveX) * moveDistance,
                 };
 
-                // Update instance character position (Y remains at circleSize/2 for floor level)
-                this.instanceCharacter.position.x += movement.x;
-                this.instanceCharacter.position.z += movement.z;
-                // Y stays constant at floor level (circleSize / 2)
+                const worldAABBs = this.world.getCollidableAABBs();
+                const resolvedMovement = resolveCollision(
+                    this.instanceCharacter.position,
+                    proposedMovement,
+                    worldAABBs,
+                    INSTANCE_CHARACTER_SIZE, // height
+                    INSTANCE_CHARACTER_SIZE / 2, // radius
+                    this.collisionContext,
+                );
+
+                this.instanceCharacter.position.x += resolvedMovement.x;
+                this.instanceCharacter.position.z += resolvedMovement.z;
+                // Y stays constant at floor level (INSTANCE_CHARACTER_SIZE / 2)
             }
         }
 
@@ -654,6 +767,10 @@ export class GameLoop {
     render(): void {
         this.renderer.beginFrame();
 
+        // Chunk debug data
+        const currentChunkCoords = World.getChunkCoords(this.camera.position);
+        const currentChunkData = this.world.activeChunks.get(World.getChunkID(currentChunkCoords.x, currentChunkCoords.z));
+
         // Scene mode rendering (2D overlay)
         if (this.gameMode === 'scene_2d') {
             // 1. Render frozen 3D world (normal 3D rendering, camera frozen)
@@ -671,7 +788,9 @@ export class GameLoop {
             const moonElevation = { value: -this.sunElevation.value };
             this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
 
-            // Each body's visibility now comes from ITS OWN elevation, not the other
+            this.renderBoundaryWireframe(viewProj);
+
+            // Each body's visibility comes from ITS OWN elevation, not the other
             // body's time-of-day triangle - see computeCelestialVisibility for why.
             const sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
             const moonVisibility = this.computeCelestialVisibility(moonElevation.value);
@@ -720,12 +839,12 @@ export class GameLoop {
 
             if (sunVisibility > 0) {
                 matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
-                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
+                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility, true);
             }
 
             if (moonVisibility > 0) {
                 matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
-                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
+                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility, true);
             }
 
             const visibleMeshes = this.world.getVisibleMeshes();
@@ -794,6 +913,15 @@ export class GameLoop {
                     timeOfDay,
                     yaw: this.camera.yaw,
                     pitch: this.camera.pitch,
+                    gameMode: this.gameMode,
+                    instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                        ? this.instanceCharacter.position
+                        : undefined,
+                    currentChunk: {
+                        x: currentChunkCoords.x,
+                        z: currentChunkCoords.z,
+                        hasContent: currentChunkData?.hasContent ?? false,
+                    },
                 });
             }
 
@@ -810,6 +938,8 @@ export class GameLoop {
         const timeOfDay = this.isPaused
             ? this.computeTimeOfDay(this.simulationTime)
             : this.computeTimeOfDay(this.simulationTime);
+
+        this.renderBoundaryWireframe(viewProj);
 
         this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);
         this.computeSunDirection(timeOfDay, this.lightDirection);
@@ -867,12 +997,12 @@ export class GameLoop {
 
         if (sunVisibility > 0) {
             matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
-            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility);
+            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility, true);
         }
 
         if (moonVisibility > 0) {
             matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
-            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility);
+            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility, true);
         }
 
         const visibleMeshes = this.world.getVisibleMeshes();
@@ -886,7 +1016,7 @@ export class GameLoop {
             if (this.partyMemberTexture1) {
                 // Calculate transform for circle (billboard at character position)
                 const pos = this.instanceCharacter.position;
-                const circleSize = 0.5; // Small size as specified
+                const circleSize = INSTANCE_CHARACTER_SIZE; // Small size as specified
 
                 // Calculate billboard orientation (face camera, stay vertical)
                 const toCamera = {
@@ -941,6 +1071,15 @@ export class GameLoop {
                 timeOfDay,
                 yaw: this.camera.yaw,
                 pitch: this.camera.pitch,
+                gameMode: this.gameMode,
+                instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                    ? this.instanceCharacter.position
+                    : undefined,
+                currentChunk: {
+                    x: currentChunkCoords.x,
+                    z: currentChunkCoords.z,
+                    hasContent: currentChunkData?.hasContent ?? false,
+                },
             });
         }
 

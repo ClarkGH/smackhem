@@ -6,14 +6,14 @@ src/platforms/console
 # 'Public' hand-crafted assets
 public/*
 
-# Cursor AI
-.cursor/
-
 # Node modules
 node_modules/
 
 # Build output
 dist/
+
+# Test coverage
+coverage/
 
 # Vite cache
 .vite/
