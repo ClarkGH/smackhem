@@ -46,6 +46,7 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
       - Major: Breaking changes, the whole application has had massive changes to the point where it's working vastly differently
       - Minor: Potentially breaking changes, major features have been added
       - Patch: Bugfix, minor features 
+   - 0.3.1 wouldn't be considered a patch in a professional scenario. Probably opening myself up for mockery by doing things this way, but who cares? The lessons are logged and the learning is good. If a version denotes something important, and there's valuable insights, logging it in the wiki will help other developers see the thought process. Especially for something that's in essence a 'solo hackathon project'.
 
 ## Patterns / Paradigms
 

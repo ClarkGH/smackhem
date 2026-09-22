@@ -1,4 +1,4 @@
-import { MeshHandle, Renderer } from '../services/renderer';
+import { MeshHandle } from '../services/renderer';
 import { Mat4, Vec3 } from '../types/common';
 import { type AABB, createAABB } from './math/aabb';
 

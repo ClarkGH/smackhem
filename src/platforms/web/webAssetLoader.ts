@@ -80,7 +80,7 @@ export class WebAssetLoader implements AssetLoader {
 
         // Pre-flight check: Does the file exist AND is it actually a JSON file?
         const fileExists = await fetch(path, { method: 'HEAD' })
-            .then(res => {
+            .then((res) => {
                 const isOk = res.ok;
                 const contentType = res.headers.get('content-type') || '';
                 // If Vite serves an HTML 404 fallback page, the content-type will contain 'text/html'

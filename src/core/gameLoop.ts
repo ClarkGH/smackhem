@@ -14,6 +14,8 @@ import {
 import {
     resolveCollision,
     createCollisionContext,
+    updatePlayerAABB,
+    checkCollision,
     type CollisionContext,
 } from './collision';
 import {
@@ -255,6 +257,26 @@ export class GameLoop {
         } catch (error) {
             console.error('Failed to load circle texture:', error);
         }
+    }
+
+    // Check if we're going to collide or move through AABB while transitioning to an instance
+    private isInstanceTransitionPositionBlocked(position: Vec3): boolean {
+        updatePlayerAABB(
+            position,
+            INSTANCE_CHARACTER_SIZE,
+            INSTANCE_CHARACTER_SIZE / 2,
+            this.collisionContext.playerAABB,
+        );
+
+        const worldAABBs = this.world.getCollidableAABBs();
+
+        for (let i = 0; i < worldAABBs.length; i += 1) {
+            if (checkCollision(this.collisionContext.playerAABB, worldAABBs[i])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private pause(): void {
@@ -524,23 +546,15 @@ export class GameLoop {
         // Update instance state transition (only when paused)
         if (this.isPaused && this.instance.isTransitioning) {
             // Update transition progress using fixed timestep
-            this.instance.transitionProgress += (dt * this.instance.transitionDirection) / TRANSITION_DURATION;
+            this.instance.transitionProgress += (
+                dt * this.instance.transitionDirection
+            ) / TRANSITION_DURATION;
 
             // Clamp to [0, 1]
             if (this.instance.transitionProgress >= 1.0) {
                 this.instance.transitionProgress = 1.0;
-                this.instance.isTransitioning = false;
-                if (this.instance.transitionDirection > 0) {
-                    this.instance.isActive = true;
-                }
             } else if (this.instance.transitionProgress <= 0.0) {
                 this.instance.transitionProgress = 0.0;
-                this.instance.isTransitioning = false;
-                if (this.instance.transitionDirection < 0) {
-                    this.instance.isActive = false;
-                    // Reverse transition complete, actually unpause now
-                    this.isPaused = false;
-                }
             }
 
             // Calculate current position via interpolation
@@ -551,6 +565,34 @@ export class GameLoop {
                 smoothT,
                 this.instanceCharacter.position,
             );
+
+            // If moving forward and the character hits an AABB,
+            // reverse the transition and return to the previous state.
+            if (
+                this.instance.transitionDirection > 0
+                && this.isInstanceTransitionPositionBlocked(this.instanceCharacter.position)
+            ) {
+                this.instance.transitionDirection = -1.0;
+                this.instance.isActive = false;
+            }
+
+            // Forward transition complete
+            if (
+                this.instance.transitionProgress >= 1.0
+                && this.instance.transitionDirection > 0
+            ) {
+                this.instance.isTransitioning = false;
+                this.instance.isActive = true;
+            }
+
+            // Reverse transition complete
+            if (this.instance.transitionProgress <= 0.0) {
+                this.instance.isTransitioning = false;
+                this.instance.isActive = false;
+
+                // Reverse transition complete, actually unpause now
+                this.isPaused = false;
+            }
         }
 
         // Update camera pitch transition (when paused or in scene mode, going to 0)
