@@ -303,7 +303,7 @@ lerpVec3(a, b, t, out) {
 - `t` is derived from `transitionProgress` (0.0 to 1.0) using smoothstep for easing
 - Progress accumulates over fixed timestep: `progress += dt * direction / duration`
 - For reverse transition: `direction = -1.0`, so progress decreases from 1.0 → 0.0
-- TODO: When a sprite spawns or transitions forward, if the sprite hits collision the animation should reverse and return to the 3d game mode.
+- When a sprite spawns or transitions forward, if the sprite hits collision the animation should reverse and return to the 3d game mode.
 
 **Zero-Allocation Design:**
 
