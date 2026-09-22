@@ -8,6 +8,8 @@ export interface DebugInfo {
     timeOfDay?: number;
     yaw?: number;
     pitch?: number;
+    gameMode?: string;
+    instancePosition?: Vec3;
 }
 
 export const createDebugHUD = (canvas: HTMLCanvasElement): {
@@ -156,6 +158,16 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
                 10,
                 y,
             );
+            y += lineHeight;
+        }
+
+        if (info.gameMode !== undefined) {
+            drawText(`Game Mode: ${info.gameMode}`, 10, y);
+            y += lineHeight;
+        }
+
+        if (info.instancePosition) {
+            drawText(`Instance Position: ${formatVec3(info.instancePosition)}`, 10, y);
         }
     };
 

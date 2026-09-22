@@ -33,13 +33,19 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
    - Currently it looks like there are still some inversions here and there on sunset (closer to the sun setting is darker than further away, which is strange). Overall it's better than it was
    - 2D lighting had a different issue. The sprite has been updated to change color based on time of day. Same light pattern we used for blending with the meshes. Since the quad is standing upright and facing us, and not straight down like the plane, we needed the normalized vector in the drawn quad
 4. Chunking. Seeded procedural generation being used first, before static files... was an incredibly helpful decision! I didn't make it, I think Gemini and ChatGPT did while I was researching and just ran with it. It made stubbing so much faster. If I make another engine I'll do it again
-5. Sun and Moon. Moon and Sun confused me. I should not have built both at the same time while over-relying on cursor. It's a slippery slope. Removing the moon and slowly debugging just the sun after 2 days resolved the problem. As I recall, the moon just worked when I brought it back in
+5. Sun and Moon. Moon and Sun confused me. I should not have built both at the same time while over-relying on cursor. It's a slippery slope. Removing the moon and slowly debugging just the sun after 2 days. Came back almost half a year later and it still took a while to fix.
 6. Proteus Rabbit-hole
    - Proteus was a big inspiration
    - All it has are a height field function, a sky state, a global lighting function, a handful of instance rules, and a renderer that draws up meshes, quads, and the sky
 7. Cursor/Claude conflate 2D and 3D classes
    - At some point, I started confusing Cursor. Will need to review and re-organize... but I'm not sure if it's cursor's fault. We've entered territory where my application is becoming it's own unique beast, and the web scraper doesn't or didn't fully understand visual concepts well. I don't blame it for not reading my mind
 8. Nvidia driver updates may break webGL if you don't restart your computer. I learned this the hard way. Thought I broke my app.
+9. Adhoc Versioning
+   - There was no reason to introduce versioning to non-production hobby code. Planning what 0.X.0 would contain was a naive idea. We probably could have just jumped straight to 0.8.0 once we had something alpha-ready. I feel like I limited my freedom.
+   - For ACTUAL X.X.X versioning in the wild. Major.Minor.Patch
+      - Major: Breaking changes, the whole application has had massive changes to the point where it's working vastly differently
+      - Minor: Potentially breaking changes, major features have been added
+      - Patch: Bugfix, minor features 
 
 ## Patterns / Paradigms
 

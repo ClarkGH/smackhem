@@ -63,6 +63,8 @@ export interface DebugHUD {
         timeOfDay?: number;
         yaw?: number;
         pitch?: number;
+        gameMode?: string;
+        instancePosition?: Vec3;
     }) => void;
     toggle: () => void;
     isVisible: () => boolean;
@@ -864,6 +866,10 @@ export class GameLoop {
                     timeOfDay,
                     yaw: this.camera.yaw,
                     pitch: this.camera.pitch,
+                    gameMode: this.gameMode,
+                    instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                        ? this.instanceCharacter.position
+                        : undefined,
                 });
             }
 
@@ -1013,6 +1019,10 @@ export class GameLoop {
                 timeOfDay,
                 yaw: this.camera.yaw,
                 pitch: this.camera.pitch,
+                gameMode: this.gameMode,
+                instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                    ? this.instanceCharacter.position
+                    : undefined,
             });
         }
 
