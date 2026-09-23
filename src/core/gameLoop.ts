@@ -279,6 +279,7 @@ export class GameLoop {
         return false;
     }
 
+    // TODO: Consider renaming or moving, we call this pause... but we're doing instancing here
     private pause(): void {
         this.isPaused = true;
         this.savedPitch = this.camera.pitch;
@@ -298,6 +299,7 @@ export class GameLoop {
         this.instanceCharacter.position.z = this.transitionStartPos.z;
     }
 
+    // TODO: See above todo, de-instancing
     private unpause(): void {
         this.instance.isTransitioning = true;
         this.instance.transitionDirection = -1.0;
@@ -893,7 +895,7 @@ export class GameLoop {
                 m[4] = 0; m[5] = spriteSize; m[6] = 0; m[7] = 0;
                 m[8] = 0; m[9] = 0; m[10] = 1; m[11] = 0;
                 // Translate to screen position (Z = 0.5 for depth)
-                m[12] = posX; m[13] = posY; m[14] = 0.5; m[15] = 1;
+                m[12] = posX; m[13] = posY; m[14] = -0.5; m[15] = 1;
 
                 // Multiply projection * model into meshMVP (reuse existing matrix)
                 matrixMultiplyInto(this.sceneOrthoProj, this.sceneSpriteTransform, this.meshMVP);

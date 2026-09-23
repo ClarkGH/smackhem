@@ -14,8 +14,6 @@ Each chunk is stored in a separate JSON file: `chunks/{fileX}_{fileZ}.json` wher
 **Offset-Based Naming:**
 Chunk coordinates are offset by 10000 to ensure all filenames are non-negative. This prevents issues with negative coordinates in filenames (e.g., chunk `-1,0` becomes file `9999_10000.json`, chunk `0,0` becomes file `10000_10000.json`).
 
-**Current Implementation Note (Temporary):**
-For development/testing, all chunks currently load from `10000_10000.json` (same file reused for all chunk coordinates). Chunks are positioned at their correct world coordinates based on `chunkX` and `chunkZ`, even though they use the same mesh data. This will be extended to support per-chunk files in the future.
 **CRITICAL RULE: JSON is purely declarative**
 
 - JSON describes **what exists**, not **what happens**
