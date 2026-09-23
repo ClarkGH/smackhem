@@ -34,6 +34,10 @@ export default class WebGLRenderer implements Renderer {
 
     private quadVAO: WebGLVertexArrayObject | null = null;
 
+    private screenQuadProgram: WebGLProgram | null = null;
+
+    private screenQuadVAO: WebGLVertexArrayObject | null = null;
+
     private sunDirection: Vec3 = { x: -1, y: 0, z: 0 };
 
     private sunColor: Vec3 = { x: 0, y: 0, z: 0 };
@@ -91,6 +95,7 @@ export default class WebGLRenderer implements Renderer {
         this.initShaders();
         this.initTextureShaders();
         this.createQuadMesh();
+        this.initScreenQuadShaders();
     }
 
     private initShaders(): void {
@@ -881,6 +886,134 @@ export default class WebGLRenderer implements Renderer {
         // Disable blending after drawing
         gl.disable(gl.BLEND);
 
+        gl.bindVertexArray(null);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
+    private initScreenQuadShaders(): void {
+        const { gl } = this;
+
+        const vertexShaderSource = `#version 300 es
+            in vec3 a_position;
+            in vec2 a_texCoord;
+
+            uniform mat4 u_transform;
+
+            out vec2 v_texCoord;
+
+            void main() {
+                // Flat 2D screen-space sprite: this quad's geometry varies on
+                // local X and Z (same layout as the billboard quad, which lies
+                // flat on Y=0). Unlike the billboard shader, BOTH of those axes
+                // are meaningful screen directions here - there's no "depth
+                // toward camera" for something drawn on a flat overlay - so we
+                // read local X and Z straight into clip X/Y instead of
+                // discarding one and routing the other to depth.
+                vec4 clipPos = u_transform * vec4(a_position.x, a_position.z, 0.0, 1.0);
+                v_texCoord = a_texCoord;
+                gl_Position = clipPos;
+            }
+        `;
+
+        const fragmentShaderSource = `#version 300 es
+            precision mediump float;
+
+            uniform sampler2D u_texture;
+
+            in vec2 v_texCoord;
+
+            out vec4 fragColor;
+
+            void main() {
+                // Unlit - this is a flat UI overlay sprite, not a lit world
+                // object, so no sun/moon diffuse term here.
+                fragColor = texture(u_texture, v_texCoord);
+            }
+        `;
+
+        const vertexShader = this.compileShader(gl.VERTEX_SHADER, vertexShaderSource);
+        const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+        const program = gl.createProgram();
+        if (!program) throw new Error('Failed to create screen quad program');
+
+        if (vertexShader) gl.attachShader(program, vertexShader);
+        if (fragmentShader) gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            const info = gl.getProgramInfoLog(program);
+            gl.deleteProgram(program);
+            throw new Error(`Failed to link screen quad program: ${info}`);
+        }
+
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+
+        this.screenQuadProgram = program;
+
+        // Same quad geometry as the billboard quad - but its own VAO. Attribute
+        // locations are assigned per-program by the driver, not guaranteed to
+        // match textureProgram's, so the two VAOs can't safely be shared even
+        // though the vertex data is identical.
+        const vertices = new Float32Array([
+            -0.5, 0, -0.5, 0, 1,
+            0.5, 0, -0.5, 1, 1,
+            0.5, 0, 0.5, 1, 0,
+
+            -0.5, 0, -0.5, 0, 1,
+            0.5, 0, 0.5, 1, 0,
+            -0.5, 0, 0.5, 0, 0,
+        ]);
+
+        const vao = gl.createVertexArray();
+        if (!vao) throw new Error('Failed to create screen quad VAO');
+        gl.bindVertexArray(vao);
+
+        const vbo = gl.createBuffer();
+        if (!vbo) throw new Error('Failed to create screen quad VBO');
+        gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+        const positionLoc = gl.getAttribLocation(program, 'a_position');
+        gl.enableVertexAttribArray(positionLoc);
+        gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 20, 0);
+
+        const texCoordLoc = gl.getAttribLocation(program, 'a_texCoord');
+        gl.enableVertexAttribArray(texCoordLoc);
+        gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 20, 12);
+
+        gl.bindVertexArray(null);
+
+        this.screenQuadVAO = vao;
+    }
+
+    drawScreenQuad(texture: TextureHandle, transform: Mat4): void {
+        const webglTexture = this.textures.get(texture.id);
+        if (!webglTexture || !this.screenQuadProgram || !this.screenQuadVAO) {
+            return;
+        }
+
+        const { gl } = this;
+
+        gl.useProgram(this.screenQuadProgram);
+        gl.bindVertexArray(this.screenQuadVAO);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, webglTexture.texture);
+
+        const textureLoc = gl.getUniformLocation(this.screenQuadProgram, 'u_texture');
+        if (textureLoc) gl.uniform1i(textureLoc, 0);
+
+        const transformLoc = gl.getUniformLocation(this.screenQuadProgram, 'u_transform');
+        if (transformLoc) gl.uniformMatrix4fv(transformLoc, false, transform.elements);
+
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        gl.disable(gl.BLEND);
         gl.bindVertexArray(null);
         gl.bindTexture(gl.TEXTURE_2D, null);
     }

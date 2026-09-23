@@ -899,7 +899,7 @@ export class GameLoop {
 
                 // Multiply projection * model into meshMVP (reuse existing matrix)
                 matrixMultiplyInto(this.sceneOrthoProj, this.sceneSpriteTransform, this.meshMVP);
-                this.renderer.drawTexturedQuad(this.partyMemberTexture1, this.meshMVP, spriteSize);
+                this.renderer.drawScreenQuad(this.partyMemberTexture1, this.meshMVP);
             }
 
             // 4. Render debug HUD (if visible, same as normal)

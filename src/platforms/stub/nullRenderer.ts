@@ -87,6 +87,10 @@ export default class NullRenderer implements Renderer {
         }
     }
 
+    drawScreenQuad(_texture: TextureHandle, _transform: Mat4): void {
+        // Stub implementation - no rendering
+    }
+
     // Optional lighting methods (Renderer interface extension)
     setLightDirection(_direction: Vec3): void {
         this.lightDirection = { ..._direction };

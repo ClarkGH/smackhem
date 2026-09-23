@@ -20,6 +20,7 @@ export interface Renderer {
     createPyramidMesh(_size: number): MeshHandle;
     createPrismMesh(_width: number, _height: number, _depth: number): MeshHandle;
     createSphereMesh(_radius: number, _segments: number): MeshHandle;
+    drawScreenQuad(_texture: TextureHandle, _transform: Mat4): void;
     setLightDirection?(_direction: Vec3): void;
     setLightColor?(_color: Vec3): void;
     setAmbientIntensity?(_intensity: number): void;
