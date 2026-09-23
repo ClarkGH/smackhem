@@ -53,38 +53,33 @@ We can't easily sort pre-execution, we absolutely have to process them sequentia
 ## Architectural Design
 
 Proposed flow
-```mermaid
 
+```mermaid
+flowchart TB
+    Start(["START FIXED TICK"]) --> MPSC
+
+    MPSC["1. Read MPSC Ring Buffer<br/>Ingest async updates, memory<br/>wraparound checks — pushes<br/>into local frame's system states"] --> Poll
+
+    Poll["2. Poll Input &amp; OS Events<br/>Fire double-buffered events"] --> Flush1
+
+    Flush1["3. Engine::FlushEvents()<br/>Flip double-buffer: process input"] --> EdgeClear
+
+    EdgeClear["[INJECTED]<br/>Clear single-press input edge-triggers"] --> Systems
+
+    Systems["4. Execute Systems<br/>Audio, Gameplay Logic,<br/>Mixed 2D/3D Transforms<br/>— systems fire new internal<br/>events &amp; write output queues"] --> Flush2
+
+    Flush2["5. Engine::FlushEvents()<br/>Flip double-buffer: process<br/>internal gameplay side-effects"] --> Signal
+
+    Signal["[INJECTED]<br/>Signal worker threads /<br/>wake async audio &amp; net loops"] --> End
+
+    End(["END FIXED TICK"]) --> Snapshot
+
+    Snapshot["[INJECTED PRE-RENDER]<br/>Cache current transform snapshot<br/>for alpha interpolation"] --> Render
+
+    Render["Render Step<br/>Variable DT / requestAnimationFrame<br/>Lerp(StateBuffer.Previous,<br/>StateBuffer.Current, Alpha)"]
 ```
 
 ## Proposed Implementation
-
-### Example implementation
-
-```text
-[ START FIXED TICK ]
-  │
-  ├── 1. Read MPSC Ring Buffer ──> (Ingest Async updates with memory wraparound checks)
-  │                                 └── Pushes them into the local frame's system states.
-  │
-  ├── 2. Poll Input & OS Events ──> (Fire Double-Buffered Events)
-  │
-  ├── 3. Engine::FlushEvents()  ──> (Flip Double-Buffer: Process Input)
-  │        └── [INJECTED] ───────> (Clear single-press Input Edge-Triggers)
-  │
-  ├── 4. Execute Systems ─────────> (Audio System, Gameplay Logic, Mixed 2D/3D Transforms)
-  │                                 └── Systems fire new internal events & write to output queues
-  │
-  ├── 5. Engine::FlushEvents()  ──> (Flip Double-Buffer: Process internal gameplay side-effects)
-  │
-  └── [INJECTED] ─────────────────> (Signal Worker Threads / Wake up Async Audio & Net loops)
-  │
-[ END FIXED TICK ]
-  │
-  └── [INJECTED PRE-RENDER] ─────> (Cache current transform snapshot for Alpha interpolation)
-        │
-        └── Proceed to Render Step (Variable DT / requestAnimationFrame)
-```
 
 ### State management
 
@@ -106,6 +101,7 @@ Proposed flow
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
 - **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
+- **[State Management](state-management.md)** - State Management considerations
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, and geometry systems
 - **[Data Formats](data-formats.md)** - Data format specifications
