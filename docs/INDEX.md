@@ -79,7 +79,6 @@ Initial code is being built off of Typescript with porting to C++ in-mind. Cross
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
 - **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
 - **[Event Bus](events.md)** - Event bus pub/sub constraints and considerations
-- **[State Management](state-management.md)** - State Management considerations
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, and geometry systems
 - **[Data Formats](data-formats.md)** - Data format specifications

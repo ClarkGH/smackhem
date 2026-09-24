@@ -36,6 +36,8 @@ Build a small, deterministic 3D exploration engine that:
 
 This is engine scaffolding, not content.
 
+Rules exist to prevent over-engineering and painting the project's freedom of development into a proverbial corner. Some rules may be bent intentionally. The naive approach will be corrected progressively.
+
 ### Design Principles (Non-Negotiable)
 
 These principles exist only to protect portability:
@@ -434,7 +436,6 @@ renderer.render(world, party, camera);
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
 - **[Event Bus](events.md)** - Event bus pub/sub constraints and considerations
-- **[State Management](state-management.md)** - State Management considerations
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, and geometry systems
 - **[Data Formats](data-formats.md)** - Data format specifications
