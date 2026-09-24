@@ -79,8 +79,6 @@ export class GameLoop {
     // State variables
     private simulationTime = 0;
 
-    private debugHUDVisible = false;
-
     private accumulator = 0;
 
     private savedPitch = 0;
@@ -564,7 +562,7 @@ export class GameLoop {
         if (intent.toggleDebugHUD) {
             if (this.debugHUD) {
                 this.debugHUD.toggle();
-                this.debugHUDVisible = this.debugHUD.isVisible();
+                this.gameState.discrete.debugHUDVisible = this.debugHUD.isVisible();
             } else {
                 console.warn('Debug HUD toggle requested but debugHUD not available');
             }
@@ -927,7 +925,7 @@ export class GameLoop {
             }
 
             // 4. Render debug HUD (if visible, same as normal)
-            if (this.debugHUD && this.debugHUDVisible) {
+            if (this.debugHUD && this.gameState.discrete.debugHUDVisible) {
                 const rotation = quaternionFromYawPitch(this.camera.yaw, this.camera.pitch);
                 const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
 
@@ -1085,7 +1083,7 @@ export class GameLoop {
             // Texture not loaded yet - could render placeholder here if needed
         }
 
-        if (this.debugHUD && this.debugHUDVisible) {
+        if (this.debugHUD && this.gameState.discrete.debugHUDVisible) {
             const rotation = quaternionFromYawPitch(this.camera.yaw, this.camera.pitch);
             const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
 

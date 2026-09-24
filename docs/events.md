@@ -206,6 +206,11 @@ Initial implementation assumes game state will be updated per tick, rendering wi
    └── 3. Render Pass ─────> Lerp(StateBuffer.Previous, StateBuffer.Current, Alpha) ──> WebGL/OpenGl Draw
 ```
 
+## Pitfalls to Avoid
+
+1. Events indicate what happened, not what should happen.
+2. Immediate Handlers create execution stalls.
+
 ## Navigation
 
 - **[Index](INDEX.md)** - Project overview and documentation index
