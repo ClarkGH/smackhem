@@ -4,9 +4,6 @@
 
 - [Introduction](#introduction)
 - [The Event Bus](#the-event-bus)
-    - [Synchronous Events](#synchronous-events)
-    - [Async and Multi-threaded Events](#async-and-multi-threaded-events)
-- [Architectural Design](#architectural-design)
 - [Navigation](#navigation)
 
 ## Introduction
