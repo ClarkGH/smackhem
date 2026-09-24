@@ -32,7 +32,7 @@ export interface InterpolatedState {
 // TODO: Consider renaming isPaused to something else if it's only pausing the 3D world
 // TODO: Consider renaming world_3d or adding another 3d state for instances. Right now there's no differentiation beyond pausing a few things.
 export interface DiscreteState {
-    mode: 'world_3d' | 'scene_2d';
+    gameMode: 'world_3d' | 'scene_2d';
     isPaused: boolean;
     debugHUDVisible: boolean;
     instanceIsActive: boolean;
@@ -47,12 +47,12 @@ export interface DiscreteState {
     targetPitch: number;
 }
 
-export interface State {
+export interface GameState {
     interpolated: InterpolatedState;
     discrete: DiscreteState;
 }
 
-export const createState = (): State => ({
+export const createGameState = (): GameState => ({
     interpolated: {
         cameraPosition: { x: 0, y: 0, z: 0 },
         cameraYaw: 0,
@@ -64,7 +64,7 @@ export const createState = (): State => ({
         sceneTransitionProgress: 0,
     },
     discrete: {
-        mode: 'world_3d',
+        gameMode: 'world_3d',
         isPaused: false,
         debugHUDVisible: false,
         instanceIsActive: false,
