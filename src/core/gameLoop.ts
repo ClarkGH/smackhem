@@ -365,6 +365,23 @@ export class GameLoop {
         outElevation.value = elevation;
     }
 
+    // TODO: Decouple from gameloop
+    private setGameMode(newMode: 'world_3d' | 'scene_2d'): void {
+        const previousMode = this.gameState.discrete.gameMode;
+
+        if (previousMode === newMode) {
+            return;
+        }
+
+        this.gameState.discrete.gameMode = newMode;
+
+        this.eventBus.publish({
+            type: 'game_mode_changed',
+            previousMode,
+            currentMode: newMode,
+        });
+    }
+
     // PERFORMANCE: Writes into existing object to avoid allocation
     private sphericalToDirection(
         azimuth: number,
@@ -505,14 +522,8 @@ export class GameLoop {
                 this.targetPitch = 0;
                 this.isTransitioningPitch = true;
 
-                const previousMode = this.gameState.discrete.gameMode;
-                this.gameState.discrete.gameMode = 'scene_2d';
+                this.setGameMode('scene_2d');
 
-                this.eventBus.publish({
-                    type: 'game_mode_changed',
-                    previousMode,
-                    currentMode: 'scene_2d',
-                });
                 // Initialize scene character to grid center
                 this.sceneCharacter = createSceneCharacter({ x: 12, y: 9 });
                 // Start scene transition
@@ -532,14 +543,7 @@ export class GameLoop {
                     this.savedCameraState = null;
                 }
 
-                const previousMode = this.gameState.discrete.gameMode;
-                this.gameState.discrete.gameMode = 'world_3d';
-
-                this.eventBus.publish({
-                    type: 'game_mode_changed',
-                    previousMode,
-                    currentMode: 'world_3d',
-                });
+                this.setGameMode('world_3d');
 
                 // Reset scene state
                 this.scene.isActive = false;
@@ -649,15 +653,7 @@ export class GameLoop {
                 this.scene.isActive = false;
 
                 // Return to 3D world state
-                const previousMode = this.gameState.discrete.gameMode;
-                this.gameState.discrete.gameMode = 'world_3d';
-                this.isTransitioningPitch = false;
-
-                this.eventBus.publish({
-                    type: 'game_mode_changed',
-                    previousMode,
-                    currentMode: 'world_3d',
-                });
+                this.setGameMode('world_3d');
 
                 // Restore Camera State
                 if (this.savedCameraState) {
