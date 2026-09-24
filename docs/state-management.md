@@ -17,9 +17,14 @@ We'll need a form of state and a state buffer. True state will live in the buffe
 
 The collision grid and world chunks will be excluded, purposefully. Since it's content and non-reliant on the ticks, there's no benefit.
 
-### Interpolated State
+There's a current differentiation between discrete and interpolated state. Discrete state is directly copied, while interpolated state includes other calculations/events that need to be freed up and unblocked.
 
-### Discrete State
+```typescript
+export interface GameState {
+    interpolated: InterpolatedState;
+    discrete: DiscreteState;
+}
+```
 
 ## Navigation
 
