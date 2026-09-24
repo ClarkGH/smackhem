@@ -4,8 +4,8 @@ import {
     expect,
     beforeEach,
 } from 'vitest';
-import { TypeSafeEventBus } from 'src/core/events';
-import { createGameState } from 'src/core/gameState';
+import { TypeSafeEventBus } from '../../core/events';
+import { createGameState } from '../../core/gameState';
 import { GameLoop } from '../../core/gameLoop';
 import NullRenderer from './nullRenderer';
 import { World } from '../../core/world';

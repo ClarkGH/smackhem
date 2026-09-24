@@ -77,8 +77,6 @@ export interface DebugHUD {
 
 export class GameLoop {
     // State variables
-    private simulationTime = 0;
-
     private accumulator = 0;
 
     private savedPitch = 0;
@@ -298,9 +296,9 @@ export class GameLoop {
 
         this.calculateTransitionPositions();
 
-        this.instanceCharacter.position.x = this.transitionStartPos.x;
-        this.instanceCharacter.position.y = this.transitionStartPos.y;
-        this.instanceCharacter.position.z = this.transitionStartPos.z;
+        this.gameState.interpolated.instanceCharacterPosition.x = this.transitionStartPos.x;
+        this.gameState.interpolated.instanceCharacterPosition.y = this.transitionStartPos.y;
+        this.gameState.interpolated.instanceCharacterPosition.z = this.transitionStartPos.z;
     }
 
     // TODO: See above todo, de-instancing
@@ -309,9 +307,9 @@ export class GameLoop {
         this.instance.transitionDirection = -1.0;
         this.instance.transitionProgress = 1.0;
 
-        this.transitionEndPos.x = this.instanceCharacter.position.x;
-        this.transitionEndPos.y = this.instanceCharacter.position.y;
-        this.transitionEndPos.z = this.instanceCharacter.position.z;
+        this.transitionEndPos.x = this.gameState.interpolated.instanceCharacterPosition.x;
+        this.transitionEndPos.y = this.gameState.interpolated.instanceCharacterPosition.y;
+        this.transitionEndPos.z = this.gameState.interpolated.instanceCharacterPosition.z;
 
         const circleSize = INSTANCE_CHARACTER_SIZE;
         const floorY = circleSize / 2;
@@ -590,14 +588,14 @@ export class GameLoop {
                 this.transitionStartPos,
                 this.transitionEndPos,
                 smoothT,
-                this.instanceCharacter.position,
+                interpolatedState.instanceCharacterPosition,
             );
 
             // If moving forward and the character hits an AABB,
             // reverse the transition and return to the previous state.
             if (
                 this.instance.transitionDirection > 0
-                && this.isInstanceTransitionPositionBlocked(this.instanceCharacter.position)
+                && this.isInstanceTransitionPositionBlocked(interpolatedState.instanceCharacterPosition)
             ) {
                 this.instance.transitionDirection = -1.0;
                 this.instance.isActive = false;
@@ -618,7 +616,7 @@ export class GameLoop {
                 this.instance.isActive = false;
 
                 // Reverse transition complete, actually unpause now
-                this.gameState.discrete.isPaused = false;
+                discreteState.isPaused = false;
             }
         }
 
@@ -683,7 +681,7 @@ export class GameLoop {
 
                 const worldAABBs = this.world.getCollidableAABBs();
                 const resolvedMovement = resolveCollision(
-                    this.instanceCharacter.position,
+                    interpolatedState.instanceCharacterPosition,
                     proposedMovement,
                     worldAABBs,
                     INSTANCE_CHARACTER_SIZE, // height
@@ -691,8 +689,8 @@ export class GameLoop {
                     this.collisionContext,
                 );
 
-                this.instanceCharacter.position.x += resolvedMovement.x;
-                this.instanceCharacter.position.z += resolvedMovement.z;
+                interpolatedState.instanceCharacterPosition.x += resolvedMovement.x;
+                interpolatedState.instanceCharacterPosition.z += resolvedMovement.z;
                 // Y stays constant at floor level (INSTANCE_CHARACTER_SIZE / 2)
             }
         }
@@ -705,14 +703,14 @@ export class GameLoop {
         // Skip camera updates when in scene mode (camera is frozen)
         if (discreteState.gameMode === 'scene_2d') {
             // Scene movement (2D grid-based)
-            if (!this.scene.isPaused) {
+            if (!discreteState.isPaused) {
                 const { x: moveX, y: moveY } = intent.move;
 
                 if (moveX !== 0 || moveY !== 0) {
                     // Convert to grid movement (pixels per second)
                     const moveSpeed = PLAYER_SPEED * dt;
-                    const newPxX = this.sceneCharacter.positionPx.x + moveX * moveSpeed;
-                    const newPxY = this.sceneCharacter.positionPx.y - moveY * moveSpeed; // invert Y for up/down
+                    const newPxX = interpolatedState.sceneCharacterPositionPx.x + moveX * moveSpeed;
+                    const newPxY = interpolatedState.sceneCharacterPositionPx.y - moveY * moveSpeed; // invert Y for up/down
 
                     // Convert pixel position to grid coordinates
                     const gridX = Math.floor(newPxX / SCENE_TILE_SIZE);
@@ -726,16 +724,16 @@ export class GameLoop {
 
                         if (isWalkable) {
                             // Update position
-                            this.sceneCharacter.positionPx.x = newPxX;
-                            this.sceneCharacter.positionPx.y = newPxY;
+                            interpolatedState.sceneCharacterPositionPx.x = newPxX;
+                            interpolatedState.sceneCharacterPositionPx.y = newPxY;
                             this.sceneCharacter.positionGrid.x = gridX;
                             this.sceneCharacter.positionGrid.y = gridY;
                         }
                     }
 
                     // Clamp positionPx to stay within scene bounds (0-799, 0-599)
-                    this.sceneCharacter.positionPx.x = Math.max(0, Math.min(SCENE_WIDTH_PX - 1, this.sceneCharacter.positionPx.x));
-                    this.sceneCharacter.positionPx.y = Math.max(0, Math.min(SCENE_HEIGHT_PX - 1, this.sceneCharacter.positionPx.y));
+                    interpolatedState.sceneCharacterPositionPx.x = Math.max(0, Math.min(SCENE_WIDTH_PX - 1, interpolatedState.sceneCharacterPositionPx.x));
+                    interpolatedState.sceneCharacterPositionPx.y = Math.max(0, Math.min(SCENE_HEIGHT_PX - 1, interpolatedState.sceneCharacterPositionPx.y));
                 }
             }
             // Skip normal simulation updates in scene mode
@@ -743,7 +741,7 @@ export class GameLoop {
         }
 
         // Normal simulation updates
-        this.simulationTime += dt;
+        interpolatedState.simulationTime += dt;
 
         const sensitivity = 0.005;
         this.camera.yaw += intent.look.yaw * sensitivity;
@@ -792,19 +790,21 @@ export class GameLoop {
 
     render(): void {
         this.renderer.beginFrame();
+        const discreteState = this.gameState.discrete;
+        const interpolatedState = this.gameState.interpolated;
 
         // Chunk debug data
         const currentChunkCoords = World.getChunkCoords(this.camera.position);
         const currentChunkData = this.world.activeChunks.get(World.getChunkID(currentChunkCoords.x, currentChunkCoords.z));
 
         // Scene mode rendering (2D overlay)
-        if (this.gameState.discrete.gameMode === 'scene_2d') {
+        if (discreteState.gameMode === 'scene_2d') {
             // 1. Render frozen 3D world (normal 3D rendering, camera frozen)
             const aspect = this.getAspectRatio();
             const viewProj = getCameraMatrix(this.camera, aspect);
 
             // PERFORMANCE: Reuse pre-allocated objects, zero allocations per frame
-            const timeOfDay = this.computeTimeOfDay(this.simulationTime);
+            const timeOfDay = this.computeTimeOfDay(interpolatedState.simulationTime);
 
             this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);
             this.computeSunDirection(timeOfDay, this.lightDirection);
@@ -907,8 +907,8 @@ export class GameLoop {
             if (this.partyMemberTexture1) {
                 // positionPx is already in pixel coordinates (0-799, 0-599)
                 const spriteSize = SCENE_TILE_SIZE; // 32x32 pixels
-                const posX = this.sceneCharacter.positionPx.x;
-                const posY = this.sceneCharacter.positionPx.y;
+                const posX = interpolatedState.sceneCharacterPositionPx.x;
+                const posY = interpolatedState.sceneCharacterPositionPx.y;
 
                 // Create model transform matrix: scale then translate
                 // For 2D screen-space: scale(spriteSize) * translate(posX, posY, 0.5)
@@ -927,7 +927,7 @@ export class GameLoop {
             }
 
             // 4. Render debug HUD (if visible, same as normal)
-            if (this.debugHUD && this.gameState.discrete.debugHUDVisible) {
+            if (this.debugHUD && discreteState.debugHUDVisible) {
                 const rotation = quaternionFromYawPitch(this.camera.yaw, this.camera.pitch);
                 const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
 
@@ -939,9 +939,9 @@ export class GameLoop {
                     timeOfDay,
                     yaw: this.camera.yaw,
                     pitch: this.camera.pitch,
-                    gameMode: this.gameState.discrete.gameMode,
-                    instancePosition: (this.gameState.discrete.isPaused && (this.instance.isTransitioning || this.instance.isActive))
-                        ? this.instanceCharacter.position
+                    gameMode: discreteState.gameMode,
+                    instancePosition: (discreteState.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                        ? interpolatedState.instanceCharacterPosition
                         : undefined,
                     currentChunk: {
                         x: currentChunkCoords.x,
@@ -961,9 +961,9 @@ export class GameLoop {
 
         // PERFORMANCE: Reuse pre-allocated objects, zero allocations per frame
         // When paused, use last timeOfDay (frozen)
-        const timeOfDay = this.gameState.discrete.isPaused
-            ? this.computeTimeOfDay(this.simulationTime)
-            : this.computeTimeOfDay(this.simulationTime);
+        const timeOfDay = discreteState.isPaused
+            ? this.computeTimeOfDay(interpolatedState.simulationTime)
+            : this.computeTimeOfDay(interpolatedState.simulationTime);
 
         this.renderBoundaryWireframe(viewProj);
 
@@ -1038,10 +1038,10 @@ export class GameLoop {
         });
 
         // Render lead party member when paused and active/transitioning
-        if (this.gameState.discrete.isPaused && (this.instance.isTransitioning || this.instance.isActive)) {
+        if (discreteState.isPaused && (this.instance.isTransitioning || this.instance.isActive)) {
             if (this.partyMemberTexture1) {
                 // Calculate transform for circle (billboard at character position)
-                const pos = this.instanceCharacter.position;
+                const pos = interpolatedState.instanceCharacterPosition;
                 const circleSize = INSTANCE_CHARACTER_SIZE; // Small size as specified
 
                 // Calculate billboard orientation (face camera, stay vertical)
@@ -1085,7 +1085,7 @@ export class GameLoop {
             // Texture not loaded yet - could render placeholder here if needed
         }
 
-        if (this.debugHUD && this.gameState.discrete.debugHUDVisible) {
+        if (this.debugHUD && discreteState.debugHUDVisible) {
             const rotation = quaternionFromYawPitch(this.camera.yaw, this.camera.pitch);
             const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
 
@@ -1097,9 +1097,9 @@ export class GameLoop {
                 timeOfDay,
                 yaw: this.camera.yaw,
                 pitch: this.camera.pitch,
-                gameMode: this.gameState.discrete.gameMode,
-                instancePosition: (this.gameState.discrete.isPaused && (this.instance.isTransitioning || this.instance.isActive))
-                    ? this.instanceCharacter.position
+                gameMode: discreteState.gameMode,
+                instancePosition: (discreteState.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                    ? interpolatedState.instanceCharacterPosition
                     : undefined,
                 currentChunk: {
                     x: currentChunkCoords.x,
@@ -1117,7 +1117,7 @@ export class GameLoop {
     }
 
     getTimeOfDay(): number {
-        return (this.simulationTime % this.DAY_LENGTH_SECONDS) / this.DAY_LENGTH_SECONDS;
+        return (this.gameState.interpolated.simulationTime % this.DAY_LENGTH_SECONDS) / this.DAY_LENGTH_SECONDS;
     }
 }
 
