@@ -55,14 +55,25 @@ Not to be confused with web-based events, which are all asynchronous. With node 
 While we may consider and utilize asynchronous javascript, the consideration for multi-threading in c++ is a non-negotiable eventuality. Both a double-buffered event bus, and an additional MPSC event chain for async/multi-threading, will be useful for porting and learning.
 
 ```typescript
-export type Event = {
+type Event = {
    type: 'mode_changed';
    previousMode: 'world_3d' | 'scene_2d';
    currentMode: 'world_3d' | 'scene_2d';
 }
 ```
 
-Events will be explicitly typed. We'll subscribe in the main logic, and will publish in the game loop.
+Events will be explicitly typed. We'll subscribe listeners in the main logic, and will publish events in the game loop. State management eventually shouldn't be handled outside of event listeners unless otherwise specified.
+
+```typescript
+interface EventBus {
+    publish(event: Event): void;
+
+    subscribe<K extends Event['type']>(
+        type: K,
+        handler: (event: ExtractEvent<K>) => void,
+    ): () => void;
+}
+```
 
 #### Synchronous Events
 
