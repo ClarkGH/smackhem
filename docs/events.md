@@ -110,6 +110,63 @@ Double-buffered event queues are primarily useful for single-threaded frame phas
 
 They rely on pointer swapping, are entirely deterministic, and can be sorted before execution. We can control nitty gritty render events and maximize cache performance manually.
 
+Generic Double-buffered event queue with synchronous dispatch:
+
+```typescript
+export class TypeSafeEventBus implements EventBus {
+    private listeners = new Map<string, Array<(event: any) => void>>();
+
+    private incomingQueue: Event[] = [];
+
+    private processingQueue: Event[] = [];
+
+    publish(event: Event): void {
+        this.incomingQueue.push(event);
+    }
+
+    flush(): void {
+        if (this.incomingQueue.length === 0) return;
+
+        this.processingQueue = this.incomingQueue;
+        this.incomingQueue = [];
+
+        for (let i = 0; i < this.processingQueue.length; i += 1) {
+            const event = this.processingQueue[i];
+            const handlers = this.listeners.get(event.type);
+            if (handlers) {
+                for (let j = 0; j < handlers.length; j += 1) {
+                    handlers[j](event);
+                }
+            }
+        }
+
+        this.processingQueue = [];
+    }
+
+    subscribe<K extends Event['type']>(
+        type: K,
+        handler: (event: ExtractEvent<K>) => void,
+    ): () => void {
+        if (!this.listeners.has(type)) {
+            this.listeners.set(type, []);
+        }
+
+        const handlers = this.listeners.get(type)!;
+        handlers.push(handler);
+
+        return () => {
+            const currentHandlers = this.listeners.get(type);
+            if (!currentHandlers) return;
+
+            this.listeners.set(
+                type,
+                currentHandlers.filter((h) => h !== handler),
+            );
+        };
+    }
+}
+```
+
 #### MPSC Queue
 
 The lock-free ring buffer, or MPSC queue, is useful for multi-threaded, high frequency, communication between workers and the main game loop. The initial complexity is high, it requires atomic operations and memory order fencing. We'd need to pre-allocate our memory. Benefit to the high complexity is that there would be no thread contention, since we'd be using lock-free pointers. Memory management can be painful, we might suffer from buffer overflow with a naive implementation, we'll need to watch that our consumers don't lag behind our producers.
