@@ -24,6 +24,8 @@ Remember Drakkhen? On the Amiga? The Super Nintendo? It's one of the most confus
 
 Initial code is being built off of Typescript with porting to C++ in-mind. Cross Code was built with the same, but learning from their pain points when they started programming Alabaster Dawn. Using WebGL to start, the dev is attempting to build an engine that should port directly over to C++ (or so the dev naively hopes).
 
+Not all code examples in the documentation are 1:1 with how the code actually functions and should be considered from a conceptual standpoint. As the project rapidly evolves, so does the documentation. Some of the documentation may not be up to date, some may be stale.
+
 ## Open source code available to the public
 
 - Dungeons and dragons-esque stat blocks
