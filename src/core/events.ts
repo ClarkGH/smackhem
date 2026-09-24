@@ -10,6 +10,8 @@ type ExtractEvent<K extends GameEvent['type']> = Extract<GameEvent, { type: K }>
 export interface EventBus {
     publish(event: GameEvent): void;
 
+    flush(): void;
+
     subscribe<K extends GameEvent['type']>(
         type: K,
         handler: (event: ExtractEvent<K>) => void,
@@ -19,13 +21,31 @@ export interface EventBus {
 export class TypeSafeEventBus implements EventBus {
     private listeners = new Map<string, Array<(event: any) => void>>();
 
-    publish(event: GameEvent): void {
-        const handlers = this.listeners.get(event.type);
-        if (!handlers) return;
+    private incomingQueue: GameEvent[] = [];
 
-        for (let i = 0; i < handlers.length; i += 1) {
-            handlers[i](event);
+    private processingQueue: GameEvent[] = [];
+
+    publish(event: GameEvent): void {
+        this.incomingQueue.push(event);
+    }
+
+    flush(): void {
+        if (this.incomingQueue.length === 0) return;
+
+        this.processingQueue = this.incomingQueue;
+        this.incomingQueue = [];
+
+        for (let i = 0; i < this.processingQueue.length; i += 1) {
+            const event = this.processingQueue[i];
+            const handlers = this.listeners.get(event.type);
+            if (handlers) {
+                for (let j = 0; j < handlers.length; j += 1) {
+                    handlers[j](event);
+                }
+            }
         }
+
+        this.processingQueue = [];
     }
 
     subscribe<K extends GameEvent['type']>(

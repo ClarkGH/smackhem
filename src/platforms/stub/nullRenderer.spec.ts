@@ -4,6 +4,8 @@ import {
     expect,
     beforeEach,
 } from 'vitest';
+import { TypeSafeEventBus } from 'src/core/events';
+import { createGameState } from 'src/core/gameState';
 import { GameLoop } from '../../core/gameLoop';
 import NullRenderer from './nullRenderer';
 import { World } from '../../core/world';
@@ -11,7 +13,6 @@ import StubInput from './stubInput';
 import StubClock from './stubClock';
 import { identity } from '../../core/math/mathHelpers';
 import { createChunk } from './stubBootstrap';
-import { TypeSafeEventBus } from 'src/core/events';
 
 describe('NullRenderer - Portability Validation (RULE P-1)', () => {
     let renderer: NullRenderer;
@@ -32,6 +33,7 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
             world,
             () => 16 / 9,
             new TypeSafeEventBus(),
+            createGameState(),
         )).not.toThrow();
     });
 
@@ -163,7 +165,7 @@ describe('StubPlatform - Chunk streaming smoke test', () => {
             world.addChunk(createChunk(x, z, renderer));
         });
 
-        gameLoop = new GameLoop(renderer, input, world, () => 16 / 9, new TypeSafeEventBus());
+        gameLoop = new GameLoop(renderer, input, world, () => 16 / 9, new TypeSafeEventBus(), createGameState());
         clock.setFixedDeltaTime(1 / 60);
     });
 
@@ -225,6 +227,7 @@ describe('StubPlatform - Full Integration Test', () => {
             world,
             () => 16 / 9,
             new TypeSafeEventBus(),
+            createGameState(),
         );
     });
 

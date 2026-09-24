@@ -1,7 +1,7 @@
 // Platform-agnostic entry point
 import { World } from './core/world';
 import { GameLoop } from './core/gameLoop';
-import { EventBus, TypeSafeEventBus } from './core/events';
+import { TypeSafeEventBus } from './core/events';
 import { createGameState, GameState } from './core/gameState';
 import { createCamera } from './core/camera';
 import type { PlatformServices } from './services/platform';
@@ -25,9 +25,9 @@ const createPlatform = async (): Promise<PlatformServices> => {
 const main = async () => {
     const platform = await createPlatform();
     const world = new World();
-    const eventBus : EventBus = new TypeSafeEventBus();
+    const eventBus = new TypeSafeEventBus();
 
-    const gameState : GameState = createGameState(); 
+    const gameState : GameState = createGameState();
 
     // Import chunk management function (platform-specific)
     // Type parameters are intentionally unused (they're for type checking only)
@@ -102,6 +102,7 @@ const main = async () => {
         platform.clock.update();
         platform.input.update();
         gameLoop.update(platform.clock.getDeltaTime());
+        eventBus.flush();
 
         // Update chunk loading/unloading based on player position
         // Fire and forget - chunks will populate as they load (non-blocking)

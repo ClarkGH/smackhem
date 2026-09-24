@@ -511,7 +511,7 @@ export class GameLoop {
                 this.eventBus.publish({
                     type: 'game_mode_changed',
                     previousMode,
-                    currentMode: 'scene_2d'
+                    currentMode: 'scene_2d',
                 });
                 // Initialize scene character to grid center
                 this.sceneCharacter = createSceneCharacter({ x: 12, y: 9 });
@@ -538,7 +538,7 @@ export class GameLoop {
                 this.eventBus.publish({
                     type: 'game_mode_changed',
                     previousMode,
-                    currentMode: 'world_3d'
+                    currentMode: 'world_3d',
                 });
 
                 // Reset scene state
@@ -656,7 +656,7 @@ export class GameLoop {
                 this.eventBus.publish({
                     type: 'game_mode_changed',
                     previousMode,
-                    currentMode: 'world_3d'
+                    currentMode: 'world_3d',
                 });
 
                 // Restore Camera State
