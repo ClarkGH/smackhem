@@ -503,10 +503,12 @@ export class GameLoop {
 
     private updateSimulation(dt: number): void {
         const intent = this.input.getIntent();
+        const discreteState = this.gameState.discrete;
+        const interpolatedState = this.gameState.interpolated;
 
         // Handle scene entry/exit (interact key)
         if (intent.interact) {
-            if (this.gameState.discrete.gameMode === 'world_3d') {
+            if (discreteState.gameMode === 'world_3d') {
                 // Enter scene_2d
                 // Save camera state
                 this.savedCameraState = {
@@ -527,7 +529,7 @@ export class GameLoop {
                 this.scene.transitionDirection = 1.0;
                 this.scene.transitionProgress = 0.0;
                 this.scene.isActive = false;
-            } else if (this.gameState.discrete.gameMode === 'scene_2d') {
+            } else if (discreteState.gameMode === 'scene_2d') {
                 // Exit to world_3d
                 // Restore camera state
                 if (this.savedCameraState) {
@@ -550,8 +552,8 @@ export class GameLoop {
         }
 
         // Handle pause toggle
-        if (intent.pause && this.gameState.discrete.gameMode === 'world_3d') {
-            if (this.gameState.discrete.isPaused) {
+        if (intent.pause && discreteState.gameMode === 'world_3d') {
+            if (discreteState.isPaused) {
                 this.unpause();
             } else {
                 this.pause();
@@ -562,14 +564,14 @@ export class GameLoop {
         if (intent.toggleDebugHUD) {
             if (this.debugHUD) {
                 this.debugHUD.toggle();
-                this.gameState.discrete.debugHUDVisible = this.debugHUD.isVisible();
+                discreteState.debugHUDVisible = this.debugHUD.isVisible();
             } else {
                 console.warn('Debug HUD toggle requested but debugHUD not available');
             }
         }
 
         // Update instance state transition (only when paused)
-        if (this.gameState.discrete.isPaused && this.instance.isTransitioning) {
+        if (discreteState.isPaused && this.instance.isTransitioning) {
             // Update transition progress using fixed timestep
             this.instance.transitionProgress += (
                 dt * this.instance.transitionDirection
@@ -621,7 +623,7 @@ export class GameLoop {
         }
 
         // Update camera pitch transition (when paused or in scene mode, going to 0)
-        if ((this.gameState.discrete.isPaused || this.gameState.discrete.gameMode === 'scene_2d') && this.isTransitioningPitch) {
+        if ((discreteState.isPaused || discreteState.gameMode === 'scene_2d') && this.isTransitioningPitch) {
             const pitchTransitionSpeed = 2.0; // radians per second
             const pitchDelta = (this.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
 
@@ -635,7 +637,7 @@ export class GameLoop {
         }
 
         // Update scene transition
-        if (this.gameState.discrete.gameMode === 'scene_2d' && this.scene.isTransitioning) {
+        if (discreteState.gameMode === 'scene_2d' && this.scene.isTransitioning) {
             this.scene.transitionProgress += (dt * this.scene.transitionDirection) / SCENE_TRANSITION_DURATION;
 
             // Clamp to [0, 1]
@@ -665,7 +667,7 @@ export class GameLoop {
 
         // Handle WASD movement for circle character in instance mode
         // Only when paused, active (transition complete), and not transitioning
-        if (this.gameState.discrete.isPaused && this.instance.isActive && !this.instance.isTransitioning) {
+        if (discreteState.isPaused && this.instance.isActive && !this.instance.isTransitioning) {
             const { x: moveX, y: moveY } = intent.move;
 
             if (moveX !== 0 || moveY !== 0) {
@@ -696,12 +698,12 @@ export class GameLoop {
         }
 
         // Skip normal simulation updates when paused (except instance state above)
-        if (this.gameState.discrete.isPaused) {
+        if (discreteState.isPaused) {
             return;
         }
 
         // Skip camera updates when in scene mode (camera is frozen)
-        if (this.gameState.discrete.gameMode === 'scene_2d') {
+        if (discreteState.gameMode === 'scene_2d') {
             // Scene movement (2D grid-based)
             if (!this.scene.isPaused) {
                 const { x: moveX, y: moveY } = intent.move;
