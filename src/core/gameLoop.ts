@@ -83,8 +83,6 @@ export class GameLoop {
 
     private accumulator = 0;
 
-    private isPaused = false;
-
     private savedPitch = 0;
 
     private targetPitch = 0;
@@ -289,7 +287,7 @@ export class GameLoop {
 
     // TODO: Consider renaming or moving, we call this pause... but we're doing instancing here
     private pause(): void {
-        this.isPaused = true;
+        this.gameState.discrete.isPaused = true;
         this.savedPitch = this.camera.pitch;
         this.targetPitch = 0; // Reset to horizontal view
         this.isTransitioningPitch = true;
@@ -555,7 +553,7 @@ export class GameLoop {
 
         // Handle pause toggle
         if (intent.pause && this.gameState.discrete.gameMode === 'world_3d') {
-            if (this.isPaused) {
+            if (this.gameState.discrete.isPaused) {
                 this.unpause();
             } else {
                 this.pause();
@@ -573,7 +571,7 @@ export class GameLoop {
         }
 
         // Update instance state transition (only when paused)
-        if (this.isPaused && this.instance.isTransitioning) {
+        if (this.gameState.discrete.isPaused && this.instance.isTransitioning) {
             // Update transition progress using fixed timestep
             this.instance.transitionProgress += (
                 dt * this.instance.transitionDirection
@@ -620,12 +618,12 @@ export class GameLoop {
                 this.instance.isActive = false;
 
                 // Reverse transition complete, actually unpause now
-                this.isPaused = false;
+                this.gameState.discrete.isPaused = false;
             }
         }
 
         // Update camera pitch transition (when paused or in scene mode, going to 0)
-        if ((this.isPaused || this.gameState.discrete.gameMode === 'scene_2d') && this.isTransitioningPitch) {
+        if ((this.gameState.discrete.isPaused || this.gameState.discrete.gameMode === 'scene_2d') && this.isTransitioningPitch) {
             const pitchTransitionSpeed = 2.0; // radians per second
             const pitchDelta = (this.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
 
@@ -669,7 +667,7 @@ export class GameLoop {
 
         // Handle WASD movement for circle character in instance mode
         // Only when paused, active (transition complete), and not transitioning
-        if (this.isPaused && this.instance.isActive && !this.instance.isTransitioning) {
+        if (this.gameState.discrete.isPaused && this.instance.isActive && !this.instance.isTransitioning) {
             const { x: moveX, y: moveY } = intent.move;
 
             if (moveX !== 0 || moveY !== 0) {
@@ -700,7 +698,7 @@ export class GameLoop {
         }
 
         // Skip normal simulation updates when paused (except instance state above)
-        if (this.isPaused) {
+        if (this.gameState.discrete.isPaused) {
             return;
         }
 
@@ -942,7 +940,7 @@ export class GameLoop {
                     yaw: this.camera.yaw,
                     pitch: this.camera.pitch,
                     gameMode: this.gameState.discrete.gameMode,
-                    instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                    instancePosition: (this.gameState.discrete.isPaused && (this.instance.isTransitioning || this.instance.isActive))
                         ? this.instanceCharacter.position
                         : undefined,
                     currentChunk: {
@@ -963,7 +961,7 @@ export class GameLoop {
 
         // PERFORMANCE: Reuse pre-allocated objects, zero allocations per frame
         // When paused, use last timeOfDay (frozen)
-        const timeOfDay = this.isPaused
+        const timeOfDay = this.gameState.discrete.isPaused
             ? this.computeTimeOfDay(this.simulationTime)
             : this.computeTimeOfDay(this.simulationTime);
 
@@ -1040,7 +1038,7 @@ export class GameLoop {
         });
 
         // Render lead party member when paused and active/transitioning
-        if (this.isPaused && (this.instance.isTransitioning || this.instance.isActive)) {
+        if (this.gameState.discrete.isPaused && (this.instance.isTransitioning || this.instance.isActive)) {
             if (this.partyMemberTexture1) {
                 // Calculate transform for circle (billboard at character position)
                 const pos = this.instanceCharacter.position;
@@ -1100,7 +1098,7 @@ export class GameLoop {
                 yaw: this.camera.yaw,
                 pitch: this.camera.pitch,
                 gameMode: this.gameState.discrete.gameMode,
-                instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                instancePosition: (this.gameState.discrete.isPaused && (this.instance.isTransitioning || this.instance.isActive))
                     ? this.instanceCharacter.position
                     : undefined,
                 currentChunk: {
