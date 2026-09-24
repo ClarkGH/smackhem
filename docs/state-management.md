@@ -11,11 +11,15 @@
 
 ## Introduction
 
-State is changing information saved in a blob of information that the engine utilizes to make determinations. We currently have state, while it's not explicitly set as such. Our pub / sub event service and state tie directly into one and another.
+State is changing information which the engine utilizes to make determinations. Our pub / sub event service and state tie directly into one and another.
 
 We'll need a form of state and a state buffer. True state will live in the buffer, cache will be computed from state, but never be stored or lerped independently.
 
 The collision grid and world chunks will be excluded, purposefully. Since it's content and non-reliant on the ticks, there's no benefit.
+
+### Interpolated State
+
+### Discrete State
 
 ## Navigation
 
