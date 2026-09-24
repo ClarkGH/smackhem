@@ -1,5 +1,6 @@
 import type { Renderer, TextureHandle } from '../services/renderer';
 import type { Input } from '../services/input';
+import type { EventBus } from './events';
 import {
     createCamera,
     getCameraMatrix,
@@ -52,6 +53,7 @@ import {
     createSceneCharacter,
     type SceneCharacter,
 } from './sceneCharacter';
+import { GameState } from './gameState';
 
 const FIXED_DT = 1 / 60;
 
@@ -97,7 +99,9 @@ export class GameLoop {
 
     private sceneCharacter: SceneCharacter;
 
-    private gameMode: 'world_3d' | 'scene_2d' = 'world_3d';
+    private eventBus: EventBus;
+
+    private gameState: GameState;
 
     private savedCameraState: { position: Vec3; yaw: number; pitch: number } | null = null;
 
@@ -208,12 +212,16 @@ export class GameLoop {
         input: Input,
         world: World,
         getAspectRatio: () => number,
+        eventBus: EventBus,
+        gameState: GameState,
         debugHUD?: DebugHUD,
     ) {
         this.renderer = renderer;
         this.input = input;
         this.world = world;
         this.getAspectRatio = getAspectRatio;
+        this.eventBus = eventBus;
+        this.gameState = gameState;
         this.debugHUD = debugHUD;
 
         // Core objects
@@ -485,7 +493,7 @@ export class GameLoop {
 
         // Handle scene entry/exit (interact key)
         if (intent.interact) {
-            if (this.gameMode === 'world_3d') {
+            if (this.gameState.discrete.gameMode === 'world_3d') {
                 // Enter scene_2d
                 // Save camera state
                 this.savedCameraState = {
@@ -496,8 +504,15 @@ export class GameLoop {
                 // Transition pitch to 0
                 this.targetPitch = 0;
                 this.isTransitioningPitch = true;
-                // Set game mode
-                this.gameMode = 'scene_2d';
+
+                const previousMode = this.gameState.discrete.gameMode;
+                this.gameState.discrete.gameMode = 'scene_2d';
+
+                this.eventBus.publish({
+                    type: 'game_mode_changed',
+                    previousMode,
+                    currentMode: 'scene_2d'
+                });
                 // Initialize scene character to grid center
                 this.sceneCharacter = createSceneCharacter({ x: 12, y: 9 });
                 // Start scene transition
@@ -505,7 +520,7 @@ export class GameLoop {
                 this.scene.transitionDirection = 1.0;
                 this.scene.transitionProgress = 0.0;
                 this.scene.isActive = false;
-            } else if (this.gameMode === 'scene_2d') {
+            } else if (this.gameState.discrete.gameMode === 'scene_2d') {
                 // Exit to world_3d
                 // Restore camera state
                 if (this.savedCameraState) {
@@ -516,8 +531,16 @@ export class GameLoop {
                     this.camera.pitch = this.savedCameraState.pitch;
                     this.savedCameraState = null;
                 }
-                // Set game mode
-                this.gameMode = 'world_3d';
+
+                const previousMode = this.gameState.discrete.gameMode;
+                this.gameState.discrete.gameMode = 'world_3d';
+
+                this.eventBus.publish({
+                    type: 'game_mode_changed',
+                    previousMode,
+                    currentMode: 'world_3d'
+                });
+
                 // Reset scene state
                 this.scene.isActive = false;
                 this.scene.isTransitioning = false;
@@ -527,7 +550,7 @@ export class GameLoop {
         }
 
         // Handle pause toggle
-        if (intent.pause && this.gameMode === 'world_3d') {
+        if (intent.pause && this.gameState.discrete.gameMode === 'world_3d') {
             if (this.isPaused) {
                 this.unpause();
             } else {
@@ -598,7 +621,7 @@ export class GameLoop {
         }
 
         // Update camera pitch transition (when paused or in scene mode, going to 0)
-        if ((this.isPaused || this.gameMode === 'scene_2d') && this.isTransitioningPitch) {
+        if ((this.isPaused || this.gameState.discrete.gameMode === 'scene_2d') && this.isTransitioningPitch) {
             const pitchTransitionSpeed = 2.0; // radians per second
             const pitchDelta = (this.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
 
@@ -612,7 +635,7 @@ export class GameLoop {
         }
 
         // Update scene transition
-        if (this.gameMode === 'scene_2d' && this.scene.isTransitioning) {
+        if (this.gameState.discrete.gameMode === 'scene_2d' && this.scene.isTransitioning) {
             this.scene.transitionProgress += (dt * this.scene.transitionDirection) / SCENE_TRANSITION_DURATION;
 
             // Clamp to [0, 1]
@@ -626,8 +649,15 @@ export class GameLoop {
                 this.scene.isActive = false;
 
                 // Return to 3D world state
-                this.gameMode = 'world_3d';
+                const previousMode = this.gameState.discrete.gameMode;
+                this.gameState.discrete.gameMode = 'world_3d';
                 this.isTransitioningPitch = false;
+
+                this.eventBus.publish({
+                    type: 'game_mode_changed',
+                    previousMode,
+                    currentMode: 'world_3d'
+                });
 
                 // Restore Camera State
                 if (this.savedCameraState) {
@@ -679,7 +709,7 @@ export class GameLoop {
         }
 
         // Skip camera updates when in scene mode (camera is frozen)
-        if (this.gameMode === 'scene_2d') {
+        if (this.gameState.discrete.gameMode === 'scene_2d') {
             // Scene movement (2D grid-based)
             if (!this.scene.isPaused) {
                 const { x: moveX, y: moveY } = intent.move;
@@ -774,7 +804,7 @@ export class GameLoop {
         const currentChunkData = this.world.activeChunks.get(World.getChunkID(currentChunkCoords.x, currentChunkCoords.z));
 
         // Scene mode rendering (2D overlay)
-        if (this.gameMode === 'scene_2d') {
+        if (this.gameState.discrete.gameMode === 'scene_2d') {
             // 1. Render frozen 3D world (normal 3D rendering, camera frozen)
             const aspect = this.getAspectRatio();
             const viewProj = getCameraMatrix(this.camera, aspect);
@@ -915,7 +945,7 @@ export class GameLoop {
                     timeOfDay,
                     yaw: this.camera.yaw,
                     pitch: this.camera.pitch,
-                    gameMode: this.gameMode,
+                    gameMode: this.gameState.discrete.gameMode,
                     instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
                         ? this.instanceCharacter.position
                         : undefined,
@@ -1073,7 +1103,7 @@ export class GameLoop {
                 timeOfDay,
                 yaw: this.camera.yaw,
                 pitch: this.camera.pitch,
-                gameMode: this.gameMode,
+                gameMode: this.gameState.discrete.gameMode,
                 instancePosition: (this.isPaused && (this.instance.isTransitioning || this.instance.isActive))
                     ? this.instanceCharacter.position
                     : undefined,

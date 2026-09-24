@@ -1,6 +1,8 @@
 // Platform-agnostic entry point
 import { World } from './core/world';
 import { GameLoop } from './core/gameLoop';
+import { EventBus, TypeSafeEventBus } from './core/events';
+import { createGameState, GameState } from './core/gameState';
 import { createCamera } from './core/camera';
 import type { PlatformServices } from './services/platform';
 import { createDebugHUD } from './platforms/web/debugHUD';
@@ -23,6 +25,9 @@ const createPlatform = async (): Promise<PlatformServices> => {
 const main = async () => {
     const platform = await createPlatform();
     const world = new World();
+    const eventBus : EventBus = new TypeSafeEventBus();
+
+    const gameState : GameState = createGameState(); 
 
     // Import chunk management function (platform-specific)
     // Type parameters are intentionally unused (they're for type checking only)
@@ -75,11 +80,21 @@ const main = async () => {
         debugHUD = createDebugHUD(platform.canvas as HTMLCanvasElement);
     }
 
+    // Event Subscriptions
+    eventBus.subscribe('game_mode_changed', (event) => {
+        // TODO: Do the logic in the subscriptions in the main loop, might not live in this file.
+        console.log('📣 [EventBus Test] Game Mode Has Swapped!');
+        console.log(`   └─ Previous Mode: ${event.previousMode}`);
+        console.log(`   └─ Current Mode:  ${event.currentMode}`);
+    });
+
     const gameLoop = new GameLoop(
         platform.renderer,
         platform.input,
         world,
         platform.getAspectRatio,
+        eventBus,
+        gameState,
         debugHUD,
     );
 

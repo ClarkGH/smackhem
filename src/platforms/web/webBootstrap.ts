@@ -1,15 +1,12 @@
 import type { Renderer } from '../../services/renderer';
 import type { PlatformServices } from '../../services/platform';
-import { GameLoop } from '../../core/gameLoop';
 import WebGLRenderer from './webGLRenderer';
 import {
     World,
     CHUNK_LOAD_RADIUS,
 } from '../../core/world';
 import WebClock from './webClock';
-import { createCamera } from '../../core/camera';
 import { WebInputService } from './webInputService';
-import { createDebugHUD } from './debugHUD';
 import type { Vec3 } from '../../types/common';
 import { WebAssetLoader } from './webAssetLoader';
 
@@ -131,42 +128,4 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
         assetLoader,
         getAspectRatio: () => canvas.width / canvas.height,
     };
-};
-
-// Legacy bootstrap function for direct import (will be removed)
-export const bootstrapWeb = (): void => {
-    createWebPlatform().then((platform) => {
-        const world = new World();
-        const initialCamera = createCamera();
-        updateActiveChunks(world, initialCamera.position, platform.renderer, platform.assetLoader);
-
-        // Create debug HUD
-        const debugHUD = createDebugHUD(platform.canvas);
-
-        const gameLoop = new GameLoop(
-            platform.renderer,
-            platform.input,
-            world,
-            platform.getAspectRatio,
-            debugHUD,
-        );
-
-        const loop = () => {
-            platform.clock.update();
-            platform.input.update();
-            gameLoop.update(platform.clock.getDeltaTime());
-
-            // Update chunk loading/unloading based on player position
-            // Fire and forget - chunks will populate as they load
-            const cameraPosition = gameLoop.getCameraPosition();
-            updateActiveChunks(world, cameraPosition, platform.renderer, platform.assetLoader).catch((error) => {
-                console.error('Error in updateActiveChunks:', error);
-            });
-
-            gameLoop.render();
-            requestAnimationFrame(loop);
-        };
-
-        loop();
-    }).catch(console.error);
 };

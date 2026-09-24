@@ -11,6 +11,7 @@ import StubInput from './stubInput';
 import StubClock from './stubClock';
 import { identity } from '../../core/math/mathHelpers';
 import { createChunk } from './stubBootstrap';
+import { TypeSafeEventBus } from 'src/core/events';
 
 describe('NullRenderer - Portability Validation (RULE P-1)', () => {
     let renderer: NullRenderer;
@@ -30,6 +31,7 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
             input,
             world,
             () => 16 / 9,
+            new TypeSafeEventBus(),
         )).not.toThrow();
     });
 
@@ -161,7 +163,7 @@ describe('StubPlatform - Chunk streaming smoke test', () => {
             world.addChunk(createChunk(x, z, renderer));
         });
 
-        gameLoop = new GameLoop(renderer, input, world, () => 16 / 9);
+        gameLoop = new GameLoop(renderer, input, world, () => 16 / 9, new TypeSafeEventBus());
         clock.setFixedDeltaTime(1 / 60);
     });
 
@@ -222,6 +224,7 @@ describe('StubPlatform - Full Integration Test', () => {
             input,
             world,
             () => 16 / 9,
+            new TypeSafeEventBus(),
         );
     });
 

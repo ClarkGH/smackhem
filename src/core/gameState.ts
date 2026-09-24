@@ -1,4 +1,4 @@
-import { Vec3 } from "src/types/common";
+import { Vec3 } from 'src/types/common';
 
 export interface TransitionState<T> {
     isActive: boolean;
