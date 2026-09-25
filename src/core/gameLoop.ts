@@ -49,10 +49,6 @@ import {
     SCENE_TRANSITION_DURATION,
     type Scene,
 } from './scene';
-import {
-    createSceneCharacter,
-    type SceneCharacter,
-} from './sceneCharacter';
 import { GameMode, GameState } from './gameState';
 
 const FIXED_DT = 1 / 60;
@@ -90,8 +86,6 @@ export class GameLoop {
     private instanceCharacter: InstanceCharacter;
 
     private scene: Scene;
-
-    private sceneCharacter: SceneCharacter;
 
     private eventBus: EventBus;
 
@@ -246,7 +240,6 @@ export class GameLoop {
 
         // Scene system
         this.scene = createScene();
-        this.sceneCharacter = createSceneCharacter({ x: 12, y: 9 }); // center of grid
 
         // Load party textures asynchronously
         this.loadPartyTextures();
@@ -520,13 +513,11 @@ export class GameLoop {
 
                 this.setGameMode('scene_2d');
 
-                // Initialize scene character to grid center
-                this.sceneCharacter = createSceneCharacter({ x: 12, y: 9 });
                 // Start scene transition
                 this.scene.isTransitioning = true;
                 this.scene.transitionDirection = 1.0;
                 this.scene.transitionProgress = 0.0;
-                this.scene.isActive = false;
+                discreteState.sceneIsActive = false;
             } else if (discreteState.gameMode === 'scene_2d') {
                 // Exit to world_3d
                 // Restore camera state
@@ -542,7 +533,7 @@ export class GameLoop {
                 this.setGameMode('world_3d');
 
                 // Reset scene state
-                this.scene.isActive = false;
+                discreteState.sceneIsActive = false;
                 this.scene.isTransitioning = false;
                 this.scene.transitionProgress = 0.0;
                 this.isTransitioningPitch = false;
@@ -642,11 +633,11 @@ export class GameLoop {
             if (this.scene.transitionProgress >= 1.0) {
                 this.scene.transitionProgress = 1.0;
                 this.scene.isTransitioning = false;
-                this.scene.isActive = true;
+                discreteState.sceneIsActive = true;
             } else if (this.scene.transitionProgress <= 0.0) {
                 this.scene.transitionProgress = 0.0;
                 this.scene.isTransitioning = false;
-                this.scene.isActive = false;
+                discreteState.sceneIsActive = false;
 
                 // Return to 3D world state
                 this.setGameMode('world_3d');
@@ -726,8 +717,8 @@ export class GameLoop {
                             // Update position
                             interpolatedState.sceneCharacterPositionPx.x = newPxX;
                             interpolatedState.sceneCharacterPositionPx.y = newPxY;
-                            this.sceneCharacter.positionGrid.x = gridX;
-                            this.sceneCharacter.positionGrid.y = gridY;
+                            discreteState.sceneCharacterPositionGrid.x = gridX;
+                            discreteState.sceneCharacterPositionGrid.y = gridY;
                         }
                     }
 
