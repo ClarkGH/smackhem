@@ -53,7 +53,7 @@ import {
     createSceneCharacter,
     type SceneCharacter,
 } from './sceneCharacter';
-import { GameState } from './gameState';
+import { GameMode, GameState } from './gameState';
 
 const FIXED_DT = 1 / 60;
 
@@ -360,7 +360,7 @@ export class GameLoop {
     }
 
     // TODO: Decouple from gameloop
-    private setGameMode(newMode: 'world_3d' | 'scene_2d'): void {
+    private setGameMode(newMode: GameMode ): void {
         const previousMode = this.gameState.discrete.gameMode;
 
         if (previousMode === newMode) {
@@ -786,6 +786,7 @@ export class GameLoop {
             this.updateSimulation(FIXED_DT);
             this.accumulator -= FIXED_DT;
         }
+        this.eventBus.flush();
     }
 
     render(): void {

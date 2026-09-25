@@ -1,8 +1,10 @@
+import { GameMode } from "./gameState";
+
 export type GameEvent =
     | {
         type: 'game_mode_changed';
-        previousMode: 'world_3d' | 'scene_2d';
-        currentMode: 'world_3d' | 'scene_2d';
+        previousMode: GameMode;
+        currentMode: GameMode;
     };
 
 type ExtractEvent<K extends GameEvent['type']> = Extract<GameEvent, { type: K }>;
