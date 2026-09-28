@@ -6,11 +6,6 @@ export const SCENE_HEIGHT_PX = Math.round(SCENE_GRID_HEIGHT * SCENE_TILE_SIZE); 
 export const SCENE_TRANSITION_DURATION = 1.0; // seconds
 
 export interface Scene {
-    isActive: boolean;
-    isTransitioning: boolean;
-    transitionProgress: number; // 0.0 to 1.0
-    transitionDirection: number; // 1.0 forward, -1.0 reverse
-    isPaused: boolean; // scene-specific pause
     collisionGrid: Uint8Array; // 25x18.75 = 469 bytes, tile-based (0 = walkable, 1 = solid)
 }
 
@@ -21,11 +16,6 @@ export const createScene = (): Scene => {
     // All tiles are walkable (0) by default
 
     return {
-        isActive: false,
-        isTransitioning: false,
-        transitionProgress: 0.0,
-        transitionDirection: 1.0,
-        isPaused: false,
         collisionGrid,
     };
 };

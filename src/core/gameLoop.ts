@@ -31,15 +31,6 @@ import {
 import { World } from './world';
 import type { Vec3, Mat4 } from '../types/common';
 import {
-    createInstance,
-    TRANSITION_DURATION,
-    type Instance,
-} from './instance';
-import {
-    createInstanceCharacter,
-    type InstanceCharacter,
-} from './instanceCharacter';
-import {
     createScene,
     SCENE_TILE_SIZE,
     SCENE_GRID_WIDTH,
@@ -52,6 +43,7 @@ import {
 import { GameMode, GameState } from './gameState';
 
 const FIXED_DT = 1 / 60;
+const TRANSITION_DURATION = 1;
 
 export interface DebugHUD {
     // eslint-disable-next-line no-unused-vars
@@ -74,16 +66,6 @@ export interface DebugHUD {
 export class GameLoop {
     // State variables
     private accumulator = 0;
-
-    private savedPitch = 0;
-
-    private targetPitch = 0;
-
-    private isTransitioningPitch = false;
-
-    private instance: Instance;
-
-    private instanceCharacter: InstanceCharacter;
 
     private scene: Scene;
 
@@ -234,10 +216,6 @@ export class GameLoop {
         this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE * 10, 16);
         this.wallDebugMesh = renderer.createCubeMesh(1);
 
-        // Instance system
-        this.instance = createInstance();
-        this.instanceCharacter = createInstanceCharacter({ x: 0, y: 0, z: 0 });
-
         // Scene system
         this.scene = createScene();
 
@@ -276,33 +254,39 @@ export class GameLoop {
 
     // TODO: Consider renaming or moving, we call this pause... but we're doing instancing here
     private pause(): void {
-        this.gameState.discrete.isPaused = true;
-        this.savedPitch = this.camera.pitch;
-        this.targetPitch = 0; // Reset to horizontal view
-        this.isTransitioningPitch = true;
+        const discreteState = this.gameState.discrete;
+        const interpolatedState = this.gameState.interpolated;
+
+        discreteState.isPaused = true;
+        discreteState.savedPitch = this.camera.pitch;
+        discreteState.targetPitch = 0; // Reset to horizontal view
+        discreteState.isTransitioningPitch = true;
 
         // Start transition
-        this.instance.isTransitioning = true;
-        this.instance.transitionDirection = 1.0; // Forward
-        this.instance.transitionProgress = 0.0;
-        this.instance.isActive = false;
+        discreteState.instanceIsTransitioning = true;
+        discreteState.instanceTransitionDirection = 1;
+        interpolatedState.instanceTransitionProgress = 0.0;
+        discreteState.instanceIsActive = false;
 
         this.calculateTransitionPositions();
 
-        this.gameState.interpolated.instanceCharacterPosition.x = this.transitionStartPos.x;
-        this.gameState.interpolated.instanceCharacterPosition.y = this.transitionStartPos.y;
-        this.gameState.interpolated.instanceCharacterPosition.z = this.transitionStartPos.z;
+        interpolatedState.instanceCharacterPosition.x = this.transitionStartPos.x;
+        interpolatedState.instanceCharacterPosition.y = this.transitionStartPos.y;
+        interpolatedState.instanceCharacterPosition.z = this.transitionStartPos.z;
     }
 
     // TODO: See above todo, de-instancing
     private unpause(): void {
-        this.instance.isTransitioning = true;
-        this.instance.transitionDirection = -1.0;
-        this.instance.transitionProgress = 1.0;
+        const discreteState = this.gameState.discrete;
+        const interpolatedState = this.gameState.interpolated;
 
-        this.transitionEndPos.x = this.gameState.interpolated.instanceCharacterPosition.x;
-        this.transitionEndPos.y = this.gameState.interpolated.instanceCharacterPosition.y;
-        this.transitionEndPos.z = this.gameState.interpolated.instanceCharacterPosition.z;
+        discreteState.instanceIsTransitioning = true;
+        discreteState.instanceTransitionDirection = -1;
+        interpolatedState.instanceTransitionProgress = 1.0;
+
+        this.transitionEndPos.x = interpolatedState.instanceCharacterPosition.x;
+        this.transitionEndPos.y = interpolatedState.instanceCharacterPosition.y;
+        this.transitionEndPos.z = interpolatedState.instanceCharacterPosition.z;
 
         const circleSize = INSTANCE_CHARACTER_SIZE;
         const floorY = circleSize / 2;
@@ -315,7 +299,7 @@ export class GameLoop {
     private calculateTransitionPositions(): void {
         // Circle starts at camera position (X/Z) and slides forward in the XZ plane
         // Use target pitch (0) for calculation since we're transitioning to it
-        const forward = getCameraForward(this.camera.yaw, this.targetPitch);
+        const forward = getCameraForward(this.camera.yaw, this.gameState.discrete.targetPitch);
         const circleSize = INSTANCE_CHARACTER_SIZE; // Circle radius
         const floorY = circleSize / 2; // Half circle size above floor (quad is centered at Y=0)
 
@@ -508,15 +492,15 @@ export class GameLoop {
                     pitch: this.camera.pitch,
                 };
                 // Transition pitch to 0
-                this.targetPitch = 0;
-                this.isTransitioningPitch = true;
+                discreteState.targetPitch = 0;
+                discreteState.isTransitioningPitch = true;
 
                 this.setGameMode('scene_2d');
 
                 // Start scene transition
-                this.scene.isTransitioning = true;
-                this.scene.transitionDirection = 1.0;
-                this.scene.transitionProgress = 0.0;
+                discreteState.sceneIsTransitioning = true;
+                discreteState.sceneTransitionDirection = 1;
+                interpolatedState.sceneTransitionProgress = 0.0;
                 discreteState.sceneIsActive = false;
             } else if (discreteState.gameMode === 'scene_2d') {
                 // Exit to world_3d
@@ -534,9 +518,9 @@ export class GameLoop {
 
                 // Reset scene state
                 discreteState.sceneIsActive = false;
-                this.scene.isTransitioning = false;
-                this.scene.transitionProgress = 0.0;
-                this.isTransitioningPitch = false;
+                discreteState.sceneIsTransitioning = false;
+                interpolatedState.sceneTransitionProgress = 0.0;
+                discreteState.isTransitioningPitch = false;
             }
         }
 
@@ -560,21 +544,21 @@ export class GameLoop {
         }
 
         // Update instance state transition (only when paused)
-        if (discreteState.isPaused && this.instance.isTransitioning) {
+        if (discreteState.isPaused && discreteState.instanceIsTransitioning) {
             // Update transition progress using fixed timestep
-            this.instance.transitionProgress += (
-                dt * this.instance.transitionDirection
+            interpolatedState.instanceTransitionProgress += (
+                dt * discreteState.instanceTransitionDirection
             ) / TRANSITION_DURATION;
 
             // Clamp to [0, 1]
-            if (this.instance.transitionProgress >= 1.0) {
-                this.instance.transitionProgress = 1.0;
-            } else if (this.instance.transitionProgress <= 0.0) {
-                this.instance.transitionProgress = 0.0;
+            if (interpolatedState.instanceTransitionProgress >= 1.0) {
+                interpolatedState.instanceTransitionProgress = 1.0;
+            } else if (interpolatedState.instanceTransitionProgress <= 0.0) {
+                interpolatedState.instanceTransitionProgress = 0.0;
             }
 
             // Calculate current position via interpolation
-            const smoothT = smoothstep(this.instance.transitionProgress);
+            const smoothT = smoothstep(interpolatedState.instanceTransitionProgress);
             lerpVec3(
                 this.transitionStartPos,
                 this.transitionEndPos,
@@ -585,26 +569,26 @@ export class GameLoop {
             // If moving forward and the character hits an AABB,
             // reverse the transition and return to the previous state.
             if (
-                this.instance.transitionDirection > 0
+                discreteState.instanceTransitionDirection > 0
                 && this.isInstanceTransitionPositionBlocked(interpolatedState.instanceCharacterPosition)
             ) {
-                this.instance.transitionDirection = -1.0;
-                this.instance.isActive = false;
+                discreteState.instanceTransitionDirection = -1;
+                discreteState.instanceIsActive = false;
             }
 
             // Forward transition complete
             if (
-                this.instance.transitionProgress >= 1.0
-                && this.instance.transitionDirection > 0
+                interpolatedState.instanceTransitionProgress >= 1.0
+                && discreteState.instanceTransitionDirection > 0
             ) {
-                this.instance.isTransitioning = false;
-                this.instance.isActive = true;
+                discreteState.instanceIsTransitioning = false;
+                discreteState.instanceIsActive = true;
             }
 
             // Reverse transition complete
-            if (this.instance.transitionProgress <= 0.0) {
-                this.instance.isTransitioning = false;
-                this.instance.isActive = false;
+            if (interpolatedState.instanceTransitionProgress <= 0.0) {
+                discreteState.instanceIsTransitioning = false;
+                discreteState.instanceIsActive = false;
 
                 // Reverse transition complete, actually unpause now
                 discreteState.isPaused = false;
@@ -612,31 +596,31 @@ export class GameLoop {
         }
 
         // Update camera pitch transition (when paused or in scene mode, going to 0)
-        if ((discreteState.isPaused || discreteState.gameMode === 'scene_2d') && this.isTransitioningPitch) {
+        if ((discreteState.isPaused || discreteState.gameMode === 'scene_2d') && discreteState.isTransitioningPitch) {
             const pitchTransitionSpeed = 2.0; // radians per second
-            const pitchDelta = (this.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
+            const pitchDelta = (discreteState.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
 
             if (Math.abs(pitchDelta) < 0.001) {
                 // Close enough, snap to target
-                this.camera.pitch = this.targetPitch;
-                this.isTransitioningPitch = false;
+                this.camera.pitch = discreteState.targetPitch;
+                discreteState.isTransitioningPitch = false;
             } else {
                 this.camera.pitch += pitchDelta;
             }
         }
 
         // Update scene transition
-        if (discreteState.gameMode === 'scene_2d' && this.scene.isTransitioning) {
-            this.scene.transitionProgress += (dt * this.scene.transitionDirection) / SCENE_TRANSITION_DURATION;
+        if (discreteState.gameMode === 'scene_2d' && discreteState.sceneIsTransitioning) {
+            interpolatedState.sceneTransitionProgress += (dt * discreteState.sceneTransitionDirection) / SCENE_TRANSITION_DURATION;
 
             // Clamp to [0, 1]
-            if (this.scene.transitionProgress >= 1.0) {
-                this.scene.transitionProgress = 1.0;
-                this.scene.isTransitioning = false;
+            if (interpolatedState.sceneTransitionProgress >= 1.0) {
+                interpolatedState.sceneTransitionProgress = 1.0;
+                discreteState.sceneIsTransitioning = false;
                 discreteState.sceneIsActive = true;
-            } else if (this.scene.transitionProgress <= 0.0) {
-                this.scene.transitionProgress = 0.0;
-                this.scene.isTransitioning = false;
+            } else if (interpolatedState.sceneTransitionProgress <= 0.0) {
+                interpolatedState.sceneTransitionProgress = 0.0;
+                discreteState.sceneIsTransitioning = false;
                 discreteState.sceneIsActive = false;
 
                 // Return to 3D world state
@@ -656,7 +640,7 @@ export class GameLoop {
 
         // Handle WASD movement for circle character in instance mode
         // Only when paused, active (transition complete), and not transitioning
-        if (discreteState.isPaused && this.instance.isActive && !this.instance.isTransitioning) {
+        if (discreteState.isPaused && discreteState.instanceIsActive && !discreteState.instanceIsTransitioning) {
             const { x: moveX, y: moveY } = intent.move;
 
             if (moveX !== 0 || moveY !== 0) {
@@ -699,7 +683,7 @@ export class GameLoop {
 
                 if (moveX !== 0 || moveY !== 0) {
                     // Convert to grid movement (pixels per second)
-                    const moveSpeed = PLAYER_SPEED * dt;
+                    const moveSpeed = PLAYER_SPEED * dt + 1;
                     const newPxX = interpolatedState.sceneCharacterPositionPx.x + moveX * moveSpeed;
                     const newPxY = interpolatedState.sceneCharacterPositionPx.y - moveY * moveSpeed; // invert Y for up/down
 
@@ -888,7 +872,7 @@ export class GameLoop {
             // Render pink overlay using clear() if available, otherwise use a full-screen quad
             if (this.renderer.clear) {
                 // Apply transition alpha for fade in/out
-                const alpha = smoothstep(this.scene.transitionProgress);
+                const alpha = smoothstep(interpolatedState.sceneTransitionProgress);
                 const pinkR = 1.0;
                 const pinkG = 0.41; // 105/255
                 const pinkB = 0.71; // 180/255
@@ -932,7 +916,7 @@ export class GameLoop {
                     yaw: this.camera.yaw,
                     pitch: this.camera.pitch,
                     gameMode: discreteState.gameMode,
-                    instancePosition: (discreteState.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                    instancePosition: (discreteState.isPaused && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
                         ? interpolatedState.instanceCharacterPosition
                         : undefined,
                     currentChunk: {
@@ -1030,7 +1014,7 @@ export class GameLoop {
         });
 
         // Render lead party member when paused and active/transitioning
-        if (discreteState.isPaused && (this.instance.isTransitioning || this.instance.isActive)) {
+        if (discreteState.isPaused && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive)) {
             if (this.partyMemberTexture1) {
                 // Calculate transform for circle (billboard at character position)
                 const pos = interpolatedState.instanceCharacterPosition;
@@ -1090,7 +1074,7 @@ export class GameLoop {
                 yaw: this.camera.yaw,
                 pitch: this.camera.pitch,
                 gameMode: discreteState.gameMode,
-                instancePosition: (discreteState.isPaused && (this.instance.isTransitioning || this.instance.isActive))
+                instancePosition: (discreteState.isPaused && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
                     ? interpolatedState.instanceCharacterPosition
                     : undefined,
                 currentChunk: {
