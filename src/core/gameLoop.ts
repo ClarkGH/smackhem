@@ -353,7 +353,7 @@ export class GameLoop {
     }
 
     // TODO: Decouple from gameloop
-    private setGameMode(newMode: GameMode ): void {
+    private setGameMode(newMode: GameMode): void {
         const previousMode = this.gameState.discrete.gameMode;
 
         if (previousMode === newMode) {

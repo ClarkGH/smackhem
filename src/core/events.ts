@@ -1,4 +1,4 @@
-import { GameMode } from "./gameState";
+import { GameMode } from './gameState';
 
 export type GameEvent =
     | {

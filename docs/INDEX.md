@@ -37,9 +37,7 @@ Not all code examples in the documentation are 1:1 with how the code actually fu
 - Random Encounter(s)
 - Explorable instance(s)
 - Shop(s) / Inn(s) / Shrine(s)
-- Quests
-- No walking into and drowning in bodies of water, disco dragon summons, or tombstone dogs allowed!
-- No Illegible Spells!
+- Event Flags / Quest system
 
 ## Private source code
 
@@ -57,11 +55,11 @@ Not all code examples in the documentation are 1:1 with how the code actually fu
 - The game is both 3D and 2D, ala Dragonview and Drakkhen. First person exploration in the main map, until combat or events, then party pops out and fights or has a conversation/investigates.
 - NPC/Enemy/Party AI. Different than Drakkhen. Party will follow the hero, follow turn based commands, or follow set tactics in real time. Enemies/NPCs will do their own thing as set by the game logic.
 - Enter an instance and be shown a 2D scene. If a dunny or explorable place, we can wobble/roll around. Otherwise only the scene.
-- EASIER TO UNDERSTAND UI THAN DRAKKHEN. That game has a terrible UI and we aren't plagiarizing.
-- Modern, and more intuitive controls.
+- EASIER TO UNDERSTAND UI THAN DRAKKHEN. We aren't plagiarizing.
+- Modern, and intuitive controls.
 - Party character specific loot/gear/equipment.
 - Group loot/money.
-- Keep the demo's code into the open source wild, put up on itch.io, and try to get funding for a full game, or get hired by a small team of indie game devs?
+- Keep the demo's code into the open source wild, put up on itch.io, and try to get funding for a full game, or be able to assist other devs.
 
 ### TBD / Next steps
 
@@ -69,10 +67,9 @@ Not all code examples in the documentation are 1:1 with how the code actually fu
 
 - Character creation.
 - A plot.
-- Spells: Unlock, fire, ice, light, lightning, invisibility, poison cloud, acid spray, buff, debuff, shield, etc.. If we have time and the spell's not broken, we'll have a good amount!
-- Strengthen/upgrade system involving math formulae.
+- Spells: Simple A/B/C weakness strength spells, maybe a heal. Keeping it light for alpha.
+- Strengthen/upgrade system involving math formulae?
 - Accessibility options.
-- Add some color for... reasons.
 - (Stretch - probably won't happen) Port demo code to Godot, because "why not?". We're building for fun.
 
 ## Navigation

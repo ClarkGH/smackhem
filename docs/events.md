@@ -83,7 +83,7 @@ Synchronous double-buffered events allow for more predictability on the onset. S
 const FIXED_DT = 1 / 60;
 ```
 
-The typescript implementation will begin as synchronous until multi-threading becomes apparent. We would LIKE to avoid creating web-based service workers to imitate an actual c++ implementation. That would increase the breadth and scope of the project, and while service workers are incredibly useful for PWAs, we have no server. Sheerly imitating multi-threaded c++ isn't the goal, creating something port-forward is.
+The typescript implementation will begin as synchronous until multi-threading becomes apparent. We would LIKE to avoid creating web-based service workers to imitate an actual c++ implementation. That would increase the breadth and scope of the project, and while service workers are incredibly useful for PWAs, we have no server. Sheerly imitating multi-threaded c++ isn't the goal, creating something port-forward is. Aside from the increased complexity, we're not facing the high-volume per millisecond calculations that would require several javascript threads.
 
 The Event bus itself starts out synchronous and simple. Events should be both subscribable and unsubscribable.
 
@@ -183,7 +183,9 @@ We have both state and a state buffer. True state will live in the buffer. Cache
 
 The collision grid and world chunks are excluded from state, purposefully. Since it's content and non-reliant on our simulated engine time, there's no benefit.
 
-There's a current differentiation between discrete and interpolated state. Discrete state is directly copied, while interpolated state includes other calculations/events that need to be freed up and unblocked.
+There's a current differentiation between discrete and interpolated state. Discrete state is directly copied. It's "true" state.
+
+Interpolated state includes "in-between" values for other calculations/events that need to be free and unblocked. Per tick the interpolation may be running at 144 Hz vs a set 60Hz simulation speed. This allows for frame rates to be ran independently of the in-game engine.
 
 ```typescript
 export interface State {
