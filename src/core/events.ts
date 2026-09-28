@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { GameMode } from './gameState';
 
 export type GameEvent =
