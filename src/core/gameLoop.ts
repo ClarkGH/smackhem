@@ -88,30 +88,7 @@ export class GameLoop {
 
     private readonly MOON_SIZE = 0.4; // Radius of moon orb (sphere)
 
-    private readonly CELESTIAL_DISTANCE: number; // Computed from camera.far
-
     private readonly WALL_DEBUG_COLOR: Vec3 = { x: 1, y: 0, z: 0 }; // Color of the wall debug mesh
-
-    /*
-     * PERFORMANCE:
-     * All objects are pre-allocated and reused every frame.
-     * This avoids allocation overhead and improves performance.
-     * This is a performance optimization, not a design principle.
-     */
-
-    // Pre-allocated MVP matrices
-    private readonly sunMVP: Mat4;
-
-    private readonly moonMVP: Mat4;
-
-    private readonly meshMVP: Mat4;
-
-    private readonly circleTransform: Mat4; // Pre-allocated for circle rendering
-
-    // Scene rendering matrices (pre-allocated)
-    private readonly sceneSpriteTransform: Mat4; // Pre-allocated for sprite
-
-    private readonly sceneOrthoProj: Mat4; // Pre-allocated orthographic projection
 
     // Mesh objects
     private readonly sunMesh;
@@ -153,17 +130,6 @@ export class GameLoop {
         this.camera.position = { ...this.gameState.interpolated.cameraPosition };
         this.camera.yaw = this.gameState.interpolated.cameraYaw;
         this.camera.pitch = this.gameState.interpolated.cameraPitch;
-
-        // Compute CELESTIAL_DISTANCE from camera.far
-        this.CELESTIAL_DISTANCE = this.camera.far - 1.0; // Very large distance (effectively infinite, must be < camera.far)
-
-        // Pre-allocated matrices
-        this.sunMVP = identity();
-        this.moonMVP = identity();
-        this.meshMVP = identity();
-        this.circleTransform = identity();
-        this.sceneSpriteTransform = identity();
-        this.sceneOrthoProj = identity();
 
         // Mesh objects
         this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE * 10, 16);
@@ -211,26 +177,6 @@ export class GameLoop {
         o[4] = 0; o[5] = scale.y; o[6] = 0; o[7] = 0;
         o[8] = 0; o[9] = 0; o[10] = scale.z; o[11] = 0;
         o[12] = center.x; o[13] = center.y; o[14] = center.z; o[15] = 1;
-    }
-
-    private renderBoundaryWireframe(viewProj: Mat4): void {
-        if (!this.renderer.getWireframeEnabled?.()) return;
-
-        this.world.getBoundaryWallAABBs().forEach((wall) => {
-            const center = {
-                x: (wall.min.x + wall.max.x) / 2,
-                y: (wall.min.y + wall.max.y) / 2,
-                z: (wall.min.z + wall.max.z) / 2,
-            };
-            const scale = {
-                x: wall.max.x - wall.min.x,
-                y: wall.max.y - wall.min.y,
-                z: wall.max.z - wall.min.z,
-            };
-            this.computeScaledTransform(center, scale, this.wallDebugTransform);
-            matrixMultiplyInto(viewProj, this.wallDebugTransform, this.wallDebugMVP);
-            this.renderer.drawMesh(this.wallDebugMesh, this.wallDebugMVP, this.WALL_DEBUG_COLOR, true);
-        });
     }
 
     private updateSimulation(dt: number, intent: PlayerIntent): void {
