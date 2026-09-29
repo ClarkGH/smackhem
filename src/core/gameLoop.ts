@@ -34,7 +34,7 @@ import {
     Scene2DSystem,
 } from './scene';
 import { GameMode, GameState } from './gameState';
-import Instance2DSystem from './instance';
+import Instance3DSystem from './instance';
 
 const FIXED_DT = 1 / 60;
 
@@ -62,7 +62,7 @@ export class GameLoop {
 
     private scene2DSystem: Scene2DSystem;
 
-    private instance2DSystem: Instance2DSystem;
+    private instance3DSystem: Instance3DSystem;
 
     private eventBus: TypeSafeEventBus;
 
@@ -186,7 +186,7 @@ export class GameLoop {
         // Core objects
         this.camera = createCamera();
         this.collisionContext = createCollisionContext();
-        this.instance2DSystem = new Instance2DSystem(this.collisionContext, this.world, this.camera, this.eventBus);
+        this.instance3DSystem = new Instance3DSystem(this.collisionContext, this.world, this.camera, this.eventBus);
 
         // Seed camera
         this.camera.position = { ...this.gameState.interpolated.cameraPosition };
@@ -415,7 +415,7 @@ export class GameLoop {
         const interpolatedState = this.gameState.interpolated;
 
         this.scene2DSystem.update(dt, this.gameState, intent);
-        this.instance2DSystem.update(dt, this.gameState, intent);
+        this.instance3DSystem.update(dt, this.gameState, intent);
 
         // TODO: Revisit if this needs to be at the top still
         if (discreteState.gameMode === 'world_3d') {
@@ -437,9 +437,9 @@ export class GameLoop {
 
         if (intent.pause) {
             if (discreteState.isTimeFrozen) {
-                this.instance2DSystem.unPropagateInstance(this.gameState);
+                this.instance3DSystem.unPropagateInstance(this.gameState);
             } else {
-                this.instance2DSystem.propagateInstance(this.gameState);
+                this.instance3DSystem.propagateInstance(this.gameState);
             }
         }
 
