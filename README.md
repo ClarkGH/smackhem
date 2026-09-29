@@ -2,7 +2,8 @@
 
 Geometric 3D/2D game engine wrapper
 
-https://github.com/user-attachments/assets/2a368c70-b1f1-4053-99c2-1a7213b621e4
+<img width="887" height="756" alt="image" src="https://github.com/user-attachments/assets/7d94d284-1cb2-4e68-b066-5cbb129181fb" />
+
 
 ## Paradigms and Intent
 
