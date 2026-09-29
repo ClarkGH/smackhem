@@ -11,7 +11,7 @@ export default class StubClock implements Clock {
 
     private fixedDeltaTime: number = 1 / 60; // Default 60fps (16.67ms)
 
-    private paused: boolean = false;
+    private frozen: boolean = false;
 
     getTime(): number {
         return this.currentTime;
@@ -22,7 +22,7 @@ export default class StubClock implements Clock {
     }
 
     update(): void {
-        if (!this.paused) {
+        if (!this.frozen) {
             this.deltaTime = this.fixedDeltaTime;
             this.currentTime += this.deltaTime;
         } else {
@@ -50,21 +50,21 @@ export default class StubClock implements Clock {
     }
 
     pause(): void {
-        this.paused = true;
+        this.frozen = true;
     }
 
     resume(): void {
-        this.paused = false;
+        this.frozen = false;
     }
 
-    isPaused(): boolean {
-        return this.paused;
+    isTimeFrozen(): boolean {
+        return this.frozen;
     }
 
     reset(): void {
         this.currentTime = 0;
         this.deltaTime = 0;
         this.fixedDeltaTime = 1 / 60;
-        this.paused = false;
+        this.frozen = false;
     }
 }

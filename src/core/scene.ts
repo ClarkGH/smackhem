@@ -93,7 +93,7 @@ export class Scene2DSystem {
             }
         }
 
-        if (discreteState.gameMode !== 'scene_2d' || discreteState.isPaused || discreteState.sceneIsTransitioning) return;
+        if (discreteState.gameMode !== 'scene_2d' || discreteState.isTimeFrozen || discreteState.sceneIsTransitioning) return;
 
         const { x: moveX, y: moveY } = intent.move;
 

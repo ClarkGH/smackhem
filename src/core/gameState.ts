@@ -32,11 +32,9 @@ export interface InterpolatedState {
 
 export type GameMode = 'world_3d' | 'instance_3d' | 'scene_2d';
 
-// TODO: Consider renaming isPaused to something else if it's only pausing the 3D world
 // TODO: Establish a differentiation between exploration in the world and in the instance
 export interface DiscreteState {
     gameMode: GameMode;
-    isPaused: boolean;
     debugHUDVisible: boolean;
     instanceIsActive: boolean;
     instanceIsTransitioning: boolean;
@@ -45,7 +43,8 @@ export interface DiscreteState {
     sceneIsActive: boolean
     sceneIsTransitioning: boolean;
     sceneTransitionDirection: 1 | -1;
-    sceneIsPaused: boolean;
+    isPaused: boolean;
+    isTimeFrozen: boolean;
     sceneCharacterPositionGrid: { x: number; y: number };
     isTransitioningPitch: boolean;
     savedPitch: number;
@@ -70,6 +69,7 @@ export const createGameState = (): GameState => ({
     },
     discrete: {
         gameMode: 'world_3d',
+        isTimeFrozen: false,
         isPaused: false,
         debugHUDVisible: false,
         instanceIsActive: false,
@@ -79,7 +79,6 @@ export const createGameState = (): GameState => ({
         sceneIsActive: false,
         sceneIsTransitioning: false,
         sceneTransitionDirection: 1,
-        sceneIsPaused: false,
         sceneCharacterPositionGrid: { x: 12, y: 9 },
         isTransitioningPitch: false,
         savedPitch: 0,

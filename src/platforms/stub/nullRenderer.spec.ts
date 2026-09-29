@@ -273,7 +273,7 @@ describe('StubPlatform - Full Integration Test', () => {
         expect(clock.getTime()).toBeCloseTo(0.016 * 30, 5);
     });
 
-    it('supports pause/resume', () => {
+    it('supports time freeze/unfreeze', () => {
         clock.setFixedDeltaTime(0.016);
         const initialTime = clock.getTime();
 

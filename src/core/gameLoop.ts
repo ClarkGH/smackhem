@@ -1,5 +1,5 @@
 import type { Renderer, TextureHandle } from '../services/renderer';
-import type { Input } from '../services/input';
+import type { Input, PlayerIntent } from '../services/input';
 import type { TypeSafeEventBus } from './events';
 import {
     createCamera,
@@ -252,12 +252,11 @@ export class GameLoop {
         return false;
     }
 
-    // TODO: Consider renaming or moving, we call this pause... but we're doing instancing here
-    private pause(): void {
+    private freezeTime(): void {
         const discreteState = this.gameState.discrete;
         const interpolatedState = this.gameState.interpolated;
 
-        discreteState.isPaused = true;
+        discreteState.isTimeFrozen = true;
         discreteState.savedPitch = this.camera.pitch;
         discreteState.targetPitch = 0; // Reset to horizontal view
         discreteState.isTransitioningPitch = true;
@@ -276,7 +275,7 @@ export class GameLoop {
     }
 
     // TODO: See above todo, de-instancing
-    private unpause(): void {
+    private unFreezeTime(): void {
         const discreteState = this.gameState.discrete;
         const interpolatedState = this.gameState.interpolated;
 
@@ -476,7 +475,7 @@ export class GameLoop {
         });
     }
 
-    private updateSimulation(dt: number, intent: any): void {
+    private updateSimulation(dt: number, intent: PlayerIntent): void {
         const discreteState = this.gameState.discrete;
         const interpolatedState = this.gameState.interpolated;
 
@@ -491,10 +490,10 @@ export class GameLoop {
         if (discreteState.gameMode === 'scene_2d') return;
 
         if (intent.pause && discreteState.gameMode === 'world_3d') {
-            if (discreteState.isPaused) {
-                this.unpause();
+            if (discreteState.isTimeFrozen) {
+                this.unFreezeTime();
             } else {
-                this.pause();
+                this.freezeTime();
             }
         }
 
@@ -508,8 +507,8 @@ export class GameLoop {
             }
         }
 
-        // Update instance state transition (only when paused)
-        if (discreteState.isPaused && discreteState.instanceIsTransitioning) {
+        // Update instance state transition (only when time is frozen)
+        if (discreteState.isTimeFrozen && discreteState.instanceIsTransitioning) {
             interpolatedState.instanceTransitionProgress += (
                 dt * discreteState.instanceTransitionDirection
             ) / TRANSITION_DURATION;
@@ -547,12 +546,12 @@ export class GameLoop {
             if (interpolatedState.instanceTransitionProgress <= 0.0) {
                 discreteState.instanceIsTransitioning = false;
                 discreteState.instanceIsActive = false;
-                discreteState.isPaused = false;
+                discreteState.isTimeFrozen = false;
             }
         }
 
-        // Update camera pitch transition (when paused, going to 0)
-        if (discreteState.isPaused && discreteState.isTransitioningPitch) {
+        // Update camera pitch transition (when time is frozen, going to 0)
+        if (discreteState.isTimeFrozen && discreteState.isTransitioningPitch) {
             const pitchTransitionSpeed = 2.0;
             const pitchDelta = (discreteState.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
 
@@ -567,7 +566,7 @@ export class GameLoop {
         }
 
         // Handle WASD movement for circle character in instance mode
-        if (discreteState.isPaused && discreteState.instanceIsActive && !discreteState.instanceIsTransitioning) {
+        if (discreteState.isTimeFrozen && discreteState.instanceIsActive && !discreteState.instanceIsTransitioning) {
             const { x: moveX, y: moveY } = intent.move;
 
             if (moveX !== 0 || moveY !== 0) {
@@ -596,7 +595,7 @@ export class GameLoop {
             }
         }
 
-        if (discreteState.isPaused) {
+        if (discreteState.isTimeFrozen) {
             return;
         }
 
@@ -809,7 +808,7 @@ export class GameLoop {
                     yaw: this.camera.yaw,
                     pitch: this.camera.pitch,
                     gameMode: discreteState.gameMode,
-                    instancePosition: (discreteState.isPaused && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
+                    instancePosition: (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
                         ? interpolatedState.instanceCharacterPosition
                         : undefined,
                     currentChunk: {
@@ -829,8 +828,8 @@ export class GameLoop {
         const viewProj = getCameraMatrix(this.camera, aspect);
 
         // PERFORMANCE: Reuse pre-allocated objects, zero allocations per frame
-        // When paused, use last timeOfDay (frozen)
-        const timeOfDay = discreteState.isPaused
+        // When time is frozen, use last timeOfDay (frozen)
+        const timeOfDay = discreteState.isTimeFrozen
             ? this.computeTimeOfDay(interpolatedState.simulationTime)
             : this.computeTimeOfDay(interpolatedState.simulationTime);
 
@@ -906,8 +905,8 @@ export class GameLoop {
             this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
         });
 
-        // Render lead party member when paused and active/transitioning
-        if (discreteState.isPaused && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive)) {
+        // Render lead party member when time is frozen and active/transitioning
+        if (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive)) {
             if (this.partyMemberTexture1) {
                 // Calculate transform for circle (billboard at character position)
                 const pos = interpolatedState.instanceCharacterPosition;
@@ -967,7 +966,7 @@ export class GameLoop {
                 yaw: this.camera.yaw,
                 pitch: this.camera.pitch,
                 gameMode: discreteState.gameMode,
-                instancePosition: (discreteState.isPaused && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
+                instancePosition: (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
                     ? interpolatedState.instanceCharacterPosition
                     : undefined,
                 currentChunk: {
