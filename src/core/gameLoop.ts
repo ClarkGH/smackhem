@@ -198,6 +198,11 @@ export class GameLoop {
         this.camera = createCamera();
         this.collisionContext = createCollisionContext();
 
+        // Seed camera
+        this.camera.position = {...this.gameState.interpolated.cameraPosition}
+        this.camera.yaw = this.gameState.interpolated.cameraYaw;
+        this.camera.pitch = this.gameState.interpolated.cameraPitch;
+
         // Compute CELESTIAL_DISTANCE from camera.far
         this.CELESTIAL_DISTANCE = this.camera.far - 1.0; // Very large distance (effectively infinite, must be < camera.far)
 
@@ -486,10 +491,10 @@ export class GameLoop {
             if (discreteState.gameMode === 'world_3d') {
                 // Enter scene_2d
                 // Save camera state
-                this.savedCameraState = {
-                    position: { ...this.camera.position },
-                    yaw: this.camera.yaw,
-                    pitch: this.camera.pitch,
+                discreteState.savedCameraState = {
+                    position: { ...interpolatedState.cameraPosition },
+                    yaw: interpolatedState.cameraYaw,
+                    pitch: interpolatedState.cameraPitch,
                 };
                 // Transition pitch to 0
                 discreteState.targetPitch = 0;
@@ -505,13 +510,11 @@ export class GameLoop {
             } else if (discreteState.gameMode === 'scene_2d') {
                 // Exit to world_3d
                 // Restore camera state
-                if (this.savedCameraState) {
-                    this.camera.position.x = this.savedCameraState.position.x;
-                    this.camera.position.y = this.savedCameraState.position.y;
-                    this.camera.position.z = this.savedCameraState.position.z;
-                    this.camera.yaw = this.savedCameraState.yaw;
-                    this.camera.pitch = this.savedCameraState.pitch;
-                    this.savedCameraState = null;
+                if (discreteState.savedCameraState) {
+                    this.camera.position = {...discreteState.savedCameraState.position}
+                    this.camera.yaw = discreteState.savedCameraState.yaw;
+                    this.camera.pitch = discreteState.savedCameraState.pitch;
+                    discreteState.savedCameraState = null;
                 }
 
                 this.setGameMode('world_3d');
@@ -603,9 +606,11 @@ export class GameLoop {
             if (Math.abs(pitchDelta) < 0.001) {
                 // Close enough, snap to target
                 this.camera.pitch = discreteState.targetPitch;
+                interpolatedState.cameraPitch = discreteState.targetPitch;
                 discreteState.isTransitioningPitch = false;
             } else {
                 this.camera.pitch += pitchDelta;
+                interpolatedState.cameraPitch = this.camera.pitch;
             }
         }
 
@@ -627,13 +632,11 @@ export class GameLoop {
                 this.setGameMode('world_3d');
 
                 // Restore Camera State
-                if (this.savedCameraState) {
-                    this.camera.position.x = this.savedCameraState.position.x;
-                    this.camera.position.y = this.savedCameraState.position.y;
-                    this.camera.position.z = this.savedCameraState.position.z;
-                    this.camera.yaw = this.savedCameraState.yaw;
-                    this.camera.pitch = this.savedCameraState.pitch;
-                    this.savedCameraState = null;
+                if (discreteState.savedCameraState) {
+                    interpolatedState.cameraPosition = {...discreteState.savedCameraState.position}
+                    interpolatedState.cameraYaw = discreteState.savedCameraState.yaw;
+                    interpolatedState.cameraPitch = discreteState.savedCameraState.pitch;
+                    discreteState.savedCameraState = null;
                 }
             }
         }
@@ -721,10 +724,13 @@ export class GameLoop {
         const sensitivity = 0.005;
         this.camera.yaw += intent.look.yaw * sensitivity;
         this.camera.pitch -= intent.look.pitch * sensitivity;
-
+        
         // Clamp pitch to prevent flipping
         const limit = Math.PI / 2 - 0.01;
         this.camera.pitch = Math.max(-limit, Math.min(limit, this.camera.pitch));
+
+        interpolatedState.cameraYaw = this.camera.yaw;
+        interpolatedState.cameraPitch = this.camera.pitch;
 
         const { x: moveX, y: moveY } = intent.move;
 
@@ -752,6 +758,8 @@ export class GameLoop {
             this.camera.position.x += resolvedMovement.x;
             this.camera.position.z += resolvedMovement.z;
             this.camera.position.y = PLAYER_HEIGHT;
+
+            interpolatedState.cameraPosition = {...this.camera.position}
         }
     }
 
@@ -1089,7 +1097,7 @@ export class GameLoop {
     }
 
     getCameraPosition(): Vec3 {
-        return this.camera.position;
+        return this.gameState.interpolated.cameraPosition;
     }
 
     getTimeOfDay(): number {

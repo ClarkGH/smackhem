@@ -40,6 +40,7 @@ export interface DiscreteState {
     instanceIsActive: boolean;
     instanceIsTransitioning: boolean;
     instanceTransitionDirection: 1 | -1;
+    savedCameraState: { position: Vec3; yaw: number; pitch: number } | null;
     sceneIsActive: boolean
     sceneIsTransitioning: boolean;
     sceneTransitionDirection: 1 | -1;
@@ -57,7 +58,7 @@ export interface GameState {
 
 export const createGameState = (): GameState => ({
     interpolated: {
-        cameraPosition: { x: 0, y: 0, z: 0 },
+        cameraPosition: { x: 0, y: 1, z: 0 },
         cameraYaw: 0,
         cameraPitch: 0,
         simulationTime: 0,
@@ -73,6 +74,7 @@ export const createGameState = (): GameState => ({
         instanceIsActive: false,
         instanceIsTransitioning: false,
         instanceTransitionDirection: 1,
+        savedCameraState: null,
         sceneIsActive: false,
         sceneIsTransitioning: false,
         sceneTransitionDirection: 1,
