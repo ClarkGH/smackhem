@@ -229,26 +229,6 @@ export class GameLoop {
         }
     }
 
-    // Check if we're going to collide or move through AABB while transitioning to an instance
-    private isInstanceTransitionPositionBlocked(position: Vec3): boolean {
-        updatePlayerAABB(
-            position,
-            INSTANCE_CHARACTER_SIZE,
-            INSTANCE_CHARACTER_SIZE / 2,
-            this.collisionContext.playerAABB,
-        );
-
-        const worldAABBs = this.world.getCollidableAABBs();
-
-        for (let i = 0; i < worldAABBs.length; i += 1) {
-            if (checkCollision(this.collisionContext.playerAABB, worldAABBs[i])) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private computeTimeOfDay(simTime: number): number {
         return (simTime % this.DAY_LENGTH_SECONDS) / this.DAY_LENGTH_SECONDS;
     }
@@ -268,23 +248,6 @@ export class GameLoop {
         outAzimuth.value = azimuth;
         // eslint-disable-next-line no-param-reassign
         outElevation.value = elevation;
-    }
-
-    // TODO: Decouple from gameloop
-    private setGameMode(newMode: GameMode): void {
-        const previousMode = this.gameState.discrete.gameMode;
-
-        if (previousMode === newMode) {
-            return;
-        }
-
-        this.gameState.discrete.gameMode = newMode;
-
-        this.eventBus.publish({
-            type: 'game_mode_changed',
-            previousMode,
-            currentMode: newMode,
-        });
     }
 
     // PERFORMANCE: Writes into existing object to avoid allocation
@@ -513,7 +476,6 @@ export class GameLoop {
 
         // Scene mode rendering (2D overlay)
         if (discreteState.gameMode === 'scene_2d') {
-            // 1. Render frozen 3D world (normal 3D rendering, camera frozen)
             const aspect = this.getAspectRatio();
             const viewProj = getCameraMatrix(this.camera, aspect);
 
@@ -593,7 +555,6 @@ export class GameLoop {
                 this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
             });
 
-            // 2. Render pink overlay (2D screen-space)
             const width = this.renderer.getViewportWidth?.() ?? 800;
             const height = this.renderer.getViewportHeight?.() ?? 600;
 
@@ -617,7 +578,6 @@ export class GameLoop {
                 this.renderer.clear(pinkR * alpha, pinkG * alpha, pinkB * alpha, alpha);
             }
 
-            // 3. Render scene sprite (2D screen-space)
             if (this.partyMemberTexture1) {
                 // positionPx is already in pixel coordinates (0-799, 0-599)
                 const spriteSize = SCENE_TILE_SIZE; // 32x32 pixels
