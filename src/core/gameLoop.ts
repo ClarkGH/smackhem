@@ -15,8 +15,6 @@ import {
 import {
     resolveCollision,
     createCollisionContext,
-    updatePlayerAABB,
-    checkCollision,
     type CollisionContext,
 } from './collision';
 import {
@@ -33,8 +31,9 @@ import {
     SCENE_TILE_SIZE,
     Scene2DSystem,
 } from './scene';
-import { GameMode, GameState } from './gameState';
+import { GameState } from './gameState';
 import Instance3DSystem from './instance';
+import EnvironmentSystem from './environment';
 
 const FIXED_DT = 1 / 60;
 
@@ -68,6 +67,8 @@ export class GameLoop {
 
     private gameState: GameState;
 
+    private environmentSystem: EnvironmentSystem;
+
     private partyMemberTexture1: TextureHandle | null = null;
 
     // Core objects
@@ -87,8 +88,6 @@ export class GameLoop {
     private debugHUD?: DebugHUD;
 
     // Constants
-    private readonly DAY_LENGTH_SECONDS = 120; // 2 minutes per full cycle (configurable)
-
     private readonly HORIZON_THRESHOLD = 0.0; // Elevation threshold for horizon (radians)
 
     private readonly DECLINATION_OFFSET = 0.0; // Seasonal tilt offset (for future use, currently 0)
@@ -111,33 +110,6 @@ export class GameLoop {
      * This avoids allocation overhead and improves performance.
      * This is a performance optimization, not a design principle.
      */
-
-    // Pre-allocated lighting calculation objects
-    private readonly lightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // Direction from surface toward the sun
-
-    private readonly sunAzimuth = { value: 0 }; // For spherical coordinate calculations
-
-    private readonly sunElevation = { value: 0 }; // For spherical coordinate calculations
-
-    // Pre-allocated sun objects
-    private readonly sunPosition: Vec3 = { x: 0, y: 0, z: 0 };
-
-    private readonly sunColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
-
-    private readonly sunDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated light direction for sun positioning
-
-    private readonly sunTransform: Mat4;
-
-    // Pre-allocated moon objects
-    private readonly moonPosition: Vec3 = { x: 0, y: 0, z: 0 };
-
-    private readonly moonLightDirection: Vec3 = { x: 0, y: 0, z: 0 }; // For moon (opposite of sun)
-
-    private readonly moonColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
-
-    private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 }; // Negated moon direction for moon positioning
-
-    private readonly moonTransform: Mat4;
 
     // Pre-allocated MVP matrices
     private readonly sunMVP: Mat4;
@@ -187,6 +159,7 @@ export class GameLoop {
         this.camera = createCamera();
         this.collisionContext = createCollisionContext();
         this.instance3DSystem = new Instance3DSystem(this.collisionContext, this.world, this.camera, this.eventBus);
+        this.environmentSystem = new EnvironmentSystem(this.camera.far);
 
         // Seed camera
         this.camera.position = { ...this.gameState.interpolated.cameraPosition };
@@ -197,8 +170,6 @@ export class GameLoop {
         this.CELESTIAL_DISTANCE = this.camera.far - 1.0; // Very large distance (effectively infinite, must be < camera.far)
 
         // Pre-allocated matrices
-        this.sunTransform = identity();
-        this.moonTransform = identity();
         this.sunMVP = identity();
         this.moonMVP = identity();
         this.meshMVP = identity();
@@ -227,115 +198,6 @@ export class GameLoop {
         } catch (error) {
             console.error('Failed to load circle texture:', error);
         }
-    }
-
-    private computeTimeOfDay(simTime: number): number {
-        return (simTime % this.DAY_LENGTH_SECONDS) / this.DAY_LENGTH_SECONDS;
-    }
-
-    // PERFORMANCE: Writes into existing objects to avoid allocation
-    private computeSunSpherical(
-        timeOfDay: number,
-        outAzimuth: { value: number },
-        outElevation: { value: number },
-    ): void {
-        const angle = (timeOfDay - 0.25) * Math.PI * 2;
-
-        const elevation = Math.sin(angle) + this.DECLINATION_OFFSET;
-        const azimuth = Math.PI / 2 + angle;
-
-        // eslint-disable-next-line no-param-reassign
-        outAzimuth.value = azimuth;
-        // eslint-disable-next-line no-param-reassign
-        outElevation.value = elevation;
-    }
-
-    // PERFORMANCE: Writes into existing object to avoid allocation
-    private sphericalToDirection(
-        azimuth: number,
-        elevation: number,
-        out: Vec3,
-    ): void {
-        const cosElev = Math.cos(elevation);
-        out.x = cosElev * Math.sin(azimuth);
-        out.y = Math.sin(elevation);
-        out.z = cosElev * Math.cos(azimuth);
-
-        // Normalize even if already normalized
-        // Prevents NaN errors from dividing by zero.
-        const len = Math.sqrt(out.x * out.x + out.y * out.y + out.z * out.z);
-        if (len > 0.0001) {
-            out.x /= len;
-            out.y /= len;
-            out.z /= len;
-        }
-    }
-
-    // PERFORMANCE: Writes into existing object to avoid allocation
-    private computeSunDirection(timeOfDay: number, out: Vec3): void {
-        const azimuth = { value: 0 };
-        const elevation = { value: 0 };
-
-        this.computeSunSpherical(timeOfDay, azimuth, elevation);
-        this.sphericalToDirection(azimuth.value, elevation.value, out);
-    }
-
-    // PERFORMANCE: Pure function, no allocations
-    private computeAmbientIntensity(elevation: number): number {
-        // Normalize elevation from [-1, 1] to [0, 1]
-        const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
-
-        // Elevation-based ambient transition
-        const t = normalizedElev;
-        let smoothT = 0;
-        if (t <= 0) {
-            smoothT = 0;
-        } else if (t >= 1) {
-            smoothT = 1;
-        } else {
-            smoothT = t * t * (3 - 2 * t); // Smoothstep function
-        }
-
-        // Interpolate between 0.1 (night) and 0.5 (day)
-        return 0.1 + (0.5 - 0.1) * smoothT;
-    }
-
-    // PERFORMANCE: Pure function, no allocations
-    // Replaces computeSunVisibility/computeMoonVisibility. Each body's visibility now
-    // depends only on ITS OWN elevation, fading smoothly through the horizon band
-    // instead of being derived from the other body's time-of-day triangle. This is
-    // what lets the sun and moon fade independently and in sync with where they're
-    // actually drawn, instead of one snapping to full/zero based on the other.
-    private computeCelestialVisibility(elevation: number): number {
-        const FADE_BAND = 0.15; // how far above/below the horizon the fade extends
-        const t = Math.max(0, Math.min(1, (elevation + FADE_BAND) / (2 * FADE_BAND)));
-        return t * t * (3 - 2 * t); // smoothstep: no fade at the horizon, smooth ends
-    }
-
-    // PERFORMANCE: Writes into existing object to avoid allocation (complies with RULE M-1)
-    private computeCelestialPosition(
-        dirVec: Vec3,
-        distance: number,
-        playerPosition: Vec3,
-        out: Vec3,
-    ): void {
-        out.x = playerPosition.x + dirVec.x * distance;
-        out.y = playerPosition.y + dirVec.y * distance;
-        out.z = playerPosition.z + dirVec.z * distance;
-    }
-
-    // PERFORMANCE: Writes into existing matrix to avoid allocation
-    private computeCelestialTransform(
-        position: Vec3,
-        size: number,
-        out: Mat4,
-    ): void {
-        const o = out.elements;
-
-        o[0] = size; o[1] = 0; o[2] = 0; o[3] = 0;
-        o[4] = 0; o[5] = size; o[6] = 0; o[7] = 0;
-        o[8] = 0; o[9] = 0; o[10] = size; o[11] = 0;
-        o[12] = position.x; o[13] = position.y; o[14] = position.z; o[15] = 1;
     }
 
     // Same column-major layout as computeCelestialTransform, just per-axis scale
@@ -379,6 +241,7 @@ export class GameLoop {
 
         this.scene2DSystem.update(dt, this.gameState, intent);
         this.instance3DSystem.update(dt, this.gameState, intent);
+        
 
         // TODO: Revisit if this needs to be at the top still
         if (discreteState.gameMode === 'world_3d') {
@@ -387,25 +250,7 @@ export class GameLoop {
             this.camera.pitch = interpolatedState.cameraPitch;
         }
 
-        if (intent.toggleDebugHUD) {
-            if (this.debugHUD) {
-                this.debugHUD.toggle();
-                discreteState.debugHUDVisible = this.debugHUD.isVisible();
-            } else {
-                console.warn('Debug HUD toggle requested but debugHUD not available');
-            }
-        }
-
         if (discreteState.gameMode === 'scene_2d') return;
-
-        if (intent.pause) {
-            if (discreteState.isTimeFrozen) {
-                this.instance3DSystem.unPropagateInstance(this.gameState);
-            } else {
-                this.instance3DSystem.propagateInstance(this.gameState);
-            }
-        }
-
         if (discreteState.gameMode === 'instance_3d' || discreteState.isTimeFrozen) return;
 
         // Normal 3D simulation updates
@@ -457,6 +302,23 @@ export class GameLoop {
 
         const intentSnapshot = this.input.getIntent();
 
+        if (intentSnapshot.toggleDebugHUD) {
+            if (this.debugHUD) {
+                this.debugHUD.toggle();
+                this.gameState.discrete.debugHUDVisible = this.debugHUD.isVisible();
+            } else {
+                console.warn('Debug HUD toggle requested but debugHUD not available');
+            }
+        }
+
+        if (intentSnapshot.pause) {
+            if (this.gameState.discrete.isTimeFrozen) {
+                this.instance3DSystem.unPropagateInstance(this.gameState);
+            } else {
+                this.instance3DSystem.propagateInstance(this.gameState);
+            }
+        }
+
         while (this.accumulator >= FIXED_DT) {
             this.updateSimulation(FIXED_DT, intentSnapshot);
             this.accumulator -= FIXED_DT;
@@ -474,79 +336,34 @@ export class GameLoop {
         const currentChunkCoords = World.getChunkCoords(this.camera.position);
         const currentChunkData = this.world.activeChunks.get(World.getChunkID(currentChunkCoords.x, currentChunkCoords.z));
 
+        // Set moon and sun size to 1 to prevent scaling issues
+        this.environmentSystem.update(this.gameState, this.camera.position, 1, 1);
+
         // Scene mode rendering (2D overlay)
         if (discreteState.gameMode === 'scene_2d') {
             const aspect = this.getAspectRatio();
             const viewProj = getCameraMatrix(this.camera, aspect);
 
-            // PERFORMANCE: Reuse pre-allocated objects, zero allocations per frame
-            const timeOfDay = this.computeTimeOfDay(interpolatedState.simulationTime);
-
-            this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);
-            this.computeSunDirection(timeOfDay, this.lightDirection);
-
-            const ambientIntensity = this.computeAmbientIntensity(this.sunElevation.value);
-            const moonAzimuth = { value: this.sunAzimuth.value + Math.PI };
-            const moonElevation = { value: -this.sunElevation.value };
-            this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
-
             this.renderBoundaryWireframe(viewProj);
-
-            // Each body's visibility comes from ITS OWN elevation, not the other
-            // body's time-of-day triangle - see computeCelestialVisibility for why.
-            const sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
-            const moonVisibility = this.computeCelestialVisibility(moonElevation.value);
-
-            this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
-            this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
-            this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
-
-            this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
-            this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
-            this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
 
             if (this.renderer.setCelestialLighting) {
                 this.renderer.setCelestialLighting(
-                    { direction: this.lightDirection, color: this.sunColorWithVisibility },
-                    { direction: this.moonLightDirection, color: this.moonColorWithVisibility },
+                    { direction: this.environmentSystem.lightDirection, color: this.environmentSystem.sunColorWithVisibility },
+                    { direction: this.environmentSystem.moonLightDirection, color: this.environmentSystem.moonColorWithVisibility },
                 );
             }
             if (this.renderer.setAmbientIntensity) {
-                this.renderer.setAmbientIntensity(ambientIntensity);
+                this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
             }
 
-            this.sunDirectionForPosition.x = this.lightDirection.x;
-            this.sunDirectionForPosition.y = this.lightDirection.y;
-            this.sunDirectionForPosition.z = this.lightDirection.z;
-
-            this.computeCelestialPosition(
-                this.sunDirectionForPosition,
-                this.CELESTIAL_DISTANCE,
-                this.camera.position,
-                this.sunPosition,
-            );
-
-            this.moonDirectionForPosition.x = this.moonLightDirection.x;
-            this.moonDirectionForPosition.y = this.moonLightDirection.y;
-            this.moonDirectionForPosition.z = this.moonLightDirection.z;
-
-            this.computeCelestialPosition(
-                this.moonDirectionForPosition,
-                this.CELESTIAL_DISTANCE,
-                this.camera.position,
-                this.moonPosition,
-            );
-            this.computeCelestialTransform(this.sunPosition, this.SUN_SIZE, this.sunTransform);
-            this.computeCelestialTransform(this.moonPosition, this.MOON_SIZE, this.moonTransform);
-
-            if (sunVisibility > 0) {
-                matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
-                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility, true);
+            if (this.environmentSystem.sunVisibility > 0) {
+                matrixMultiplyInto(viewProj, this.environmentSystem.sunTransform, this.sunMVP);
+                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.environmentSystem.sunColorWithVisibility, true);
             }
 
-            if (moonVisibility > 0) {
-                matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
-                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility, true);
+            if (this.environmentSystem.moonVisibility > 0) {
+                matrixMultiplyInto(viewProj, this.environmentSystem.moonTransform, this.moonMVP);
+                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.environmentSystem.moonColorWithVisibility, true);
             }
 
             const visibleMeshes = this.world.getVisibleMeshes();
@@ -555,52 +372,38 @@ export class GameLoop {
                 this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
             });
 
+            // Render pink overlay (2D screen-space)
             const width = this.renderer.getViewportWidth?.() ?? 800;
             const height = this.renderer.getViewportHeight?.() ?? 600;
 
-            // Create orthographic projection for screen-space rendering
-            // Maps pixel coordinates (0-width, 0-height) directly to clip space
             const orthoProj = orthographic(0, width, height, 0, 0.1, 100.0);
-            // Copy into pre-allocated matrix (reuse elements array)
             const orthoElements = orthoProj.elements;
             const sceneOrthoElements = this.sceneOrthoProj.elements;
             for (let i = 0; i < 16; i += 1) {
                 sceneOrthoElements[i] = orthoElements[i];
             }
 
-            // Render pink overlay using clear() if available, otherwise use a full-screen quad
             if (this.renderer.clear) {
-                // Apply transition alpha for fade in/out
                 const alpha = smoothstep(interpolatedState.sceneTransitionProgress);
-                const pinkR = 1.0;
-                const pinkG = 0.41; // 105/255
-                const pinkB = 0.71; // 180/255
-                this.renderer.clear(pinkR * alpha, pinkG * alpha, pinkB * alpha, alpha);
+                this.renderer.clear(1.0 * alpha, 0.41 * alpha, 0.71 * alpha, alpha);
             }
 
+            // Render scene sprite (2D screen-space)
             if (this.partyMemberTexture1) {
-                // positionPx is already in pixel coordinates (0-799, 0-599)
-                const spriteSize = SCENE_TILE_SIZE; // 32x32 pixels
+                const spriteSize = SCENE_TILE_SIZE;
                 const posX = interpolatedState.sceneCharacterPositionPx.x;
                 const posY = interpolatedState.sceneCharacterPositionPx.y;
 
-                // Create model transform matrix: scale then translate
-                // For 2D screen-space: scale(spriteSize) * translate(posX, posY, 0.5)
-                // Build transform matrix directly (scale + translation)
                 const m = this.sceneSpriteTransform.elements;
-                // Scale by sprite size
                 m[0] = spriteSize; m[1] = 0; m[2] = 0; m[3] = 0;
                 m[4] = 0; m[5] = spriteSize; m[6] = 0; m[7] = 0;
                 m[8] = 0; m[9] = 0; m[10] = 1; m[11] = 0;
-                // Translate to screen position (Z = 0.5 for depth)
                 m[12] = posX; m[13] = posY; m[14] = -0.5; m[15] = 1;
 
-                // Multiply projection * model into meshMVP (reuse existing matrix)
                 matrixMultiplyInto(this.sceneOrthoProj, this.sceneSpriteTransform, this.meshMVP);
                 this.renderer.drawScreenQuad(this.partyMemberTexture1, this.meshMVP);
             }
 
-            // 4. Render debug HUD (if visible, same as normal)
             if (this.debugHUD && discreteState.debugHUDVisible) {
                 const rotation = quaternionFromYawPitch(this.camera.yaw, this.camera.pitch);
                 const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
@@ -608,9 +411,9 @@ export class GameLoop {
                 this.debugHUD.render({
                     cameraPosition: this.camera.position,
                     cameraForward: forward,
-                    sunPosition: this.sunPosition,
-                    moonPosition: this.moonPosition,
-                    timeOfDay,
+                    sunPosition: this.environmentSystem.sunPosition,
+                    moonPosition: this.environmentSystem.moonPosition,
+                    timeOfDay: this.environmentSystem.timeOfDay,
                     yaw: this.camera.yaw,
                     pitch: this.camera.pitch,
                     gameMode: discreteState.gameMode,
@@ -629,80 +432,33 @@ export class GameLoop {
             return;
         }
 
-        // Normal 3D world rendering
+        // ==========================================
+        // Normal 3D world rendering pass
+        // ==========================================
         const aspect = this.getAspectRatio();
         const viewProj = getCameraMatrix(this.camera, aspect);
 
-        // PERFORMANCE: Reuse pre-allocated objects, zero allocations per frame
-        // When time is frozen, use last timeOfDay (frozen)
-        const timeOfDay = discreteState.isTimeFrozen
-            ? this.computeTimeOfDay(interpolatedState.simulationTime)
-            : this.computeTimeOfDay(interpolatedState.simulationTime);
-
         this.renderBoundaryWireframe(viewProj);
-
-        this.computeSunSpherical(timeOfDay, this.sunAzimuth, this.sunElevation);
-        this.computeSunDirection(timeOfDay, this.lightDirection);
-
-        const ambientIntensity = this.computeAmbientIntensity(this.sunElevation.value);
-        const moonAzimuth = { value: this.sunAzimuth.value + Math.PI };
-        const moonElevation = { value: -this.sunElevation.value };
-
-        this.sphericalToDirection(moonAzimuth.value, moonElevation.value, this.moonLightDirection);
-
-        const sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
-        const moonVisibility = this.computeCelestialVisibility(moonElevation.value);
-
-        this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
-        this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
-        this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
-
-        this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
-        this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
-        this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
 
         if (this.renderer.setCelestialLighting) {
             this.renderer.setCelestialLighting(
-                { direction: this.lightDirection, color: this.sunColorWithVisibility },
-                { direction: this.moonLightDirection, color: this.moonColorWithVisibility },
+                { direction: this.environmentSystem.lightDirection, color: this.environmentSystem.sunColorWithVisibility },
+                { direction: this.environmentSystem.moonLightDirection, color: this.environmentSystem.moonColorWithVisibility },
             );
         }
         if (this.renderer.setAmbientIntensity) {
-            this.renderer.setAmbientIntensity(ambientIntensity);
+            this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
         }
 
-        this.sunDirectionForPosition.x = this.lightDirection.x;
-        this.sunDirectionForPosition.y = this.lightDirection.y;
-        this.sunDirectionForPosition.z = this.lightDirection.z;
-
-        this.computeCelestialPosition(
-            this.sunDirectionForPosition,
-            this.CELESTIAL_DISTANCE,
-            this.camera.position,
-            this.sunPosition,
-        );
-
-        this.moonDirectionForPosition.x = this.moonLightDirection.x;
-        this.moonDirectionForPosition.y = this.moonLightDirection.y;
-        this.moonDirectionForPosition.z = this.moonLightDirection.z;
-
-        this.computeCelestialPosition(
-            this.moonDirectionForPosition,
-            this.CELESTIAL_DISTANCE,
-            this.camera.position,
-            this.moonPosition,
-        );
-        this.computeCelestialTransform(this.sunPosition, this.SUN_SIZE, this.sunTransform);
-        this.computeCelestialTransform(this.moonPosition, this.MOON_SIZE, this.moonTransform);
-
-        if (sunVisibility > 0) {
-            matrixMultiplyInto(viewProj, this.sunTransform, this.sunMVP);
-            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.sunColorWithVisibility, true);
+        // 5. DRAW CELESTIAL ELEMENTS FOR MAIN WORLD STAGE
+        if (this.environmentSystem.sunVisibility > 0) {
+            matrixMultiplyInto(viewProj, this.environmentSystem.sunTransform, this.sunMVP);
+            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.environmentSystem.sunColorWithVisibility, true);
         }
 
-        if (moonVisibility > 0) {
-            matrixMultiplyInto(viewProj, this.moonTransform, this.moonMVP);
-            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.moonColorWithVisibility, true);
+        if (this.environmentSystem.moonVisibility > 0) {
+            matrixMultiplyInto(viewProj, this.environmentSystem.moonTransform, this.moonMVP);
+            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.environmentSystem.moonColorWithVisibility, true);
         }
 
         const visibleMeshes = this.world.getVisibleMeshes();
@@ -714,14 +470,12 @@ export class GameLoop {
         // Render lead party member when time is frozen and active/transitioning
         if (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive)) {
             if (this.partyMemberTexture1) {
-                // Calculate transform for circle (billboard at character position)
                 const pos = interpolatedState.instanceCharacterPosition;
-                const circleSize = INSTANCE_CHARACTER_SIZE; // Small size as specified
+                const circleSize = INSTANCE_CHARACTER_SIZE;
 
-                // Calculate billboard orientation (face camera, stay vertical)
                 const toCamera = {
                     x: this.camera.position.x - pos.x,
-                    y: 0, // Keep vertical
+                    y: 0,
                     z: this.camera.position.z - pos.z,
                 };
                 const dist = Math.sqrt(toCamera.x * toCamera.x + toCamera.z * toCamera.z);
@@ -733,30 +487,18 @@ export class GameLoop {
                     toCamera.z = 1;
                 }
 
-                // Right vector (perpendicular to toCamera in XZ plane)
                 const right = { x: -toCamera.z, y: 0, z: toCamera.x };
                 const up = { x: 0, y: 1, z: 0 };
 
-                // Create billboard transform matrix (rotation + translation)
-                // Matrix columns: [right*size, ?, up*size, position]
-                // Shader uses a_position.x -> column 0, a_position.z -> column 2
-                // Scale right and up by circleSize
                 const m = this.circleTransform.elements;
-                // Column 0: right vector (for a_position.x)
                 m[0] = right.x * circleSize; m[1] = right.y * circleSize; m[2] = right.z * circleSize; m[3] = 0;
-                // Column 1: unused (shader uses a_position.y = 0)
                 m[4] = 0; m[5] = 0; m[6] = 0; m[7] = 0;
-                // Column 2: up vector (for a_position.z)
                 m[8] = up.x * circleSize; m[9] = up.y * circleSize; m[10] = up.z * circleSize; m[11] = 0;
-                // Column 3: position
                 m[12] = pos.x; m[13] = pos.y; m[14] = pos.z; m[15] = 1;
 
-                // Multiply by view-projection matrix (use meshMVP as temporary, already rendered world meshes)
                 matrixMultiplyInto(viewProj, this.circleTransform, this.meshMVP);
-                // Render textured quad (no camera position needed - billboard calculated on CPU)
                 this.renderer.drawTexturedQuad(this.partyMemberTexture1, this.meshMVP, 1.0, toCamera);
             }
-            // Texture not loaded yet - could render placeholder here if needed
         }
 
         if (this.debugHUD && discreteState.debugHUDVisible) {
@@ -766,9 +508,9 @@ export class GameLoop {
             this.debugHUD.render({
                 cameraPosition: this.camera.position,
                 cameraForward: forward,
-                sunPosition: this.sunPosition,
-                moonPosition: this.moonPosition,
-                timeOfDay,
+                sunPosition: this.environmentSystem.sunPosition,
+                moonPosition: this.environmentSystem.moonPosition,
+                timeOfDay: this.environmentSystem.timeOfDay,
                 yaw: this.camera.yaw,
                 pitch: this.camera.pitch,
                 gameMode: discreteState.gameMode,
@@ -782,7 +524,6 @@ export class GameLoop {
                 },
             });
         }
-
         this.renderer.endFrame();
     }
 
@@ -790,8 +531,8 @@ export class GameLoop {
         return this.gameState.interpolated.cameraPosition;
     }
 
-    getTimeOfDay(): number {
-        return (this.gameState.interpolated.simulationTime % this.DAY_LENGTH_SECONDS) / this.DAY_LENGTH_SECONDS;
+    public getTimeOfDay(): number {
+        return this.environmentSystem.timeOfDay;
     }
 }
 
