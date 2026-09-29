@@ -16,7 +16,6 @@ import {
     type CollisionContext,
 } from './collision';
 import {
-    matrixMultiplyInto,
     identity,
 } from './math/mathHelpers';
 import { World } from './world';
@@ -162,21 +161,6 @@ export class GameLoop {
         } catch (error) {
             console.error('Failed to load circle texture:', error);
         }
-    }
-
-    // Same column-major layout as computeCelestialTransform, just per-axis scale
-    // instead of uniform - a scaled-and-translated box instead of a scaled sphere.
-    private computeScaledTransform(
-        center: Vec3,
-        scale: Vec3,
-        out: Mat4,
-    ): void {
-        const o = out.elements;
-
-        o[0] = scale.x; o[1] = 0; o[2] = 0; o[3] = 0;
-        o[4] = 0; o[5] = scale.y; o[6] = 0; o[7] = 0;
-        o[8] = 0; o[9] = 0; o[10] = scale.z; o[11] = 0;
-        o[12] = center.x; o[13] = center.y; o[14] = center.z; o[15] = 1;
     }
 
     private updateSimulation(dt: number, intent: PlayerIntent): void {

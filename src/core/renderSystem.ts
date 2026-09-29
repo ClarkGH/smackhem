@@ -73,6 +73,26 @@ export default class RenderSystem {
         });
     }
 
+    private renderCelestialBodies(viewProj: Mat4): void {
+        if (this.renderer.setCelestialLighting) {
+            this.renderer.setCelestialLighting(
+                { direction: this.environmentSystem.lightDirection, color: this.environmentSystem.sunColorWithVisibility },
+                { direction: this.environmentSystem.moonLightDirection, color: this.environmentSystem.moonColorWithVisibility },
+            );
+        }
+        if (this.renderer.setAmbientIntensity) {
+            this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
+        }
+        if (this.environmentSystem.sunVisibility > 0) {
+            matrixMultiplyInto(viewProj, this.environmentSystem.sunTransform, this.sunMVP);
+            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.environmentSystem.sunColorWithVisibility, true);
+        }
+        if (this.environmentSystem.moonVisibility > 0) {
+            matrixMultiplyInto(viewProj, this.environmentSystem.moonTransform, this.moonMVP);
+            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.environmentSystem.moonColorWithVisibility, true);
+        }
+    }
+
     public render(
         gameState: GameState,
         camera: Camera,
@@ -96,25 +116,7 @@ export default class RenderSystem {
 
             this.renderBoundaryWireframe(viewProj, wallDebugTransform, wallDebugMVP, WALL_DEBUG_COLOR);
 
-            if (this.renderer.setCelestialLighting) {
-                this.renderer.setCelestialLighting(
-                    { direction: this.environmentSystem.lightDirection, color: this.environmentSystem.sunColorWithVisibility },
-                    { direction: this.environmentSystem.moonLightDirection, color: this.environmentSystem.moonColorWithVisibility },
-                );
-            }
-            if (this.renderer.setAmbientIntensity) {
-                this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
-            }
-
-            if (this.environmentSystem.sunVisibility > 0) {
-                matrixMultiplyInto(viewProj, this.environmentSystem.sunTransform, this.sunMVP);
-                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.environmentSystem.sunColorWithVisibility, true);
-            }
-
-            if (this.environmentSystem.moonVisibility > 0) {
-                matrixMultiplyInto(viewProj, this.environmentSystem.moonTransform, this.moonMVP);
-                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.environmentSystem.moonColorWithVisibility, true);
-            }
+            this.renderCelestialBodies(viewProj);
 
             this.world.getVisibleMeshes().forEach((sm) => {
                 matrixMultiplyInto(viewProj, sm.transform, this.meshMVP);
@@ -155,25 +157,7 @@ export default class RenderSystem {
 
             this.renderBoundaryWireframe(viewProj, wallDebugTransform, wallDebugMVP, WALL_DEBUG_COLOR);
 
-            if (this.renderer.setCelestialLighting) {
-                this.renderer.setCelestialLighting(
-                    { direction: this.environmentSystem.lightDirection, color: this.environmentSystem.sunColorWithVisibility },
-                    { direction: this.environmentSystem.moonLightDirection, color: this.environmentSystem.moonColorWithVisibility },
-                );
-            }
-            if (this.renderer.setAmbientIntensity) {
-                this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
-            }
-
-            if (this.environmentSystem.sunVisibility > 0) {
-                matrixMultiplyInto(viewProj, this.environmentSystem.sunTransform, this.sunMVP);
-                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.environmentSystem.sunColorWithVisibility, true);
-            }
-
-            if (this.environmentSystem.moonVisibility > 0) {
-                matrixMultiplyInto(viewProj, this.environmentSystem.moonTransform, this.moonMVP);
-                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.environmentSystem.moonColorWithVisibility, true);
-            }
+            this.renderCelestialBodies(viewProj);
 
             this.world.getVisibleMeshes().forEach((sm) => {
                 matrixMultiplyInto(viewProj, sm.transform, this.meshMVP);
