@@ -61,7 +61,7 @@ const main = async () => {
     const assetLoader = 'assetLoader' in platform ? (platform as { assetLoader: any }).assetLoader : undefined;
     await updateActiveChunks(world, initialCamera.position, platform.renderer, assetLoader);
 
-    // Create debug HUD (only for web platform)
+    // Create debug HUD
     let debugHUD: {
         // eslint-disable-next-line no-unused-vars
         render: (_info: {
@@ -80,14 +80,6 @@ const main = async () => {
         debugHUD = createDebugHUD(platform.canvas as HTMLCanvasElement);
     }
 
-    // Event Subscriptions
-    eventBus.subscribe('game_mode_changed', (event) => {
-        // TODO: Do the logic in the subscriptions in the main loop, might not live in this file.
-        console.log('📣 [EventBus Test] Game Mode Has Swapped!');
-        console.log(`   └─ Previous Mode: ${event.previousMode}`);
-        console.log(`   └─ Current Mode:  ${event.currentMode}`);
-    });
-
     const gameLoop = new GameLoop(
         platform.renderer,
         platform.input,
@@ -102,10 +94,8 @@ const main = async () => {
         platform.clock.update();
         platform.input.update();
         gameLoop.update(platform.clock.getDeltaTime());
-        eventBus.flush();
 
         // Update chunk loading/unloading based on player position
-        // Fire and forget - chunks will populate as they load (non-blocking)
         const cameraPosition = gameLoop.getCameraPosition();
         updateActiveChunks(world, cameraPosition, platform.renderer, assetLoader).catch((error) => {
             console.error('Error in updateActiveChunks:', error);

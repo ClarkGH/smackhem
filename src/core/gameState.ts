@@ -1,4 +1,5 @@
 import { Vec3 } from 'src/types/common';
+import { PLAYER_HEIGHT } from './camera';
 
 export interface TransitionState<T> {
     isActive: boolean;
@@ -58,7 +59,7 @@ export interface GameState {
 
 export const createGameState = (): GameState => ({
     interpolated: {
-        cameraPosition: { x: 0, y: 1, z: 0 },
+        cameraPosition: { x: 0, y: PLAYER_HEIGHT, z: 0 },
         cameraYaw: 0,
         cameraPitch: 0,
         simulationTime: 0,

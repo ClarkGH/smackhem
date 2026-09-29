@@ -155,6 +155,10 @@ export const syncWebInput = (
     coreState.axes.moveX = finalMoveX;
     coreState.axes.moveY = finalMoveY;
 
+    if (interact) coreState.actions.Interact = true;
+    if (pause) coreState.actions.Pause = true;
+    if (toggleDebugHUD) coreState.actions.ToggleDebugHUD = true;
+
     // Reset mouse deltas or they repeat frames
     webState.axes.mouseLookX = 0;
     webState.axes.mouseLookY = 0;

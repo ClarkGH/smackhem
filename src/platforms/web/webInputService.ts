@@ -1,13 +1,7 @@
-import type { Input, PlayerIntent } from '../../services/input';
+import type { Input } from '../../services/input';
+import { createInputState, type InputState } from '../../core/input';
 import {
-    createInputState,
-    type InputState,
-} from '../../core/input';
-import {
-    createWebInputState,
-    setupWebInput,
-    syncWebInput,
-    type WebInputState,
+    createWebInputState, setupWebInput, syncWebInput, type WebInputState,
 } from './webInput';
 
 export class WebInputService implements Input {
@@ -15,33 +9,18 @@ export class WebInputService implements Input {
 
     private webState: WebInputState;
 
-    private toggleDebugHUD: boolean = false;
-
-    private pause: boolean = false;
-
-    private interact: boolean = false;
-
-    private pendingInteract: boolean = false;
-
     constructor(canvas: HTMLCanvasElement) {
         this.coreState = createInputState();
         this.webState = createWebInputState();
         setupWebInput(canvas, this.coreState, this.webState);
     }
 
-    update(): void {
-        const result = syncWebInput(this.coreState, this.webState);
-        this.toggleDebugHUD = result.toggleDebugHUD;
-        this.pause = result.pause;
-        this.interact = result.interact;
-
-        if (result.interact) {
-            this.pendingInteract = true;
-        }
+    public update(): void {
+        syncWebInput(this.coreState, this.webState);
     }
 
-    getIntent(): PlayerIntent {
-        const intent: PlayerIntent = {
+    public getIntent() {
+        const intent = {
             move: {
                 x: this.coreState.axes.moveX,
                 y: this.coreState.axes.moveY,
@@ -50,24 +29,17 @@ export class WebInputService implements Input {
                 yaw: this.coreState.axes.lookX,
                 pitch: this.coreState.axes.lookY,
             },
+            interact: this.coreState.actions.Interact,
+            pause: this.coreState.actions.Pause,
+            toggleDebugHUD: this.coreState.actions.ToggleDebugHUD,
             toggleCamera: this.coreState.actions.Look,
         };
-        if (this.toggleDebugHUD) {
-            intent.toggleDebugHUD = true;
-            // Reset after consuming (one-shot event)
-            this.toggleDebugHUD = false;
-        }
-        if (this.pause) {
-            intent.pause = true;
-            // Reset after consuming (one-shot event)
-            this.pause = false;
-        }
-        if (this.interact) {
-            intent.interact = true;
-            // Reset after consuming (one-shot event)
-            this.interact = false;
-            this.pendingInteract = false;
-        }
+
+        // Reset edge triggers immediately after consumption to prevent infinite repeat firing
+        if (this.coreState.actions.Interact) this.coreState.actions.Interact = false;
+        if (this.coreState.actions.Pause) this.coreState.actions.Pause = false;
+        if (this.coreState.actions.ToggleDebugHUD) this.coreState.actions.ToggleDebugHUD = false;
+
         return intent;
     }
 }
