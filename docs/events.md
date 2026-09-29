@@ -177,7 +177,7 @@ We can't easily sort pre-execution, we absolutely have to process them sequentia
 
 ### State management
 
-State is changing information which the engine utilizes to make determinations. Our pub / sub event service, simulation, and state tie directly into one and another.
+State is changing information which the engine utilizes to make determinations. Our pub / sub event service, simulation, and state tie directly into one and another. State is authoritative simulation data. It is not responsible for broadcasting changes.
 
 We have both state and a state buffer. True state will live in the buffer. Cache will be computed from state, but never be stored or lerped independently.
 

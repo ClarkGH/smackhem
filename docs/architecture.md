@@ -178,6 +178,10 @@ If the answer is "no", the design has a dependency on FFI that must be removed.
 - Modern consoles (PS5, Xbox Series X/S, Nintendo Switch) do not natively support FFI or JavaScript runtimes
 - Console ports will likely require porting core logic to C++ and calling interfaces directly
 
+#### CONSTRAINT P-8: Avoid God Objects
+
+God objects add layers of complexity that grow harder and harder to decouple as you progress.
+
 #### Development & Porting Timeline
 
 ##### Learning-First Approach: Gradual Transition to C++
