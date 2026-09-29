@@ -252,7 +252,7 @@ export class GameLoop {
         return false;
     }
 
-    private freezeTime(): void {
+    private propagateInstance(): void {
         const discreteState = this.gameState.discrete;
         const interpolatedState = this.gameState.interpolated;
 
@@ -274,8 +274,7 @@ export class GameLoop {
         interpolatedState.instanceCharacterPosition.z = this.transitionStartPos.z;
     }
 
-    // TODO: See above todo, de-instancing
-    private unFreezeTime(): void {
+    private unPropagateInstance(): void {
         const discreteState = this.gameState.discrete;
         const interpolatedState = this.gameState.interpolated;
 
@@ -491,9 +490,9 @@ export class GameLoop {
 
         if (intent.pause && discreteState.gameMode === 'world_3d') {
             if (discreteState.isTimeFrozen) {
-                this.unFreezeTime();
+                this.unPropagateInstance();
             } else {
-                this.freezeTime();
+                this.propagateInstance();
             }
         }
 
