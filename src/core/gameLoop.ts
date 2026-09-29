@@ -3,8 +3,6 @@ import type { Input, PlayerIntent } from '../services/input';
 import type { TypeSafeEventBus } from './events';
 import {
     createCamera,
-    getCameraMatrix,
-    INSTANCE_CHARACTER_SIZE,
     PLAYER_SPEED,
     PLAYER_HEIGHT,
     PLAYER_RADIUS,
@@ -20,20 +18,16 @@ import {
 import {
     matrixMultiplyInto,
     identity,
-    quaternionFromYawPitch,
-    quaternionApplyToVector,
-    smoothstep,
-    orthographic,
 } from './math/mathHelpers';
 import { World } from './world';
 import type { Vec3, Mat4 } from '../types/common';
 import {
-    SCENE_TILE_SIZE,
     Scene2DSystem,
 } from './scene';
 import { GameState } from './gameState';
 import Instance3DSystem from './instance';
 import EnvironmentSystem from './environment';
+import RenderSystem from './renderSystem';
 
 const FIXED_DT = 1 / 60;
 
@@ -67,6 +61,8 @@ export class GameLoop {
 
     private gameState: GameState;
 
+    private renderSystem: RenderSystem;
+
     private environmentSystem: EnvironmentSystem;
 
     private partyMemberTexture1: TextureHandle | null = null;
@@ -88,17 +84,9 @@ export class GameLoop {
     private debugHUD?: DebugHUD;
 
     // Constants
-    private readonly HORIZON_THRESHOLD = 0.0; // Elevation threshold for horizon (radians)
-
-    private readonly DECLINATION_OFFSET = 0.0; // Seasonal tilt offset (for future use, currently 0)
-
     private readonly SUN_SIZE = 0.5; // Radius of sun orb (sphere)
 
     private readonly MOON_SIZE = 0.4; // Radius of moon orb (sphere)
-
-    private readonly SUN_COLOR: Vec3 = { x: 1.0, y: 0.85, z: 0.2 }; // Golden yellow
-
-    private readonly MOON_COLOR: Vec3 = { x: 0.4, y: 0.6, z: 0.9 }; // Cool blue
 
     private readonly CELESTIAL_DISTANCE: number; // Computed from camera.far
 
@@ -182,6 +170,16 @@ export class GameLoop {
         this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE * 10, 16);
         this.wallDebugMesh = renderer.createCubeMesh(1);
 
+        this.renderSystem = new RenderSystem(
+            this.renderer,
+            this.world,
+            this.environmentSystem,
+            this.getAspectRatio,
+            this.sunMesh,
+            this.moonMesh,
+            this.wallDebugMesh,
+        );
+
         this.eventBus.subscribe('game_mode_changed', (event) => {
             console.log(`event - ${event.type}\n`, `curr mode: ${event.currentMode}\n`, `prev mode: ${event.previousMode}`);
             this.gameState.discrete.gameMode = event.currentMode;
@@ -241,7 +239,6 @@ export class GameLoop {
 
         this.scene2DSystem.update(dt, this.gameState, intent);
         this.instance3DSystem.update(dt, this.gameState, intent);
-        
 
         // TODO: Revisit if this needs to be at the top still
         if (discreteState.gameMode === 'world_3d') {
@@ -328,203 +325,17 @@ export class GameLoop {
     }
 
     render(): void {
-        this.renderer.beginFrame();
-        const discreteState = this.gameState.discrete;
-        const interpolatedState = this.gameState.interpolated;
+        this.environmentSystem.update(this.gameState, this.camera.position, 1.0, 1.0);
 
-        // Chunk debug data
-        const currentChunkCoords = World.getChunkCoords(this.camera.position);
-        const currentChunkData = this.world.activeChunks.get(World.getChunkID(currentChunkCoords.x, currentChunkCoords.z));
-
-        // Set moon and sun size to 1 to prevent scaling issues
-        this.environmentSystem.update(this.gameState, this.camera.position, 1, 1);
-
-        // Scene mode rendering (2D overlay)
-        if (discreteState.gameMode === 'scene_2d') {
-            const aspect = this.getAspectRatio();
-            const viewProj = getCameraMatrix(this.camera, aspect);
-
-            this.renderBoundaryWireframe(viewProj);
-
-            if (this.renderer.setCelestialLighting) {
-                this.renderer.setCelestialLighting(
-                    { direction: this.environmentSystem.lightDirection, color: this.environmentSystem.sunColorWithVisibility },
-                    { direction: this.environmentSystem.moonLightDirection, color: this.environmentSystem.moonColorWithVisibility },
-                );
-            }
-            if (this.renderer.setAmbientIntensity) {
-                this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
-            }
-
-            if (this.environmentSystem.sunVisibility > 0) {
-                matrixMultiplyInto(viewProj, this.environmentSystem.sunTransform, this.sunMVP);
-                this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.environmentSystem.sunColorWithVisibility, true);
-            }
-
-            if (this.environmentSystem.moonVisibility > 0) {
-                matrixMultiplyInto(viewProj, this.environmentSystem.moonTransform, this.moonMVP);
-                this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.environmentSystem.moonColorWithVisibility, true);
-            }
-
-            const visibleMeshes = this.world.getVisibleMeshes();
-            visibleMeshes.forEach((sm) => {
-                matrixMultiplyInto(viewProj, sm.transform, this.meshMVP);
-                this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
-            });
-
-            // Render pink overlay (2D screen-space)
-            const width = this.renderer.getViewportWidth?.() ?? 800;
-            const height = this.renderer.getViewportHeight?.() ?? 600;
-
-            const orthoProj = orthographic(0, width, height, 0, 0.1, 100.0);
-            const orthoElements = orthoProj.elements;
-            const sceneOrthoElements = this.sceneOrthoProj.elements;
-            for (let i = 0; i < 16; i += 1) {
-                sceneOrthoElements[i] = orthoElements[i];
-            }
-
-            if (this.renderer.clear) {
-                const alpha = smoothstep(interpolatedState.sceneTransitionProgress);
-                this.renderer.clear(1.0 * alpha, 0.41 * alpha, 0.71 * alpha, alpha);
-            }
-
-            // Render scene sprite (2D screen-space)
-            if (this.partyMemberTexture1) {
-                const spriteSize = SCENE_TILE_SIZE;
-                const posX = interpolatedState.sceneCharacterPositionPx.x;
-                const posY = interpolatedState.sceneCharacterPositionPx.y;
-
-                const m = this.sceneSpriteTransform.elements;
-                m[0] = spriteSize; m[1] = 0; m[2] = 0; m[3] = 0;
-                m[4] = 0; m[5] = spriteSize; m[6] = 0; m[7] = 0;
-                m[8] = 0; m[9] = 0; m[10] = 1; m[11] = 0;
-                m[12] = posX; m[13] = posY; m[14] = -0.5; m[15] = 1;
-
-                matrixMultiplyInto(this.sceneOrthoProj, this.sceneSpriteTransform, this.meshMVP);
-                this.renderer.drawScreenQuad(this.partyMemberTexture1, this.meshMVP);
-            }
-
-            if (this.debugHUD && discreteState.debugHUDVisible) {
-                const rotation = quaternionFromYawPitch(this.camera.yaw, this.camera.pitch);
-                const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
-
-                this.debugHUD.render({
-                    cameraPosition: this.camera.position,
-                    cameraForward: forward,
-                    sunPosition: this.environmentSystem.sunPosition,
-                    moonPosition: this.environmentSystem.moonPosition,
-                    timeOfDay: this.environmentSystem.timeOfDay,
-                    yaw: this.camera.yaw,
-                    pitch: this.camera.pitch,
-                    gameMode: discreteState.gameMode,
-                    instancePosition: (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
-                        ? interpolatedState.instanceCharacterPosition
-                        : undefined,
-                    currentChunk: {
-                        x: currentChunkCoords.x,
-                        z: currentChunkCoords.z,
-                        hasContent: currentChunkData?.hasContent ?? false,
-                    },
-                });
-            }
-
-            this.renderer.endFrame();
-            return;
-        }
-
-        // ==========================================
-        // Normal 3D world rendering pass
-        // ==========================================
-        const aspect = this.getAspectRatio();
-        const viewProj = getCameraMatrix(this.camera, aspect);
-
-        this.renderBoundaryWireframe(viewProj);
-
-        if (this.renderer.setCelestialLighting) {
-            this.renderer.setCelestialLighting(
-                { direction: this.environmentSystem.lightDirection, color: this.environmentSystem.sunColorWithVisibility },
-                { direction: this.environmentSystem.moonLightDirection, color: this.environmentSystem.moonColorWithVisibility },
-            );
-        }
-        if (this.renderer.setAmbientIntensity) {
-            this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
-        }
-
-        // 5. DRAW CELESTIAL ELEMENTS FOR MAIN WORLD STAGE
-        if (this.environmentSystem.sunVisibility > 0) {
-            matrixMultiplyInto(viewProj, this.environmentSystem.sunTransform, this.sunMVP);
-            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.environmentSystem.sunColorWithVisibility, true);
-        }
-
-        if (this.environmentSystem.moonVisibility > 0) {
-            matrixMultiplyInto(viewProj, this.environmentSystem.moonTransform, this.moonMVP);
-            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.environmentSystem.moonColorWithVisibility, true);
-        }
-
-        const visibleMeshes = this.world.getVisibleMeshes();
-        visibleMeshes.forEach((sm) => {
-            matrixMultiplyInto(viewProj, sm.transform, this.meshMVP);
-            this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
-        });
-
-        // Render lead party member when time is frozen and active/transitioning
-        if (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive)) {
-            if (this.partyMemberTexture1) {
-                const pos = interpolatedState.instanceCharacterPosition;
-                const circleSize = INSTANCE_CHARACTER_SIZE;
-
-                const toCamera = {
-                    x: this.camera.position.x - pos.x,
-                    y: 0,
-                    z: this.camera.position.z - pos.z,
-                };
-                const dist = Math.sqrt(toCamera.x * toCamera.x + toCamera.z * toCamera.z);
-                if (dist > 0.001) {
-                    toCamera.x /= dist;
-                    toCamera.z /= dist;
-                } else {
-                    toCamera.x = 0;
-                    toCamera.z = 1;
-                }
-
-                const right = { x: -toCamera.z, y: 0, z: toCamera.x };
-                const up = { x: 0, y: 1, z: 0 };
-
-                const m = this.circleTransform.elements;
-                m[0] = right.x * circleSize; m[1] = right.y * circleSize; m[2] = right.z * circleSize; m[3] = 0;
-                m[4] = 0; m[5] = 0; m[6] = 0; m[7] = 0;
-                m[8] = up.x * circleSize; m[9] = up.y * circleSize; m[10] = up.z * circleSize; m[11] = 0;
-                m[12] = pos.x; m[13] = pos.y; m[14] = pos.z; m[15] = 1;
-
-                matrixMultiplyInto(viewProj, this.circleTransform, this.meshMVP);
-                this.renderer.drawTexturedQuad(this.partyMemberTexture1, this.meshMVP, 1.0, toCamera);
-            }
-        }
-
-        if (this.debugHUD && discreteState.debugHUDVisible) {
-            const rotation = quaternionFromYawPitch(this.camera.yaw, this.camera.pitch);
-            const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
-
-            this.debugHUD.render({
-                cameraPosition: this.camera.position,
-                cameraForward: forward,
-                sunPosition: this.environmentSystem.sunPosition,
-                moonPosition: this.environmentSystem.moonPosition,
-                timeOfDay: this.environmentSystem.timeOfDay,
-                yaw: this.camera.yaw,
-                pitch: this.camera.pitch,
-                gameMode: discreteState.gameMode,
-                instancePosition: (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
-                    ? interpolatedState.instanceCharacterPosition
-                    : undefined,
-                currentChunk: {
-                    x: currentChunkCoords.x,
-                    z: currentChunkCoords.z,
-                    hasContent: currentChunkData?.hasContent ?? false,
-                },
-            });
-        }
-        this.renderer.endFrame();
+        this.renderSystem.render(
+            this.gameState,
+            this.camera,
+            this.partyMemberTexture1,
+            this.debugHUD,
+            this.WALL_DEBUG_COLOR,
+            this.wallDebugTransform,
+            this.wallDebugMVP,
+        );
     }
 
     getCameraPosition(): Vec3 {

@@ -55,7 +55,7 @@ export default class EnvironmentSystem {
 
     private computeSunSpherical(timeOfDay: number, outAzimuth: { value: number }, outElevation: { value: number }): void {
         const angle = (timeOfDay - 0.25) * Math.PI * 2;
-        // We are mindfully overriding the function parameters memory
+        // We are mindfully overriding the function parameter's memory
         // eslint-disable-next-line
         outAzimuth.value = Math.PI / 2 + angle;
         // eslint-disable-next-line
