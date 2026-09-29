@@ -160,6 +160,7 @@ export default class Instance3DSystem {
                 discreteState.instanceIsTransitioning = false;
                 discreteState.instanceIsActive = false;
                 discreteState.isTimeFrozen = false;
+                this.publishModeChange(discreteState.gameMode, 'world_3d');
             }
         }
 
