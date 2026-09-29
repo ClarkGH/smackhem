@@ -1,4 +1,4 @@
-import type { GameState } from './gameState';
+import type { GameMode, GameState } from './gameState';
 import type { PlayerIntent } from '../services/input';
 import type { TypeSafeEventBus } from './events';
 import { PLAYER_SPEED } from './camera';
@@ -14,22 +14,12 @@ interface Scene {
     collisionGrid: Uint8Array; // Currently a rounded 469 bytes, tile-based (0 = walkable, 1 = solid)
 }
 
-const createScene = (): Scene => {
-    const gridSize = Math.round(SCENE_GRID_WIDTH * SCENE_GRID_HEIGHT);
-    const collisionGrid = new Uint8Array(gridSize);
-    // All tiles are walkable (0) by default
-
-    return {
-        collisionGrid,
-    };
-};
-
 export class Scene2DSystem {
     public scene: Scene;
 
     // eslint-disable-next-line
     constructor(private eventBus: TypeSafeEventBus) { // I assure you, this variable is in use
-        this.scene = createScene();
+        this.scene = this.createScene();
     }
 
     public update(dt: number, gameState: GameState, intent: PlayerIntent): void {
@@ -123,7 +113,17 @@ export class Scene2DSystem {
         }
     }
 
-    private publishModeChange(previousMode: any, currentMode: any): void {
+    private createScene = (): Scene => {
+        const gridSize = Math.round(SCENE_GRID_WIDTH * SCENE_GRID_HEIGHT);
+        const collisionGrid = new Uint8Array(gridSize);
+        // All tiles are walkable (0) by default
+
+        return {
+            collisionGrid,
+        };
+    };
+
+    private publishModeChange(previousMode: GameMode, currentMode: GameMode): void {
         if (previousMode === currentMode) return;
 
         this.eventBus.publish({

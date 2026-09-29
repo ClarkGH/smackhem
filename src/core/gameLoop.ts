@@ -25,7 +25,6 @@ import {
     quaternionFromYawPitch,
     quaternionApplyToVector,
     smoothstep,
-    lerpVec3,
     orthographic,
 } from './math/mathHelpers';
 import { World } from './world';
@@ -35,9 +34,9 @@ import {
     Scene2DSystem,
 } from './scene';
 import { GameMode, GameState } from './gameState';
+import Instance2DSystem from './instance';
 
 const FIXED_DT = 1 / 60;
-const TRANSITION_DURATION = 1;
 
 export interface DebugHUD {
     // eslint-disable-next-line no-unused-vars
@@ -62,6 +61,8 @@ export class GameLoop {
     private accumulator = 0;
 
     private scene2DSystem: Scene2DSystem;
+
+    private instance2DSystem: Instance2DSystem;
 
     private eventBus: TypeSafeEventBus;
 
@@ -164,11 +165,6 @@ export class GameLoop {
 
     private readonly wallDebugMVP: Mat4 = identity();
 
-    // Pre-allocated Vec3 objects for transition calculations
-    private readonly transitionStartPos: Vec3 = { x: 0, y: 0, z: 0 };
-
-    private readonly transitionEndPos: Vec3 = { x: 0, y: 0, z: 0 };
-
     constructor(
         renderer: Renderer,
         input: Input,
@@ -190,6 +186,7 @@ export class GameLoop {
         // Core objects
         this.camera = createCamera();
         this.collisionContext = createCollisionContext();
+        this.instance2DSystem = new Instance2DSystem(this.collisionContext, this.world, this.camera, this.eventBus);
 
         // Seed camera
         this.camera.position = { ...this.gameState.interpolated.cameraPosition };
@@ -250,67 +247,6 @@ export class GameLoop {
         }
 
         return false;
-    }
-
-    private propagateInstance(): void {
-        const discreteState = this.gameState.discrete;
-        const interpolatedState = this.gameState.interpolated;
-
-        discreteState.isTimeFrozen = true;
-        discreteState.savedPitch = this.camera.pitch;
-        discreteState.targetPitch = 0; // Reset to horizontal view
-        discreteState.isTransitioningPitch = true;
-
-        // Start transition
-        discreteState.instanceIsTransitioning = true;
-        discreteState.instanceTransitionDirection = 1;
-        interpolatedState.instanceTransitionProgress = 0.0;
-        discreteState.instanceIsActive = false;
-
-        this.calculateTransitionPositions();
-
-        interpolatedState.instanceCharacterPosition.x = this.transitionStartPos.x;
-        interpolatedState.instanceCharacterPosition.y = this.transitionStartPos.y;
-        interpolatedState.instanceCharacterPosition.z = this.transitionStartPos.z;
-    }
-
-    private unPropagateInstance(): void {
-        const discreteState = this.gameState.discrete;
-        const interpolatedState = this.gameState.interpolated;
-
-        discreteState.instanceIsTransitioning = true;
-        discreteState.instanceTransitionDirection = -1;
-        interpolatedState.instanceTransitionProgress = 1.0;
-
-        this.transitionEndPos.x = interpolatedState.instanceCharacterPosition.x;
-        this.transitionEndPos.y = interpolatedState.instanceCharacterPosition.y;
-        this.transitionEndPos.z = interpolatedState.instanceCharacterPosition.z;
-
-        const circleSize = INSTANCE_CHARACTER_SIZE;
-        const floorY = circleSize / 2;
-
-        this.transitionStartPos.x = this.camera.position.x;
-        this.transitionStartPos.y = floorY;
-        this.transitionStartPos.z = this.camera.position.z;
-    }
-
-    private calculateTransitionPositions(): void {
-        // Circle starts at camera position (X/Z) and slides forward in the XZ plane
-        // Use target pitch (0) for calculation since we're transitioning to it
-        const forward = getCameraForward(this.camera.yaw, this.gameState.discrete.targetPitch);
-        const circleSize = INSTANCE_CHARACTER_SIZE; // Circle radius
-        const floorY = circleSize / 2; // Half circle size above floor (quad is centered at Y=0)
-
-        // Start position: Camera's X/Z position at floor level
-        this.transitionStartPos.x = this.camera.position.x;
-        this.transitionStartPos.y = floorY;
-        this.transitionStartPos.z = this.camera.position.z;
-
-        // End position: Forward along camera direction, at floor level
-        const forwardDistance = 3.0; // Distance to slide forward
-        this.transitionEndPos.x = this.camera.position.x + forward.x * forwardDistance;
-        this.transitionEndPos.y = floorY;
-        this.transitionEndPos.z = this.camera.position.z + forward.z * forwardDistance;
     }
 
     private computeTimeOfDay(simTime: number): number {
@@ -479,24 +415,15 @@ export class GameLoop {
         const interpolatedState = this.gameState.interpolated;
 
         this.scene2DSystem.update(dt, this.gameState, intent);
+        this.instance2DSystem.update(dt, this.gameState, intent);
 
+        // TODO: Revisit if this needs to be at the top still
         if (discreteState.gameMode === 'world_3d') {
             this.camera.position = { ...interpolatedState.cameraPosition };
             this.camera.yaw = interpolatedState.cameraYaw;
             this.camera.pitch = interpolatedState.cameraPitch;
         }
 
-        if (discreteState.gameMode === 'scene_2d') return;
-
-        if (intent.pause && discreteState.gameMode === 'world_3d') {
-            if (discreteState.isTimeFrozen) {
-                this.unPropagateInstance();
-            } else {
-                this.propagateInstance();
-            }
-        }
-
-        // Handle debug HUD toggle configurations
         if (intent.toggleDebugHUD) {
             if (this.debugHUD) {
                 this.debugHUD.toggle();
@@ -506,97 +433,17 @@ export class GameLoop {
             }
         }
 
-        // Update instance state transition (only when time is frozen)
-        if (discreteState.isTimeFrozen && discreteState.instanceIsTransitioning) {
-            interpolatedState.instanceTransitionProgress += (
-                dt * discreteState.instanceTransitionDirection
-            ) / TRANSITION_DURATION;
+        if (discreteState.gameMode === 'scene_2d') return;
 
-            if (interpolatedState.instanceTransitionProgress >= 1.0) {
-                interpolatedState.instanceTransitionProgress = 1.0;
-            } else if (interpolatedState.instanceTransitionProgress <= 0.0) {
-                interpolatedState.instanceTransitionProgress = 0.0;
-            }
-
-            const smoothT = smoothstep(interpolatedState.instanceTransitionProgress);
-            lerpVec3(
-                this.transitionStartPos,
-                this.transitionEndPos,
-                smoothT,
-                interpolatedState.instanceCharacterPosition,
-            );
-
-            if (
-                discreteState.instanceTransitionDirection > 0
-                && this.isInstanceTransitionPositionBlocked(interpolatedState.instanceCharacterPosition)
-            ) {
-                discreteState.instanceTransitionDirection = -1;
-                discreteState.instanceIsActive = false;
-            }
-
-            if (
-                interpolatedState.instanceTransitionProgress >= 1.0
-                && discreteState.instanceTransitionDirection > 0
-            ) {
-                discreteState.instanceIsTransitioning = false;
-                discreteState.instanceIsActive = true;
-            }
-
-            if (interpolatedState.instanceTransitionProgress <= 0.0) {
-                discreteState.instanceIsTransitioning = false;
-                discreteState.instanceIsActive = false;
-                discreteState.isTimeFrozen = false;
-            }
-        }
-
-        // Update camera pitch transition (when time is frozen, going to 0)
-        if (discreteState.isTimeFrozen && discreteState.isTransitioningPitch) {
-            const pitchTransitionSpeed = 2.0;
-            const pitchDelta = (discreteState.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
-
-            if (Math.abs(pitchDelta) < 0.001) {
-                this.camera.pitch = discreteState.targetPitch;
-                interpolatedState.cameraPitch = discreteState.targetPitch;
-                discreteState.isTransitioningPitch = false;
+        if (intent.pause) {
+            if (discreteState.isTimeFrozen) {
+                this.instance2DSystem.unPropagateInstance(this.gameState);
             } else {
-                this.camera.pitch += pitchDelta;
-                interpolatedState.cameraPitch = this.camera.pitch;
+                this.instance2DSystem.propagateInstance(this.gameState);
             }
         }
 
-        // Handle WASD movement for circle character in instance mode
-        if (discreteState.isTimeFrozen && discreteState.instanceIsActive && !discreteState.instanceIsTransitioning) {
-            const { x: moveX, y: moveY } = intent.move;
-
-            if (moveX !== 0 || moveY !== 0) {
-                const forward = getCameraForward(this.camera.yaw, 0);
-                const right = getCameraRight(this.camera.yaw);
-
-                const moveDistance = PLAYER_SPEED * dt;
-                const proposedMovement = {
-                    x: (forward.x * moveY + right.x * moveX) * moveDistance,
-                    y: 0,
-                    z: (forward.z * moveY + right.z * moveX) * moveDistance,
-                };
-
-                const worldAABBs = this.world.getCollidableAABBs();
-                const resolvedMovement = resolveCollision(
-                    interpolatedState.instanceCharacterPosition,
-                    proposedMovement,
-                    worldAABBs,
-                    INSTANCE_CHARACTER_SIZE,
-                    INSTANCE_CHARACTER_SIZE / 2,
-                    this.collisionContext,
-                );
-
-                interpolatedState.instanceCharacterPosition.x += resolvedMovement.x;
-                interpolatedState.instanceCharacterPosition.z += resolvedMovement.z;
-            }
-        }
-
-        if (discreteState.isTimeFrozen) {
-            return;
-        }
+        if (discreteState.gameMode === 'instance_3d' || discreteState.isTimeFrozen) return;
 
         // Normal 3D simulation updates
         interpolatedState.simulationTime += dt;
