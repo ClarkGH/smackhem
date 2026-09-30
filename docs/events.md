@@ -1,4 +1,4 @@
-# Eventing and State
+# Eventing, State, and Audio Systems
 
 ## Table of Contents
 
@@ -62,7 +62,7 @@ type Event = {
 }
 ```
 
-Events will be explicitly typed. We'll subscribe listeners in the main logic, and will publish events in the game loop. State is authoritative simulation data. It is not responsible for broadcasting changes.
+Events will be explicitly typed. We'll subscribe listeners in the main logic, and will publish events in the game loop. Events will not affect state directly, subscribers will call event handlers per system as-required.
 
 ```typescript
 interface EventBus {
@@ -175,13 +175,15 @@ These are non-blocking. Some systems will want to broadcast events without waiti
 
 We can't easily sort pre-execution, we absolutely have to process them sequentially.
 
-### State management
+### Global State management
 
-State is changing information which the engine utilizes to make determinations. Our pub / sub event service, simulation, and state tie directly into one and another. State is authoritative simulation data. It is not responsible for broadcasting changes.
+State is changing information which the engine utilizes to make determinations. Our pub / sub event service, system simulations, and global state complement one and another. State is authoritative simulation data. It is not responsible for broadcasting changes.
 
-We have both state and a state buffer. True state will live in the buffer. Cache will be computed from state, but never be stored or lerped independently.
+Systems may contain their own state. Accessing protected system data/state may change, but if state is not global, it is protected. Whether through events or public getters, protected state can be returned in different ways until patterns emerge. Trade-offs will be considered from there.
 
-The collision grid and world chunks are excluded from state, purposefully. Since it's content and non-reliant on our simulated engine time, there's no benefit.
+We have both state and a state buffer. True global state will live in the buffer. Cache will be computed from state, but never be stored or lerped independently.
+
+The collision grid and world chunks are excluded from global state, purposefully. Since it's content and non-reliant on our simulated engine time, there's no benefit.
 
 There's a current differentiation between discrete and interpolated state. Discrete state is directly copied. It's "true" state.
 
@@ -206,6 +208,21 @@ Initial implementation assumes game state will be updated per tick, rendering wi
 [ END FIXED TICK ]
    │
    └── 3. Render Pass ─────> Lerp(StateBuffer.Previous, StateBuffer.Current, Alpha) ──> WebGL/OpenGl Draw
+```
+
+### Audio Systems
+
+Audio needs to be playable, pauseable, streamable, and stopable.
+
+Two separate audio systems will be in-use, a decoded buffer and a streaming source. Initially the decoded buffer (short SFX) will be implemented, then the streaming source.
+
+```typescript
+interface AudioService {
+    play(soundId: string): void;
+    pause(): void;
+    resume(): void;
+    stop(): void;
+}
 ```
 
 ## Pitfalls to Avoid

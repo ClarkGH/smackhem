@@ -397,7 +397,7 @@ No GPU calls should appear outside the renderer layer. All WebGL/GPU operations 
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
-- **[Event Bus](events.md)** - Event bus pub/sub constraints and considerations
+- **[Events, State, and Audio Systems](events.md)** - Eventing, global state management, and audio systems
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, and geometry systems
 - **[Data Formats](data-formats.md)** - Data format specifications
