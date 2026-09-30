@@ -1,4 +1,6 @@
-// Platform-agnostic entry point
+/* eslint-disable no-unused-vars */
+/* eslint-disable no-undef */
+/* eslint-disable no-shadow */
 import { World } from './core/world';
 import { GameLoop } from './core/gameLoop';
 import { TypeSafeEventBus } from './core/events';
@@ -29,22 +31,15 @@ const main = async () => {
 
     const gameState : GameState = createGameState();
 
-    // Import chunk management function (platform-specific)
     // Type parameters are intentionally unused (they're for type checking only)
-    // eslint-disable-next-line no-shadow
     let updateActiveChunks: (
-        // eslint-disable-next-line no-unused-vars
         _w: World,
-        // eslint-disable-next-line no-unused-vars
         _pos: { x: number; y: number; z: number },
-        // eslint-disable-next-line no-unused-vars
         _r: PlatformServices['renderer'],
-        // eslint-disable-next-line no-unused-vars
         _assetLoader?: any,
     ) => Promise<void>;
 
     // __PLATFORM__ is a build-time define from Vite, not available at ESLint parse time
-    // eslint-disable-next-line no-undef
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
         // Stub platform chunk management (deterministic, same as web)
         const { updateActiveChunks: stubUpdateActiveChunks } = await import('./platforms/stub/stubBootstrap.js');
@@ -63,7 +58,6 @@ const main = async () => {
 
     // Create debug HUD
     let debugHUD: {
-        // eslint-disable-next-line no-unused-vars
         render: (_info: {
             cameraPosition: { x: number; y: number; z: number };
             cameraForward: { x: number; y: number; z: number };

@@ -8,8 +8,7 @@ import type { Chunk } from '../../core/world';
  * Web platform implementation of AssetLoader
  * Handles loading chunk JSON files via fetch()
  */
-// eslint-disable-next-line import/prefer-default-export
-export class WebAssetLoader implements AssetLoader {
+export default class WebAssetLoader implements AssetLoader {
     /**
      * Offset applied to chunk coordinates for filename generation.
      * Prevents negative coordinates in filenames (e.g., -1_0.json -> 9999_10000.json).

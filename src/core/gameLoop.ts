@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import type { Renderer, TextureHandle } from '../services/renderer';
 import type { Input, PlayerIntent } from '../services/input';
 import type { TypeSafeEventBus } from './events';
@@ -31,7 +32,6 @@ import RenderSystem from './renderSystem';
 const FIXED_DT = 1 / 60;
 
 export interface DebugHUD {
-    // eslint-disable-next-line no-unused-vars
     render: (_info: {
         cameraPosition: Vec3;
         cameraForward: Vec3;

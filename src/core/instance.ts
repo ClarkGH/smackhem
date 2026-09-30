@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { PlayerIntent } from 'src/services/input';
 import { Vec3 } from 'src/types/common';
 import { TypeSafeEventBus } from './events';
@@ -27,15 +28,14 @@ export default class Instance3DSystem {
     private readonly transitionEndPos: Vec3 = { x: 0, y: 0, z: 0 };
 
     constructor(
-        // I assure you, these variables are in use
-        // eslint-disable-next-line
+        // I assure you, these variables are in use.
+        // TODO: Being lazy, we can do the this.collisionContext pattern when we refactor
+        // I want to start building features and stop optimizing for a while
+        // We cool?
         private collisionContext: CollisionContext,
-        // eslint-disable-next-line
         private world: World,
-        // eslint-disable-next-line
         private camera: Camera,
-        // eslint-disable-next-line
-        private eventBus: TypeSafeEventBus
+        private eventBus: TypeSafeEventBus,
     ) {
         console.log('2D Instance System Instantiated');
     }
@@ -80,6 +80,7 @@ export default class Instance3DSystem {
         interpolatedState.instanceCharacterPosition.y = this.transitionStartPos.y;
         interpolatedState.instanceCharacterPosition.z = this.transitionStartPos.z;
 
+        // Mindfully overriding memory
         // eslint-disable-next-line
         gameState.discrete.gameMode = 'instance_3d';
         this.publishModeChange(discreteState.gameMode, 'instance_3d');
@@ -104,6 +105,7 @@ export default class Instance3DSystem {
         this.transitionStartPos.y = floorY;
         this.transitionStartPos.z = this.camera.position.z;
 
+        // Mindfully overriding memory
         // eslint-disable-next-line
         gameState.discrete.gameMode = 'world_3d';
         this.publishModeChange(discreteState.gameMode, 'world_3d');

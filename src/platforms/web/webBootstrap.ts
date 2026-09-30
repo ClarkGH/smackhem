@@ -1,14 +1,14 @@
 import type { Renderer } from '../../services/renderer';
 import type { PlatformServices } from '../../services/platform';
-import WebGLRenderer from './webGLRenderer';
 import {
     World,
     CHUNK_LOAD_RADIUS,
 } from '../../core/world';
-import WebClock from './webClock';
 import { WebInputService } from './webInputService';
 import type { Vec3 } from '../../types/common';
-import { WebAssetLoader } from './webAssetLoader';
+import WebAssetLoader from './webAssetLoader';
+import WebGLRenderer from './webGLRenderer';
+import WebClock from './webClock';
 
 // PlatformServices interface moved to src/services/platform.ts
 // This export is kept for backward compatibility but should use the shared type
