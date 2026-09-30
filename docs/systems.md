@@ -218,6 +218,8 @@ The prism allows for non-uniform scaling, creating rectangular boxes of any dime
 
 ### Input Intent
 
+Conceptual example:
+
 ```typescript
 interface PlayerIntent {
   move: Vec2;     // forward/back, strafe
@@ -245,25 +247,15 @@ The instance system manages the 2D mode where party members, NPCs, and enemies a
 
 ### Instance System Architecture
 
-```typescript
-interface Instance {
-    isActive: boolean;
-    isTransitioning: boolean;
-    transitionProgress: number; // 0.0 to 1.0 (fixed timestep accumulated)
-    transitionDirection: number; // 1.0 for forward (entering), -1.0 for reverse (exiting)
-}
+Instances take what they need in from the coordinator and play the music asked. Currently we're exposing public methods in a few places for the gameLoop to call and feed in args. This is subject to change as patterns in the architecture emerge.
 
-interface InstanceCharacter {
-    position: Vec3; // 3D world position (on floor plane)
-    // Future: sprite/texture reference
-    // Future: collision bounds (AABB for 2D)
-    // Future: type (party member, NPC, enemy)
-}
+```typescript
+const instance3DSystem = new Instance3DSystem(this.collisionContext, this.world, this.camera, this.eventBus);
 ```
 
 ### Instance Transition
 
-- **Pause/Unpause**: Triggered by space key, freezes the 3D world (timer, sun/moon, game simulation)
+- **Freeze/Unfreeze**: Currently triggered by space key, freezes the 3D world (timer, sun/moon, game simulation)
 - **Camera Pitch**: Transitions to 0 degrees (horizontal) when entering instance mode
 - **Character Transition**: Circle character transitions from camera position forward along the XZ plane into frozen 3D scene
   - Start: Camera's X/Z position at floor level
@@ -275,7 +267,7 @@ interface InstanceCharacter {
 
 #### Linear Interpolation (Lerp)
 
-**Lerp** (linear interpolation) smoothly transitions between two values by blending them based on a parameter `t` (typically 0.0 to 1.0). Used to smoothly animate from starting to end position. In layman's terms it's giving the sliding effect.
+**Lerp** (linear interpolation) smoothly transitions between two values by blending them based on a parameter `t` (typically 0.0 to 1.0). Used to smoothly animate from starting to end position. In layman's terms it's giving the sliding effect. E.G. It's an animation moving in a straight line.
 
 For scalars:
 
@@ -373,6 +365,10 @@ This is cheap, readable, and portable.
 - Deterministic.
 
 This is console-friendly and debuggable.
+
+## Scene System
+
+The 2D scene system (more TBD).
 
 ## Navigation
 

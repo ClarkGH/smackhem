@@ -32,6 +32,11 @@
 
 ## Technical Jargon and Formulae
 
+To note:
+
+- The camera is shared by both the gameLoop and the Instance3DSystem
+- We are storing camera state in the global state where needed.
+
 ### Identity Matrices
 
 Identity matrices represent the default state of an object in 3D space. We use them as the starting point.
@@ -153,7 +158,7 @@ Quaternions must be unit quaternions (length = 1) for rotation:
 ```text
 length = sqrt(x² + y² + z² + w²)
 q_normalized = {x/length, y/length, z/length, w/length}
-```
+```Game State logic
 
 **Quaternion Multiplication**
 Composing two rotations: `q_result = q_a * q_b`

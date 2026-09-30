@@ -62,11 +62,15 @@ src/
 ├─ core/
 │  ├─ camera.ts              # 3D camera math and logic
 │  ├─ collision.ts           # Collision logic
+│  ├─ environment.ts         # Enviroment systems
+│  ├─ events.ts              # Eventing pub/sub systems
 │  ├─ gameLoop.ts            # Game loop logic
+│  ├─ gameState.ts           # Game State logic
 │  ├─ input.ts               # Player input logic
-│  ├─ instance.ts            # Instance system (pause mode state)
-│  ├─ instanceCharacter.ts  # Instance character state
+│  ├─ instance.ts            # Instance systems
 │  ├─ party.ts               # Party logic
+│  ├─ renderSystem.ts        # Rendering system
+│  ├─ scene.ts               # Scene system
 │  ├─ world.ts               # World and chunking logic
 │  └─ math/                  # Shared engine math logic
 │     ├─ aabb.ts             # Axis aligned bounding box

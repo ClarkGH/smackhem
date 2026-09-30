@@ -62,7 +62,7 @@ type Event = {
 }
 ```
 
-Events will be explicitly typed. We'll subscribe listeners in the main logic, and will publish events in the game loop. State management eventually shouldn't be handled outside of event listeners unless otherwise specified.
+Events will be explicitly typed. We'll subscribe listeners in the main logic, and will publish events in the game loop. State is authoritative simulation data. It is not responsible for broadcasting changes.
 
 ```typescript
 interface EventBus {

@@ -416,8 +416,9 @@ Every system must have a clear owner. If ownership is ambiguous, the boundary ha
 
 ### Game Loop (Fixed Step)
 
-Console-safe, deterministic.
+Console-safe, deterministic. Acts as an "orchestrator". There is currently some logic in the GameLoop that can be removed, we will wait for more patterns to emerge before doing so, as we need to add features, or we'll live in refactor hell forever.
 
+Conceptual example:
 ```typescript
 while (accumulator >= FIXED_DT) {
   input.update();
@@ -433,6 +434,35 @@ renderer.render(world, party, camera);
 - Fixed timestep (e.g. 60Hz)
 - Rendering interpolates
 - No logic in render
+- Coordinates, does not own
+
+### Game State
+
+Console-safe and deterministic data, which effects logic. Think of it as "sheet music" for the orchestrator and musicians.
+
+### Event Bus
+
+Notification and decoupling mechanism. Think of the orchestrator waving his hands and the musicians responding with music at his beat/tempo.
+
+### Scene Systems
+
+Scene simulation and transition ownership. Think of all subsystems as musicians.
+
+### Instance Systems
+
+Instance simulation and transition ownership.
+
+### Environment Systems
+
+World/environment temporal behavior. 
+
+### Render Systems
+
+Rendering orchestration
+
+### World Systems
+
+World/chunk/static collision ownership
 
 ## Navigation
 
