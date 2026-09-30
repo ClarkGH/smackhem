@@ -1,6 +1,4 @@
-/* eslint-disable no-unused-vars */
-/* eslint-disable no-undef */
-/* eslint-disable no-shadow */
+/* eslint-disable no-unused-vars, no-undef, no-shadow */
 import { World } from './core/world';
 import { GameLoop } from './core/gameLoop';
 import { TypeSafeEventBus } from './core/events';
