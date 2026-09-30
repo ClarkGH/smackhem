@@ -247,6 +247,11 @@ export class GameLoop {
 
         while (this.accumulator >= FIXED_DT) {
             this.updateSimulation(FIXED_DT, intentSnapshot);
+
+            // Consume edge-triggered actions to prevent double-consumption
+            intentSnapshot.interact = false; 
+            intentSnapshot.pause = false;
+
             this.accumulator -= FIXED_DT;
         }
 
