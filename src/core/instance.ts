@@ -59,6 +59,9 @@ export default class Instance3DSystem {
 
     public propagateInstance(gameState: GameState): void {
         const discreteState = gameState.discrete;
+
+        if (discreteState.gameMode !== 'world_3d') return;
+
         const interpolatedState = gameState.interpolated;
 
         discreteState.isTimeFrozen = true;
@@ -77,6 +80,7 @@ export default class Instance3DSystem {
         interpolatedState.instanceCharacterPosition.y = this.transitionStartPos.y;
         interpolatedState.instanceCharacterPosition.z = this.transitionStartPos.z;
 
+        gameState.discrete.gameMode = 'instance_3d';
         this.publishModeChange(discreteState.gameMode, 'instance_3d');
     }
 
@@ -99,6 +103,7 @@ export default class Instance3DSystem {
         this.transitionStartPos.y = floorY;
         this.transitionStartPos.z = this.camera.position.z;
 
+        gameState.discrete.gameMode = 'world_3d';
         this.publishModeChange(discreteState.gameMode, 'world_3d');
     }
 
@@ -160,6 +165,7 @@ export default class Instance3DSystem {
                 discreteState.instanceIsTransitioning = false;
                 discreteState.instanceIsActive = false;
                 discreteState.isTimeFrozen = false;
+                discreteState.gameMode = 'world_3d';
                 this.publishModeChange(discreteState.gameMode, 'world_3d');
             }
         }

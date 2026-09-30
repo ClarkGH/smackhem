@@ -36,6 +36,7 @@ export class Scene2DSystem {
                 };
                 discreteState.targetPitch = 0;
                 discreteState.isTransitioningPitch = true;
+                discreteState.gameMode = 'scene_2d';
 
                 this.publishModeChange(discreteState.gameMode, 'scene_2d');
 
@@ -44,6 +45,7 @@ export class Scene2DSystem {
                 interpolatedState.sceneTransitionProgress = 0.0;
                 discreteState.sceneIsActive = false;
             } else if (discreteState.gameMode === 'scene_2d') {
+                discreteState.gameMode = 'world_3d';
                 this.publishModeChange(discreteState.gameMode, 'world_3d');
 
                 discreteState.sceneIsActive = false;
@@ -72,6 +74,7 @@ export class Scene2DSystem {
                 discreteState.sceneIsTransitioning = false;
                 discreteState.sceneIsActive = false;
 
+                discreteState.gameMode = 'world_3d';
                 this.publishModeChange(discreteState.gameMode, 'world_3d');
 
                 if (discreteState.savedCameraState) {

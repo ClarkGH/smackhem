@@ -147,7 +147,6 @@ export class GameLoop {
 
         this.eventBus.subscribe('game_mode_changed', (event) => {
             console.log(`event - ${event.type}\n`, `curr mode: ${event.currentMode}\n`, `prev mode: ${event.previousMode}`);
-            this.gameState.discrete.gameMode = event.currentMode;
         });
 
         // Load party textures asynchronously
