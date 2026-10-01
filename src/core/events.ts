@@ -1,11 +1,22 @@
 /* eslint-disable no-unused-vars */
 import { GameMode } from './gameState';
+import { AudioCategory } from '../services/audio';
 
 export type GameEvent =
     | {
         type: 'game_mode_changed';
         previousMode: GameMode;
         currentMode: GameMode;
+    }
+    | {
+        type: 'play_sound_requested';
+        soundId: string;
+        category: AudioCategory;
+    }
+    | {
+        type: 'audio_bus_volume_changed';
+        category: AudioCategory;
+        volume: number;
     };
 
 type ExtractEvent<K extends GameEvent['type']> = Extract<GameEvent, { type: K }>;
