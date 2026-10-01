@@ -5,9 +5,15 @@
 - [Introduction](#introduction)
 - [Architectural Design](#architectural-design)
 - [Proposed Implementation](#proposed-implementation)
-   - [The Event Bus](#the-event-bus)
-      - [Synchronous Events](#synchronous-events)
-      - [Async and Multi-threaded Events](#async-and-multi-threaded-events)
+    - [The Event Bus](#the-event-bus)
+        - [Synchronous Events](#synchronous-events)
+        - [Async and Multi-threaded Events](#async-and-multi-threaded-events)
+        - [Double-buffered events](#double-buffered-events)
+        - [MPSC Queue](#mpsc-queue)
+    - [Global State management](#global-state-management)
+    - [Audio Systems](#audio-systems)
+- [Pitfalls to Avoid](#pitfalls-to-avoid)
+- [Navigation](#navigation)
 
 ## Introduction
 
@@ -97,6 +103,8 @@ interface EventBus {
     ): () => void;
 }
 ```
+
+To avoid execution stalls, 
 
 #### Async and Multi-threaded Events
 
@@ -218,11 +226,28 @@ Two separate audio systems will be in-use, a decoded buffer and a streaming sour
 
 ```typescript
 interface AudioService {
-    play(soundId: string): void;
+    play(sound: SoundHandle): PlaybackHandle;
+}
+
+interface SoundHandle {
+    id: string;
+}
+```
+
+Smaller sound files, that are loaded globally (menu movement, menu selection, etc..), will be loaded on engine-load. Less common sound filed will be loaded dependent on criteria as patterns emerge. Larger sound files will be considered for streaming.
+
+```typescript
+interface PlaybackHandle {
     pause(): void;
     resume(): void;
     stop(): void;
 }
+```
+
+Using the event bus for a short sound:
+
+```typescript
+eventBus.subscribe('do_the_thing', () => audioService.play(doTheThing));
 ```
 
 ## Pitfalls to Avoid
