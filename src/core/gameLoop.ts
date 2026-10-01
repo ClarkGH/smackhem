@@ -223,7 +223,7 @@ export class GameLoop {
         }
     }
 
-    update(deltaTime: number): void {
+    public update(deltaTime: number): void {
         this.accumulator += deltaTime;
 
         const intentSnapshot = this.input.getIntent();
@@ -258,7 +258,7 @@ export class GameLoop {
         this.eventBus.flush();
     }
 
-    render(): void {
+    public render(): void {
         this.environmentSystem.update(this.gameState, this.camera.position, 1.0, 1.0);
 
         this.renderSystem.render(
@@ -272,7 +272,8 @@ export class GameLoop {
         );
     }
 
-    getCameraPosition(): Vec3 {
+    // TODO: Do we even need this if it lives in state? Should it live in state?
+    public getCameraPosition(): Vec3 {
         return this.gameState.interpolated.cameraPosition;
     }
 

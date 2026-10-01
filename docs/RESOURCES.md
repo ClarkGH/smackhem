@@ -8,3 +8,4 @@ These resources are inclusive of paradigms I have used, or related to what I am 
 3. [WebGL Mozilla Reference](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)
 4. [WebGL Samples](https://webglsamples.org/)
 5. [Martin Fowler's YAGNI Write-up](https://martinfowler.com/bliki/Yagni.html)
+6. [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)

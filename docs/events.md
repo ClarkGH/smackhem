@@ -83,7 +83,7 @@ interface EventBus {
 
 #### Synchronous Events
 
-Synchronous double-buffered events allow for more predictability on the onset. Synchronous events will run per tick, which is currently set as `FIXED_DT` of a second (ticks per second). Simulation speed should not be directly tied into FPS. Synchronous events guarantee that every subscriber has received intended events which will allow for straight-forward debugging.
+Synchronous double-buffered events allow for more predictability. Synchronous events will run per tick, which is currently set as `FIXED_DT` of a second (ticks per second). Simulation speed should not be directly tied into FPS. Synchronous events guarantee that every subscriber has received intended events which will allow for straight-forward debugging.
 
 ```javascript
 const FIXED_DT = 1 / 60;
@@ -112,7 +112,7 @@ Async and multi-threaded eventing is helpful with heavier lifts such as saving/l
 
 Considerations for multi-threading will also be made when we decide to utilize async event triggers. Since we're running both 2D and 3D in C++, this will not be a small lift. Our multi-threaded Pub/Sub event bus is in consideration for becoming a mix of double-buffered and lock-free ring buffered (MPSC Queue).
 
-#### Double-buffered events
+#### Double-buffered Queue
 
 Double-buffered event queues are primarily useful for single-threaded frame phases or simple batch job swaps. The initial complexity is low, and allows for dynamic vector resizing as well as array swapping. The is potential for 'high contention' across threads and will require a Mutex lock. It works well with highly variable payload sizes.
 
@@ -220,27 +220,62 @@ Initial implementation assumes game state will be updated per tick, rendering wi
 
 ### Audio Systems
 
-Audio needs to be playable, pauseable, streamable, and stopable.
+Audio needs to be playable, pauseable, streamable, and stopable. For game engines requiring low latency and precision playback, the ideal strategy is to fetch audio files as an binary ArrayBuffer, decode them into a raw PCM AudioBuffer, and store that as our internal platform-agnostic type.
 
-Two separate audio systems will be in-use, a decoded buffer and a streaming source. Initially the decoded buffer (short SFX) will be implemented, then the streaming source.
+
+```text
+Individual PCM Playback Voice (e.g., SFX Effect)
+               │
+               ▼
+         [sfxGainNode]       [uiGainNode]      [musicGainNode]
+              │                    │                  │
+              └───────────┬────────┴──────────────────┘
+                          ▼
+                   [masterGainNode]
+                          │
+                          ▼
+                 [Hardware Speakers]
+```
+
+With consideration for multiple sound types and volume, we'll need to consider support for audio categories and or mix buses.
 
 ```typescript
-interface AudioService {
-    play(sound: SoundHandle): PlaybackHandle;
+export type AudioCategory = 'master' | 'sfx' | 'music' | 'ambient' | 'ui'; // Preparation for mixing engine separation of concerns
+
+export interface AudioService { // Core service
+    play(sound: SoundHandle, category?: AudioCategory): PlaybackHandle;
+    setVolume(category: AudioCategory, volume: number): void;
+    getVolume(category: AudioCategory): number;
 }
 
-interface SoundHandle {
-    id: string;
+interface SoundHandle { // Pointer to fully loaded sound asset
+    readonly id: string;
+}
+
+interface PlaybackHandle { // Execution token representing a live and/or active audio-clip.
+    pause(): void;
+    resume(): void;
+    stop(): void;
 }
 ```
 
 Smaller sound files, that are loaded globally (menu movement, menu selection, etc..), will be loaded on engine-load. Less common sound filed will be loaded dependent on criteria as patterns emerge. Larger sound files will be considered for streaming.
 
 ```typescript
-interface PlaybackHandle {
-    pause(): void;
-    resume(): void;
-    stop(): void;
+interface AssetLoader {
+    loadSound(soundUrl: string): Promise<SoundHandle>;
+}
+
+class SoundRegistry { // Human readable registry
+    private cache = new Map<string, SoundHandle>();
+
+    public register(id: string, handle: SoundHandle): void {
+        this.cache.set(id, handle);
+    }
+
+    public get(id: string): SoundHandle | undefined {
+        return this.cache.get(id);
+    }
 }
 ```
 
@@ -250,10 +285,61 @@ Using the event bus for a short sound:
 eventBus.subscribe('do_the_thing', () => audioService.play(doTheThing));
 ```
 
+#### Web Audio
+
+We will need to do a bit of heavy lifting to pack the audio buffers and context specifics  into our own class layer. For game engines requiring low latency and precision playback, the ideal strategy is to fetch audio files as an binary ArrayBuffer, decode them into an AudioBuffer, and store that as an internal type.
+
+```typescript
+export class WebSoundHandle implements SoundHandle {
+    // Hidden from core: contains the raw PCM array decompressed in RAM
+    public readonly buffer: AudioBuffer;
+    public readonly id: string;
+
+    constructor(id: string, buffer: AudioBuffer) {
+        this.id = id;
+        this.buffer = buffer;
+    }
+}
+
+```
+
+The web platform additionally requires renewing source nodes upon resumption.
+
+```typescript
+export class WebPlaybackHandle implements PlaybackHandle {
+    //...
+    public resume(): void {
+        if (this.isPlaying) return;
+        if (this.pauseOffset < this.buffer.duration) {
+            this.start(this.pauseOffset);
+        }
+    }
+}
+```
+
+Our platform layer uses type-casting internally to unpack safely when the core engine passes abstract handles back down.
+
+```typescript
+export class WebAudioService implements AudioService {
+    //...
+    public play(sound: SoundHandle): PlaybackHandle {
+        // Safe Downcast
+        const webSound = sound as WebSoundHandle;
+        
+        if (!webSound.buffer) {
+            throw new Error(`Invalid asset passed to WebAudioService: ${sound.id}`);
+        }
+
+        return new WebPlaybackHandle(this.ctx, webSound.buffer);
+    }
+}
+```
+
 ## Pitfalls to Avoid
 
-1. Events indicate what happened, not what should happen.
-2. Immediate Handlers create execution stalls.
+1. Events indicate what happened, not what should happen. Keep payloads informational, do not pack direct mutations.
+2. Immediate handlers create execution stalls. Subscribers handle tasks lazily or queue them.
+3. Avoid buffer volatility. Decompressing files into memory scales footprints significantly. Large ambient tracks or background music loops must be routed via streaming targets instead of being cached.
 
 ## Navigation
 
