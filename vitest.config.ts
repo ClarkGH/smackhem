@@ -8,5 +8,9 @@ export default defineConfig({
       // This forces the output to the root coverage folder
       reportsDirectory: './coverage', 
     },
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+    ],
   },
 });
