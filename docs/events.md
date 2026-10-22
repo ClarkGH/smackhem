@@ -12,6 +12,12 @@
         - [MPSC Queue](#mpsc-queue)
     - [Global State management](#global-state-management)
     - [Audio Systems](#audio-systems)
+        - [Portability & Separation of Concerns](#portability--separation-of-concerns)
+        - [Audio Service Interface](#audio-service-interface)
+        - [Sound Registry & Event Integration](#sound-registry--event-integration)
+        - [Buffered vs. Streamed Sounds](#buffered-vs-streamed-sounds)
+        - [Web Audio Platform Implementation](#web-audio-platform-implementation)
+        - [Stub Platform & Testing (Rule P-1)](#stub-platform--testing-rule-p-1)
 - [Pitfalls to Avoid](#pitfalls-to-avoid)
 - [Navigation](#navigation)
 
@@ -220,8 +226,18 @@ Initial implementation assumes game state will be updated per tick, rendering wi
 
 ### Audio Systems
 
-Audio needs to be playable, pauseable, streamable, and stopable. For game engines requiring low latency and precision playback, the ideal strategy is to fetch audio files as an binary ArrayBuffer, decode them into a raw PCM AudioBuffer, and store that as our internal platform-agnostic type.
+Audio needs to be playable, pauseable, streamable, and stopable. For game engines requiring low latency and precision playback, the strategy is to fetch audio files as binary ArrayBuffers, decode them into raw PCM buffers (e.g. Web Audio `AudioBuffer`), and wrap them behind platform-agnostic handles.
 
+#### Portability & Separation of Concerns
+
+Asset loading in Smackhem originally risked becoming a monolithic "God Asset Loader" combining chunks, textures, and maps. For audio, **Portability First** demands strict separation:
+
+1. **Different Hardware Targets**: On native platforms and consoles, audio buffers route to sound chip memory or dedicated audio mixing threads (e.g., miniaudio, SDL_mixer, OpenAL). Textures route to GPU VRAM via graphics APIs, and chunks stream from disk into spatial world grids. Tying them together creates an artificial dependency tangle.
+2. **AudioService Owns Audio Loading**: Just as [`Renderer`](rendering.md) owns mesh generation and texture loading (`loadTexture`), the [`AudioService`](#audio-service-interface) owns sound loading, playback, and category mixing. There is no need for a separate loader interface.
+3. **Opaque Handles (Constraints P-1, P-2)**: Core logic only holds an opaque `SoundHandle` (`{ readonly id: string }`). Core never knows about `AudioBuffer`, `AudioContext`, or hardware sound cards.
+4. **Logical IDs (Rule A-1)**: Sounds are always requested by logical ID (`loadSound('ui_select')`), never raw file paths or URLs. Path mapping (`/assets/sounds/ui_select.mp3`) is strictly a backend concern.
+
+#### Audio Service Interface
 
 ```text
 Individual PCM Playback Voice (e.g., SFX Effect)
@@ -237,36 +253,36 @@ Individual PCM Playback Voice (e.g., SFX Effect)
                  [Hardware Speakers]
 ```
 
-With consideration for multiple sound types and volume, we'll need to consider support for audio categories and or mix buses.
+With consideration for multiple sound types and volume, we support audio categories and mix buses.
 
 ```typescript
-export type AudioCategory = 'master' | 'sfx' | 'music' | 'ambient' | 'ui'; // Preparation for mixing engine separation of concerns
+export type AudioCategory = 'master' | 'sfx' | 'music' | 'ambient' | 'ui';
 
-export interface AudioService { // Core service
-    play(sound: SoundHandle, category?: AudioCategory): PlaybackHandle;
-    setVolume(category: AudioCategory, volume: number): void;
-    getVolume(category: AudioCategory): number;
-}
-
-interface SoundHandle { // Pointer to fully loaded sound asset
+export interface SoundHandle {
+    // Opaque identifier, FFI-friendly and serializable
     readonly id: string;
 }
 
-interface PlaybackHandle { // Execution token representing a live and/or active audio-clip.
+export interface PlaybackHandle {
     pause(): void;
     resume(): void;
     stop(): void;
 }
+
+export interface AudioService {
+    loadSound(soundId: string): Promise<SoundHandle>;
+    play(sound: SoundHandle, category?: AudioCategory): PlaybackHandle;
+    setVolume(category: AudioCategory, volume: number): void;
+    getVolume(category: AudioCategory): number;
+}
 ```
 
-Smaller sound files, that are loaded globally (menu movement, menu selection, etc..), will be loaded on engine-load. Less common sound filed will be loaded dependent on criteria as patterns emerge. Larger sound files will be considered for streaming.
+#### Sound Registry & Event Integration
+
+The `SoundRegistry` acts as a human-readable lookup table mapping logical IDs to loaded `SoundHandle`s.
 
 ```typescript
-interface AssetLoader {
-    loadSound(soundUrl: string): Promise<SoundHandle>;
-}
-
-class SoundRegistry { // Human readable registry
+export class SoundRegistry {
     private cache = new Map<string, SoundHandle>();
 
     public register(id: string, handle: SoundHandle): void {
@@ -279,19 +295,40 @@ class SoundRegistry { // Human readable registry
 }
 ```
 
-Using the event bus for a short sound:
+Audio playback connects with the double-buffered event bus using the events already defined in `src/core/events.ts`:
 
 ```typescript
-eventBus.subscribe('do_the_thing', () => audioService.play(doTheThing));
+// Core system publishes audio intent (Rule I-1: intent, not hardware):
+eventBus.publish({
+    type: 'play_sound_requested',
+    soundId: 'menu_select',
+    category: 'ui',
+});
+
+// Audio orchestration listener receives flushed event:
+eventBus.subscribe('play_sound_requested', (event) => {
+    const handle = soundRegistry.get(event.soundId);
+    if (handle) {
+        audioService.play(handle, event.category);
+    }
+});
 ```
 
-#### Web Audio
+#### Buffered vs. Streamed Sounds
 
-We will need to do a bit of heavy lifting to pack the audio buffers and context specifics  into our own class layer. For game engines requiring low latency and precision playback, the ideal strategy is to fetch audio files as an binary ArrayBuffer, decode them into an AudioBuffer, and store that as an internal type.
+Audio needs vary significantly based on clip length and memory footprint:
 
+- **Short Sounds (SFX / UI)**: Pre-loaded and decoded into memory via `audioService.loadSound()`. Stored as decompressed PCM buffers for instant, low-latency playback across polyphonic voices.
+- **Long Sounds (Music / Ambience / Environmental loops)**: Streaming is not exclusive to music—long ambient loops (rain, wind, river) and heavy sound effects must also be streamed. Decompressing several multi-minute tracks into RAM causes severe buffer volatility (Pitfall 3). The audio backend handles streaming on-demand by `soundId` directly into the designated mix bus, without core needing to know the asset's size or streaming mechanism.
+
+#### Web Audio Platform Implementation
+
+The Web platform implementation packs the Web Audio API primitives (`AudioContext`, `AudioBuffer`, gain nodes) safely inside the backend layer, completely hidden from `core/`.
+
+**WebSoundHandle**:
 ```typescript
 export class WebSoundHandle implements SoundHandle {
-    // Hidden from core: contains the raw PCM array decompressed in RAM
+    // Hidden from core: contains raw decompressed PCM AudioBuffer in memory
     public readonly buffer: AudioBuffer;
     public readonly id: string;
 
@@ -300,14 +337,14 @@ export class WebSoundHandle implements SoundHandle {
         this.buffer = buffer;
     }
 }
-
 ```
 
-The web platform additionally requires renewing source nodes upon resumption.
+**WebPlaybackHandle & WebAudioService**:
+The web platform requires renewing source nodes upon resumption since Web Audio `AudioBufferSourceNode`s are single-use. `WebAudioService` also handles decoding audio buffers, managing mix buses, and streaming longer tracks via media elements routed into category gain nodes.
 
 ```typescript
 export class WebPlaybackHandle implements PlaybackHandle {
-    //...
+    // ... tracks sourceNode, pauseOffset, buffer duration ...
     public resume(): void {
         if (this.isPlaying) return;
         if (this.pauseOffset < this.buffer.duration) {
@@ -315,25 +352,45 @@ export class WebPlaybackHandle implements PlaybackHandle {
         }
     }
 }
-```
 
-Our platform layer uses type-casting internally to unpack safely when the core engine passes abstract handles back down.
-
-```typescript
 export class WebAudioService implements AudioService {
-    //...
-    public play(sound: SoundHandle): PlaybackHandle {
-        // Safe Downcast
+    private cache: Map<string, WebSoundHandle> = new Map();
+    private audioContext?: AudioContext;
+    private basePath: string;
+
+    constructor(basePath: string = '/assets/sounds/', audioContext?: AudioContext) {
+        this.basePath = basePath;
+        this.audioContext = audioContext;
+    }
+
+    async loadSound(soundId: string): Promise<WebSoundHandle> {
+        if (this.cache.has(soundId)) {
+            return this.cache.get(soundId)!;
+        }
+
+        const response = await fetch(`${this.basePath}${soundId}.mp3`);
+        const arrayBuffer = await response.arrayBuffer();
+        const ctx = this.getAudioContext();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+        const handle = new WebSoundHandle(soundId, audioBuffer);
+        this.cache.set(soundId, handle);
+        return handle;
+    }
+
+    public play(sound: SoundHandle, category: AudioCategory = 'sfx'): PlaybackHandle {
         const webSound = sound as WebSoundHandle;
-        
         if (!webSound.buffer) {
             throw new Error(`Invalid asset passed to WebAudioService: ${sound.id}`);
         }
-
-        return new WebPlaybackHandle(this.ctx, webSound.buffer);
+        return new WebPlaybackHandle(this.getAudioContext(), webSound.buffer, this.getCategoryGain(category));
     }
 }
 ```
+
+#### Stub Platform & Testing (Rule P-1)
+
+To uphold the deletion test (Rule P-1), a `StubAudioService` is provided in `src/platforms/stub/`. It implements `AudioService` and returns mock `SoundHandle` and `PlaybackHandle` objects without instantiating any browser audio contexts, ensuring that unit and integration tests run headlessly in Node/Vitest without mock polyfills.
 
 ## Pitfalls to Avoid
 

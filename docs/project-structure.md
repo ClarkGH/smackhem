@@ -81,6 +81,7 @@ src/
 │  ├─ clock.ts               # Time service
 │  ├─ assetLoader.ts         # Asset loading service
 │  ├─ chunkLoader.ts         # Chunk JSON parsing and mesh creation
+│  ├─ audio.ts               # Abstract Audio service & SoundRegistry
 │  └─ platform.ts           # Platform services interface
 ├─ platforms/
 │  ├─ web/
@@ -89,14 +90,16 @@ src/
 │  │  ├─ webGLRenderer.ts    # Renderer specifically for webGL
 │  │  ├─ webInput.ts         # Web input state management
 │  │  ├─ webInputService.ts  # Web input service implementation
-│  │  ├─ webAssetLoader.ts   # Web asset loader (chunks, textures)
+│  │  ├─ webAssetLoader.ts   # Web asset loader (chunks)
+│  │  ├─ webAudioService.ts  # Web audio playback and mixing service
 │  │  └─ debugHUD.ts         # Debug HUD overlay
 │  ├─ stub/
 │  │  ├─ nullRenderer.ts     # Stub renderer for testing/validation
 │  │  ├─ nullRenderer.spec.ts # Tests for stub renderer
 │  │  ├─ stubBootstrap.ts     # Stub platform bootstrap
 │  │  ├─ stubClock.ts         # Stub clock implementation
-│  │  └─ stubInput.ts         # Stub input implementation
+│  │  ├─ stubInput.ts         # Stub input implementation
+│  │  └─ stubAudioService.ts  # Stub audio service implementation
 │  └─ cpu/                    # CPU platform (future)
 ├─ types/
 │  └─ common.d.ts            # Common type definitions
