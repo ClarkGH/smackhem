@@ -9,3 +9,10 @@ These resources are inclusive of paradigms I have used, or related to what I am 
 4. [WebGL Samples](https://webglsamples.org/)
 5. [Martin Fowler's YAGNI Write-up](https://martinfowler.com/bliki/Yagni.html)
 6. [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
+
+## Credit
+
+We've used or am using the following royalty free and open source sound effects.
+
+1. [Ambient night](https://pixabay.com/sound-effects/nature-nature-ambience-323729/)
+2. [Menu select](https://pixabay.com/sound-effects/film-special-effects-click-buttons-ui-menu-sounds-effects-button-13-205396/)
