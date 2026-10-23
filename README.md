@@ -9,18 +9,20 @@ Geometric 3D/2D game engine wrapper
 
 3D/2D "game engine" inspired by Drakkhen's exploration and Crosscode's use of web technologies. Since that's what I'm comfortable with, I figure it's the best first-step into putting a game I'm proud of up for other people to play. Working with 2D/3D paradigms mainly for fun and learning.
 
-- Using Github issues as tasks
+- Using Github issues as tasks (showcasing project management)
 - I did and am using a variety of AI services
+  - AI was very useful for spiking and deciding for and against trade-offs. Inconsistent with writing and improving code
   - AI causes more problems than solutions without a human quality bottleneck. Absolutely have to understand every line of code and the why. It is never worth allowing all the hard work and repetition to go to others when you're the one who wants to get good at doing it
   - Cursor Pro (Short moment)
-  - Gemini
+  - Gemini and Antigravity for code assist
   - ChatGPT
-  - Claude
+  - Claude Code
 - Design document is the bread and butter of this project. For me, everything becomes easier when I write a design doc and keep it up to date
+- I didn't know what Claude's AI skills were, but up-to-date documentation worked well as them. Setting my initial constraints and guiding star held me accountable
 
 As this is hosted publicly, it's a hobby project.
 
-It's been 5 years of studying 3D. I can now say I've "put a pin" on quaternions.
+It's been over 5 years of studying 3D. I can now say I've "put a pin" on quaternions.
 
 ## Project layout
 
@@ -58,9 +60,12 @@ Minimalism is key, following YAGNI principles.
 8. Math - Custom Vec2/Vec3/Mat4
 9. Target Platforms - Web -> Desktop -> Console(future)
 10. Aseprite - Sprite creation
-11. [Documentation Overview](docs/INDEX.md)
+11. Vorbis - Open source audio file extension with amazing compression
+12. [Documentation Overview](docs/INDEX.md)
 
 ## How to run? (Web)
+
+Expect a blank field, without sounds, and with potential errors. Some public assets may be required. You have the ingredients, bake a pie with your own impressive creativity. If you don't understand the idiom, maybe find someone technical and creative, instead.
 
 - Install dependencies (node/pnpm)
 - `$ pnpm install && pnpm build && pnpm vite`
@@ -68,3 +73,4 @@ Minimalism is key, following YAGNI principles.
 - There are assets not included
   - To add collision/field objects, create chunk JSON files in `public/chunks/`. See [Data Formats](docs/data-formats.md) for chunk file format and naming conventions
   - To add the missing `circle-sleep00.png` asset, add whatever png you want into `public/images` and rename it to match
+  - Audio will not function without matching xyz file-names and audioIds, following the event bus' conventions.
