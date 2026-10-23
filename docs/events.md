@@ -228,6 +228,8 @@ Initial implementation assumes game state will be updated per tick, rendering wi
 
 Audio needs to be playable, pauseable, streamable, and stopable. For game engines requiring low latency and precision playback, the strategy is to fetch audio files as binary ArrayBuffers, decode them into raw PCM buffers (e.g. Web Audio `AudioBuffer`), and wrap them behind platform-agnostic handles.
 
+Sounds will be created as lossless .wav, then exported and coverted into .ogg directly into smackhem/public/assets/audio/.
+
 #### Portability & Separation of Concerns
 
 Asset loading in Smackhem originally risked becoming a monolithic "God Asset Loader" combining chunks, textures, and maps. For audio, **Portability First** demands strict separation:
@@ -235,7 +237,7 @@ Asset loading in Smackhem originally risked becoming a monolithic "God Asset Loa
 1. **Different Hardware Targets**: On native platforms and consoles, audio buffers route to sound chip memory or dedicated audio mixing threads (e.g., miniaudio, SDL_mixer, OpenAL). Textures route to GPU VRAM via graphics APIs, and chunks stream from disk into spatial world grids. Tying them together creates an artificial dependency tangle.
 2. **AudioService Owns Audio Loading**: Just as [`Renderer`](rendering.md) owns mesh generation and texture loading (`loadTexture`), the [`AudioService`](#audio-service-interface) owns sound loading, playback, and category mixing. There is no need for a separate loader interface.
 3. **Opaque Handles (Constraints P-1, P-2)**: Core logic only holds an opaque `SoundHandle` (`{ readonly id: string }`). Core never knows about `AudioBuffer`, `AudioContext`, or hardware sound cards.
-4. **Logical IDs (Rule A-1)**: Sounds are always requested by logical ID (`loadSound('ui_select')`), never raw file paths or URLs. Path mapping (`/assets/sounds/ui_select.mp3`) is strictly a backend concern.
+4. **Logical IDs (Rule A-1)**: Sounds are always requested by logical ID (`loadSound('ui_select')`), never raw file paths or URLs. Path mapping (`/assets/audio/ui_select.ogg`) is strictly a backend concern.
 
 #### Audio Service Interface
 
@@ -358,7 +360,7 @@ export class WebAudioService implements AudioService {
     private audioContext?: AudioContext;
     private basePath: string;
 
-    constructor(basePath: string = '/assets/sounds/', audioContext?: AudioContext) {
+    constructor(basePath: string = '/assets/audio/', audioContext?: AudioContext) {
         this.basePath = basePath;
         this.audioContext = audioContext;
     }
@@ -368,7 +370,7 @@ export class WebAudioService implements AudioService {
             return this.cache.get(soundId)!;
         }
 
-        const response = await fetch(`${this.basePath}${soundId}.mp3`);
+        const response = await fetch(`${this.basePath}${soundId}.ogg`);
         const arrayBuffer = await response.arrayBuffer();
         const ctx = this.getAudioContext();
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
