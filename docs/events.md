@@ -68,9 +68,9 @@ While we may consider and utilize asynchronous javascript, the consideration for
 
 ```typescript
 type Event = {
-   type: 'mode_changed';
-   previousMode: 'world_3d' | 'scene_2d';
-   currentMode: 'world_3d' | 'scene_2d';
+   type: 'game_mode_changed';
+   previousMode: GameMode; // 'world_3d' | 'instance_3d' | 'scene_2d'
+   currentMode: GameMode;
 }
 ```
 
@@ -228,7 +228,7 @@ Initial implementation assumes game state will be updated per tick, rendering wi
 
 Audio needs to be playable, pauseable, streamable, and stopable. For game engines requiring low latency and precision playback, the strategy is to fetch audio files as binary ArrayBuffers, decode them into raw PCM buffers (e.g. Web Audio `AudioBuffer`), and wrap them behind platform-agnostic handles.
 
-Original sound fx will be created as lossless .wav, then exported and coverted into .ogg directly into smackhem/public/assets/audio/. Non-original audio is open source, royalty free, and free for commercial use. Sources are linked in the credits section of **[RESOURCES](RESOURCES.md)**.
+Original sound fx will be created as lossless .wav, then exported and coverted into .ogg directly into smackhem/public/assets/audio/. The file name is the sound ID: snake_case, led by its purpose (`ui_select.ogg`, `ambient_night.ogg`). Non-original audio is open source, royalty free, and free for commercial use. Sources are linked in the credits section of **[RESOURCES](RESOURCES.md)**.
 
 #### Sound Compression
 
@@ -317,6 +317,8 @@ export interface PlaybackHandle {
     pause(): void;
     resume(): void;
     stop(): void;
+    // True once the sound ends on its own or is stopped. A paused voice is not finished.
+    isFinished(): boolean;
 }
 
 export interface AudioService {
@@ -338,11 +340,33 @@ Every backend already keeps a `soundId -> decoded buffer` cache: the web keeps `
 export default class AudioSystem {
     private sounds = new Map<string, SoundHandle>();
 
+    // Live voices per sound
+    private voices = new Map<string, PlaybackHandle[]>();
+
     constructor(audio: AudioService, eventBus: TypeSafeEventBus) {
         eventBus.subscribe('play_sound_requested', (event) => {
             const handle = this.sounds.get(event.soundId);
             if (!handle) return; // Never load inside a handler (Pitfall 2)
-            audio.play(handle, event.category);
+            const playback = audio.play(handle, event.category, event.loop);
+
+            let voices = this.voices.get(event.soundId);
+            if (voices) {
+                pruneFinished(voices); // swap-remove isFinished() voices, no allocation
+            } else {
+                voices = [];
+                this.voices.set(event.soundId, voices);
+            }
+            voices.push(playback);
+        });
+
+        eventBus.subscribe('stop_sound_requested', (event) => {
+            // Stops every live voice of that sound, paused ones included
+            const voices = this.voices.get(event.soundId);
+            if (!voices) return;
+            for (let i = 0; i < voices.length; i += 1) {
+                voices[i].stop();
+            }
+            voices.length = 0;
         });
 
         eventBus.subscribe('audio_bus_volume_changed', (event) => {
@@ -354,16 +378,24 @@ export default class AudioSystem {
 }
 ```
 
-Sounds are preloaded up front, so playing one is a map lookup at flush time. Core systems only publish intent (Rule I-1):
+Sounds are preloaded up front, so playing one is a map lookup at flush time. `play_sound_requested` takes an optional `loop`, and `stop_sound_requested` stops every live voice of a sound.
+
+Finished voices are found by asking each handle `isFinished()` from the tick, not through end-of-sound callbacks. On native backends those callbacks fire on the audio thread, and calling into core from there would need the MPSC queue or locks. Checking from the tick keeps audio single-threaded, and miniaudio supports it directly (`ma_sound_at_end`). It is `isFinished()` rather than `isPlaying()` so a paused voice is kept and can still be stopped. Voice lists are bounded by sounds played × voices of each playing at once (M-2).
+
+Core systems only publish intent (Rule I-1). For now `main.ts` starts the night ambience on boot:
 
 ```typescript
-await audioSystem.preload('menu_select', 'ui');
+await audioSystem.preload('ambient_night', 'ambient');
 
 eventBus.publish({
     type: 'play_sound_requested',
-    soundId: 'menu_select',
-    category: 'ui',
+    soundId: 'ambient_night',
+    category: 'ambient',
+    loop: true,
 });
+
+// Later, from any system:
+eventBus.publish({ type: 'stop_sound_requested', soundId: 'ambient_night' });
 ```
 
 #### Buffered vs. Streamed Sounds
@@ -393,7 +425,7 @@ export class WebSoundHandle implements SoundHandle {
 ```
 
 **WebPlaybackHandle & WebAudioService**:
-The web platform requires renewing source nodes upon resumption since Web Audio `AudioBufferSourceNode`s are single-use. Browsers also start the `AudioContext` suspended, so `webBootstrap` calls the web-only `resumeContext()` on the first pointer or key press. `WebAudioService` also handles decoding audio buffers, managing mix buses, and streaming longer tracks via media elements routed into category gain nodes.
+The web platform requires renewing source nodes upon resumption since Web Audio `AudioBufferSourceNode`s are single-use. Browsers also start the `AudioContext` suspended, so `webBootstrap` calls the web-only `resumeContext()` on the first pointer or key press. Streams have the same problem: a stream played before that gesture (like the boot ambience) gets `NotAllowedError` from `play()`. The service queues those streams and retries them synchronously inside `resumeContext()`, because `play()` only counts as user-initiated during the gesture. `WebAudioService` also handles decoding audio buffers, managing mix buses, and streaming longer tracks via media elements routed into category gain nodes.
 
 ```typescript
 export class WebPlaybackHandle implements PlaybackHandle {
@@ -407,7 +439,8 @@ export class WebPlaybackHandle implements PlaybackHandle {
 }
 
 export class WebAudioService implements AudioService {
-    private cache: Map<string, WebSoundHandle> = new Map();
+    // Keyed by sound ID only, a sound's category is fixed by its first load
+    private cache: Map<string, Promise<SoundHandle>> = new Map();
     private audioContext?: AudioContext;
     private basePath: string;
 
@@ -416,27 +449,28 @@ export class WebAudioService implements AudioService {
         this.audioContext = audioContext;
     }
 
-    async loadSound(soundId: string, category: AudioCategory = 'sfx'): Promise<SoundHandle> {
-        if (this.cache.has(soundId)) {
-            return this.cache.get(soundId)!;
-        }
+    public loadSound(soundId: string, category: AudioCategory = 'sfx'): Promise<SoundHandle> {
+        const cached = this.cache.get(soundId);
+        if (cached) return cached;
 
+        // Cache the in-flight load so concurrent requests share one fetch and decode
+        const pending = this.fetchSound(soundId, category);
+        this.cache.set(soundId, pending);
+        pending.catch(() => this.cache.delete(soundId)); // failed loads can be retried
+        return pending;
+    }
+
+    private async fetchSound(soundId: string, category: AudioCategory): Promise<SoundHandle> {
         const path = `${this.basePath}${soundId}.ogg`;
         if (STREAMED_CATEGORIES.has(category)) {
             // music/ambient: keep only the URL, stream on play
-            const handle = new WebStreamHandle(soundId, path);
-            this.cache.set(soundId, handle);
-            return handle;
+            return new WebStreamHandle(soundId, path);
         }
 
         const response = await fetch(path);
         const arrayBuffer = await response.arrayBuffer();
-        const ctx = this.getAudioContext();
-        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-
-        const handle = new WebSoundHandle(soundId, audioBuffer);
-        this.cache.set(soundId, handle);
-        return handle;
+        const audioBuffer = await this.getAudioContext().decodeAudioData(arrayBuffer);
+        return new WebSoundHandle(soundId, audioBuffer);
     }
 
     public play(sound: SoundHandle, category: AudioCategory = 'sfx', loop: boolean = false): PlaybackHandle {
@@ -463,6 +497,7 @@ To uphold the deletion test (Rule P-1), a `StubAudioService` is provided in `src
 1. Events indicate what happened, not what should happen. Keep payloads informational, do not pack direct mutations.
 2. Immediate handlers create execution stalls. Subscribers handle tasks lazily or queue them.
 3. Avoid buffer volatility. Decompressing files into memory scales footprints significantly. Large ambient tracks or background music loops must be routed via streaming targets instead of being cached.
+4. Read the old value before you overwrite it. A `previousMode` read after `gameMode` is assigned equals `currentMode`, so the change looks like a no-op and the event is silently dropped.
 
 ## Navigation
 

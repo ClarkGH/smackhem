@@ -1,8 +1,8 @@
 {
     "compilerOptions": {
       "target": "es2022",
-      "module": "nodenext",
-      "moduleResolution": "nodenext",
+      "module": "esnext",
+      "moduleResolution": "bundler",
       "strict": true,
       "jsx": "preserve",
       "esModuleInterop": true,
@@ -10,7 +10,6 @@
       "forceConsistentCasingInFileNames": true,
       "outDir": "./dist",
       "sourceMap": true,
-      "paths": {"src/*": ["./src/*"]},
       "rootDir": "./src", 
       "types": ["vite/client"]
     },

@@ -256,14 +256,15 @@ const instance3DSystem = new Instance3DSystem(this.collisionContext, this.world,
 ### Instance Transition
 
 - **Freeze/Unfreeze**: Currently triggered by space key, freezes the 3D world (timer, sun/moon, game simulation)
-- **Camera Pitch**: Transitions to 0 degrees (horizontal) when entering instance mode
+- **Camera Pitch**: Transitions to 0 degrees (horizontal) when entering instance mode, and stays level after exiting
 - **Character Transition**: Circle character transitions from camera position forward along the XZ plane into frozen 3D scene
   - Start: Camera's X/Z position at floor level
-  - End: Position 5 units forward from camera along forward direction, at floor level
+  - End: Position 3 units forward from camera along forward direction, at floor level
   - Duration: 1.0 second (fixed timestep)
   - Interpolation: Linear interpolation (lerp) with smoothstep easing for smooth animation
 - **Position Calculation**: Starts at camera position, slides forward along camera's forward vector in XZ plane
 - **Transition State**: Managed by instance system, tracks progress and direction
+- **Game Mode**: `instance_3d` from the moment the instance is entered. Leaving it plays the transition in reverse, and the mode returns to `world_3d` only when that finishes, so other mode changes (like entering the 2D scene) are blocked mid-transition
 
 #### Linear Interpolation (Lerp)
 

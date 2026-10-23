@@ -49,6 +49,8 @@ export class WebPlaybackHandle implements PlaybackHandle {
 
     private pauseOffset = 0;
 
+    private finished = false;
+
     private readonly ctx: AudioContext;
 
     private readonly buffer: AudioBuffer;
@@ -74,8 +76,7 @@ export class WebPlaybackHandle implements PlaybackHandle {
             // Ignore stale nodes, pause/stop detach their own handler
             if (this.source !== source) return;
             this.source = null;
-            // Finished naturally, resume() becomes a no-op
-            this.pauseOffset = this.buffer.duration;
+            this.finished = true;
         };
         source.start(0, offset);
 
@@ -102,15 +103,17 @@ export class WebPlaybackHandle implements PlaybackHandle {
     }
 
     public resume(): void {
-        if (this.source) return;
-        if (this.pauseOffset < this.buffer.duration) {
-            this.start(this.pauseOffset);
-        }
+        if (this.source || this.finished) return;
+        this.start(this.pauseOffset);
     }
 
     public stop(): void {
         this.halt();
-        this.pauseOffset = this.buffer.duration;
+        this.finished = true;
+    }
+
+    public isFinished(): boolean {
+        return this.finished;
     }
 }
 
@@ -122,39 +125,86 @@ export class WebStreamPlaybackHandle implements PlaybackHandle {
 
     private readonly node: MediaElementAudioSourceNode;
 
-    private isStopped = false;
+    private readonly onBlocked: (handle: WebStreamPlaybackHandle) => void;
 
-    constructor(ctx: AudioContext, url: string, output: AudioNode, loop: boolean) {
+    private finished = false;
+
+    // Autoplay rejected play(), waiting for the service to retry after a user gesture
+    private blocked = false;
+
+    constructor(
+        ctx: AudioContext,
+        url: string,
+        output: AudioNode,
+        loop: boolean,
+        onBlocked: (handle: WebStreamPlaybackHandle) => void,
+    ) {
+        this.onBlocked = onBlocked;
         this.element = new Audio(url);
         this.element.loop = loop;
+        // Never fires while looping, only stop() finishes a loop
+        this.element.addEventListener('ended', () => this.finish());
+        this.element.addEventListener('error', () => {
+            if (this.finished) return;
+            console.error(`Failed to stream audio: ${url}`);
+            this.finish();
+        });
         this.node = ctx.createMediaElementSource(this.element);
         this.node.connect(output);
         this.playElement();
     }
 
     private playElement(): void {
-        this.element.play().catch((error) => {
-            console.error(`Failed to stream audio: ${this.element.src}`, error);
+        this.element.play().catch((error: DOMException) => {
+            if (error.name === 'NotAllowedError' && !this.finished) {
+                this.blocked = true;
+                this.onBlocked(this);
+                return;
+            }
+            // AbortError: pause() or stop() interrupted play(), nothing to report
+            if (error.name !== 'AbortError') {
+                console.error(`Failed to stream audio: ${this.element.src}`, error);
+            }
         });
     }
 
-    public pause(): void {
-        this.element.pause();
-    }
-
-    public resume(): void {
-        if (this.isStopped || !this.element.paused) return;
-        this.playElement();
-    }
-
-    public stop(): void {
-        if (this.isStopped) return;
-        this.isStopped = true;
+    private finish(): void {
+        if (this.finished) return;
+        this.finished = true;
+        this.blocked = false;
         this.element.pause();
         this.node.disconnect();
         // Release the network stream
         this.element.removeAttribute('src');
         this.element.load();
+    }
+
+    /**
+     * Called by the service inside a user gesture, once autoplay is allowed
+     */
+    public retryBlocked(): void {
+        if (!this.blocked) return;
+        this.blocked = false;
+        this.playElement();
+    }
+
+    public pause(): void {
+        // A paused voice should not start when audio unlocks
+        this.blocked = false;
+        this.element.pause();
+    }
+
+    public resume(): void {
+        if (this.finished || !this.element.paused) return;
+        this.playElement();
+    }
+
+    public stop(): void {
+        this.finish();
+    }
+
+    public isFinished(): boolean {
+        return this.finished;
     }
 }
 
@@ -164,7 +214,8 @@ export class WebStreamPlaybackHandle implements PlaybackHandle {
  * Voice -> [category gain] -> [master gain] -> speakers
  */
 export class WebAudioService implements AudioService {
-    private cache: Map<string, SoundHandle> = new Map();
+    // Keyed by sound ID only, a sound's category is fixed by its first load
+    private cache: Map<string, Promise<SoundHandle>> = new Map();
 
     private volumes: Map<AudioCategory, number> = new Map();
 
@@ -173,6 +224,9 @@ export class WebAudioService implements AudioService {
     private audioContext?: AudioContext;
 
     private basePath: string;
+
+    // Streams the browser refused to autoplay, retried on resumeContext()
+    private blockedStreams: WebStreamPlaybackHandle[] = [];
 
     constructor(basePath: string, audioContext?: AudioContext) {
         this.basePath = basePath;
@@ -220,21 +274,35 @@ export class WebAudioService implements AudioService {
                 console.error('Failed to resume AudioContext:', error);
             });
         }
+
+        // Retry synchronously, play() only counts as user-initiated inside the gesture
+        const blocked = this.blockedStreams;
+        this.blockedStreams = [];
+        for (let i = 0; i < blocked.length; i += 1) {
+            blocked[i].retryBlocked();
+        }
     }
 
-    public async loadSound(soundId: string, category: AudioCategory = 'sfx'): Promise<SoundHandle> {
+    public loadSound(soundId: string, category: AudioCategory = 'sfx'): Promise<SoundHandle> {
         const cached = this.cache.get(soundId);
         if (cached) {
             return cached;
         }
 
+        // Cache the in-flight load so concurrent requests share one fetch and decode
+        const pending = this.fetchSound(soundId, category);
+        this.cache.set(soundId, pending);
+        // Failed loads are evicted so they can be retried
+        pending.catch(() => this.cache.delete(soundId));
+        return pending;
+    }
+
+    private async fetchSound(soundId: string, category: AudioCategory): Promise<SoundHandle> {
         // Map sound ID to file path (backend-specific, Rule A-1)
         const path = `${this.basePath}${soundId}.ogg`;
 
         if (STREAMED_CATEGORIES.has(category)) {
-            const handle = new WebStreamHandle(soundId, path);
-            this.cache.set(soundId, handle);
-            return handle;
+            return new WebStreamHandle(soundId, path);
         }
 
         const response = await fetch(path);
@@ -245,9 +313,7 @@ export class WebAudioService implements AudioService {
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await this.getAudioContext().decodeAudioData(arrayBuffer);
 
-        const handle = new WebSoundHandle(soundId, audioBuffer);
-        this.cache.set(soundId, handle);
-        return handle;
+        return new WebSoundHandle(soundId, audioBuffer);
     }
 
     public play(sound: SoundHandle, category: AudioCategory = 'sfx', loop: boolean = false): PlaybackHandle {
@@ -255,7 +321,9 @@ export class WebAudioService implements AudioService {
         const output = this.getCategoryGain(category);
 
         if (sound instanceof WebStreamHandle) {
-            return new WebStreamPlaybackHandle(ctx, sound.url, output, loop);
+            return new WebStreamPlaybackHandle(ctx, sound.url, output, loop, (handle) => {
+                this.blockedStreams.push(handle);
+            });
         }
 
         if (sound instanceof WebSoundHandle) {

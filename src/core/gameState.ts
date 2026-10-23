@@ -47,7 +47,6 @@ export interface DiscreteState {
     isTimeFrozen: boolean;
     sceneCharacterPositionGrid: { x: number; y: number };
     isTransitioningPitch: boolean;
-    savedPitch: number;
     targetPitch: number;
 }
 
@@ -81,7 +80,6 @@ export const createGameState = (): GameState => ({
         sceneTransitionDirection: 1,
         sceneCharacterPositionGrid: { x: 12, y: 9 },
         isTransitioningPitch: false,
-        savedPitch: 0,
         targetPitch: 0,
     },
 });

@@ -11,7 +11,7 @@ import { createDebugHUD } from './platforms/web/debugHUD';
 const createPlatform = async (): Promise<PlatformServices> => {
     // This will be tree-shaken based on build config
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
-        const { default: createStubPlatform } = (await import('./platforms/stub/stubBootstrap.js')).default;
+        const { default: createStubPlatform } = await import('./platforms/stub/stubBootstrap.js');
         return createStubPlatform();
     }
 
@@ -24,10 +24,16 @@ const main = async () => {
     const platform = await createPlatform();
     const world = new World();
     const eventBus = new TypeSafeEventBus();
-    // Subscribes to audio events. Preload sounds here once something triggers them,
-    // e.g. await audioSystem.preload('menu_select', 'ui');
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const audioSystem = new AudioSystem(platform.audio, eventBus);
+
+    // Night ambience loops for now, published as intent and played on the first flush
+    await audioSystem.preload('ambient_night', 'ambient');
+    eventBus.publish({
+        type: 'play_sound_requested',
+        soundId: 'ambient_night',
+        category: 'ambient',
+        loop: true,
+    });
 
     const gameState : GameState = createGameState();
 

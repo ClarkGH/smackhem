@@ -11,11 +11,43 @@ export interface StubPlayCall {
     loop: boolean;
 }
 
-const noopPlayback: PlaybackHandle = {
-    pause: () => {},
-    resume: () => {},
-    stop: () => {},
-};
+/**
+ * Stateful voice so tests can assert on stop/pause and simulate a sound ending
+ */
+export class StubPlaybackHandle implements PlaybackHandle {
+    public readonly id: string;
+
+    public paused = false;
+
+    public stopped = false;
+
+    private ended = false;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    pause(): void {
+        this.paused = true;
+    }
+
+    resume(): void {
+        this.paused = false;
+    }
+
+    stop(): void {
+        this.stopped = true;
+    }
+
+    isFinished(): boolean {
+        return this.stopped || this.ended;
+    }
+
+    // Test-only: the sound played to its end
+    finish(): void {
+        this.ended = true;
+    }
+}
 
 /**
  * Stub audio implementation for testing (Rule P-1)
@@ -23,6 +55,8 @@ const noopPlayback: PlaybackHandle = {
  */
 export default class StubAudioService implements AudioService {
     public readonly playCalls: StubPlayCall[] = [];
+
+    public readonly voices: StubPlaybackHandle[] = [];
 
     private volumes: Map<AudioCategory, number> = new Map();
 
@@ -32,7 +66,9 @@ export default class StubAudioService implements AudioService {
 
     play(sound: SoundHandle, category: AudioCategory = 'sfx', loop: boolean = false): PlaybackHandle {
         this.playCalls.push({ id: sound.id, category, loop });
-        return noopPlayback;
+        const voice = new StubPlaybackHandle(sound.id);
+        this.voices.push(voice);
+        return voice;
     }
 
     getVolume(category: AudioCategory): number {

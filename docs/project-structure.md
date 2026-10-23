@@ -60,6 +60,8 @@ This pattern:
 ```text
 src/
 ├─ core/
+│  ├─ audioSystem.ts          # Owns sound handles, turns audio events into AudioService calls
+│  ├─ audioSystem.spec.ts     # Tests for audio event handling (stub audio)
 │  ├─ camera.ts               # 3D camera math and logic
 │  ├─ collision.ts            # Collision logic
 │  ├─ environment.ts          # Enviroment systems
@@ -68,6 +70,7 @@ src/
 │  ├─ gameState.ts            # Game State logic
 │  ├─ input.ts                # Player input logic
 │  ├─ instance.ts             # Instance systems
+│  ├─ modeChange.spec.ts      # Scenario tests for game mode changes (stub platform)
 │  ├─ party.ts                # Party logic
 │  ├─ renderSystem.ts         # Rendering system
 │  ├─ scene.ts                # Scene system
@@ -113,8 +116,10 @@ src/
 public/
 ├─ chunks/                    # Chunk JSON files
 │  └─ {fileX}_{fileZ}.json    # Offset-based naming (fileX = chunkX + 10000)
-└─ audio/                     # Public Audio files
-   └─ example_audio.ogg       # SoundID-based naming (e.g. menu_click)
+└─ assets/
+   ├─ images/                 # Textures, asset ID naming (e.g. circle-sleep00.png)
+   └─ audio/                  # Audio files, file name is the sound ID
+      └─ ambient_night.ogg    # snake_case, led by purpose (e.g. ui_select)
 ```
 
 Chunk files use offset-based naming to prevent negative coordinates in filenames. See [Data Formats](data-formats.md) for details.

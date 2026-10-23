@@ -9,6 +9,7 @@ export interface PlaybackHandle {
     pause(): void;
     resume(): void;
     stop(): void;
+    isFinished(): boolean;
 }
 
 export interface AudioService {

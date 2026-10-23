@@ -37,8 +37,10 @@ It's been over 5 years of studying 3D. I can now say I've "put a pin" on quatern
 │  ├─ services/      # services (renderer, input, clock, assetLoader, chunkLoader)
 │  └─ types/         # common types
 ├─ /public           # static assets
-│  ├─ audio/         # Audio files (audio_id naming, id designates purpose)
-│  └─ chunks/        # chunk JSON files (offset-based naming: 10000_10000.json)
+│  ├─ chunks/        # chunk JSON files (offset-based naming: 10000_10000.json)
+│  └─ assets/
+│     ├─ images/     # Textures
+│     └─ audio/      # Audio files (audio_id naming, id designates purpose)
 ├─ /scripts          # utility scripts
 ├─ /docs             # project documentation
 ├─ package.json
@@ -72,5 +74,5 @@ Expect a blank field, without sounds, and with potential errors. Some public ass
 - Debug and run via browser
 - There are assets not included
   - To add collision/field objects, create chunk JSON files in `public/chunks/`. See [Data Formats](docs/data-formats.md) for chunk file format and naming conventions
-  - To add the missing `circle-sleep00.png` asset, add whatever png you want into `public/images` and rename it to match
-  - Audio will not function without matching xyz file-names and audioIds, following the event bus' conventions.
+  - To add the missing `circle-sleep00.png` asset, add whatever png you want into `public/assets/images` and rename it to match
+  - Audio will not function without matching xyz file-names and audioIds, following the event bus' conventions. The night ambience expects `public/assets/audio/ambient_night.ogg`

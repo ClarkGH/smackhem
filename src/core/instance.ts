@@ -64,7 +64,6 @@ export default class Instance3DSystem {
         const interpolatedState = gameState.interpolated;
 
         discreteState.isTimeFrozen = true;
-        discreteState.savedPitch = this.camera.pitch;
         discreteState.targetPitch = 0;
         discreteState.isTransitioningPitch = true;
 
@@ -79,9 +78,10 @@ export default class Instance3DSystem {
         interpolatedState.instanceCharacterPosition.y = this.transitionStartPos.y;
         interpolatedState.instanceCharacterPosition.z = this.transitionStartPos.z;
 
+        const previousMode = discreteState.gameMode;
         // Mindfully overriding memory
         gameState.discrete.gameMode = 'instance_3d';
-        this.publishModeChange(discreteState.gameMode, 'instance_3d');
+        this.publishModeChange(previousMode, 'instance_3d');
     }
 
     public unPropagateInstance(gameState: GameState): void {
@@ -103,9 +103,7 @@ export default class Instance3DSystem {
         this.transitionStartPos.y = floorY;
         this.transitionStartPos.z = this.camera.position.z;
 
-        // Mindfully overriding memory
-        gameState.discrete.gameMode = 'world_3d';
-        this.publishModeChange(discreteState.gameMode, 'world_3d');
+        // Mode stays instance_3d until the exit transition finishes in update()
     }
 
     private calculateTransitionPositions(gameState: GameState): void {
@@ -166,8 +164,9 @@ export default class Instance3DSystem {
                 discreteState.instanceIsTransitioning = false;
                 discreteState.instanceIsActive = false;
                 discreteState.isTimeFrozen = false;
+                const previousMode = discreteState.gameMode;
                 discreteState.gameMode = 'world_3d';
-                this.publishModeChange(discreteState.gameMode, 'world_3d');
+                this.publishModeChange(previousMode, 'world_3d');
             }
         }
 

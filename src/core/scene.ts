@@ -35,17 +35,19 @@ export class Scene2DSystem {
                 };
                 discreteState.targetPitch = 0;
                 discreteState.isTransitioningPitch = true;
+                const previousMode = discreteState.gameMode;
                 discreteState.gameMode = 'scene_2d';
 
-                this.publishModeChange(discreteState.gameMode, 'scene_2d');
+                this.publishModeChange(previousMode, 'scene_2d');
 
                 discreteState.sceneIsTransitioning = true;
                 discreteState.sceneTransitionDirection = 1;
                 interpolatedState.sceneTransitionProgress = 0.0;
                 discreteState.sceneIsActive = false;
             } else if (discreteState.gameMode === 'scene_2d') {
+                const previousMode = discreteState.gameMode;
                 discreteState.gameMode = 'world_3d';
-                this.publishModeChange(discreteState.gameMode, 'world_3d');
+                this.publishModeChange(previousMode, 'world_3d');
 
                 discreteState.sceneIsActive = false;
                 discreteState.sceneIsTransitioning = false;
@@ -68,21 +70,6 @@ export class Scene2DSystem {
                 interpolatedState.sceneTransitionProgress = 1.0;
                 discreteState.sceneIsTransitioning = false;
                 discreteState.sceneIsActive = true;
-            // TODO: Review if this runs or why we even wrote this
-            } else if (interpolatedState.sceneTransitionProgress <= 0.0) {
-                interpolatedState.sceneTransitionProgress = 0.0;
-                discreteState.sceneIsTransitioning = false;
-                discreteState.sceneIsActive = false;
-
-                discreteState.gameMode = 'world_3d';
-                this.publishModeChange(discreteState.gameMode, 'world_3d');
-
-                if (discreteState.savedCameraState) {
-                    interpolatedState.cameraPosition = { ...discreteState.savedCameraState.position };
-                    interpolatedState.cameraYaw = discreteState.savedCameraState.yaw;
-                    interpolatedState.cameraPitch = discreteState.savedCameraState.pitch;
-                    discreteState.savedCameraState = null;
-                }
             }
         }
 

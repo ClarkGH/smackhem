@@ -11,6 +11,11 @@ export type GameEvent =
         type: 'play_sound_requested';
         soundId: string;
         category: AudioCategory;
+        loop?: boolean
+    }
+    | {
+        type: 'stop_sound_requested';
+        soundId: string
     }
     | {
         type: 'audio_bus_volume_changed';
