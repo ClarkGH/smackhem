@@ -39,6 +39,7 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
    - All it has are a height field function, a sky state, a global lighting function, a handful of instance rules, and a renderer that draws up meshes, quads, and the sky
 7. Cursor/Claude conflate 2D and 3D classes
    - At some point, I started confusing Cursor. Will need to review and re-organize... but I'm not sure if it's cursor's fault. We've entered territory where my application is becoming it's own unique beast, and the web scraper doesn't or didn't fully understand visual concepts well. I don't blame it for not reading my mind
+   - Claude's way faster and has improved drastically since I started this project. I'm not running into the same problems I was a year ago
 8. Nvidia driver updates may break webGL if you don't restart your computer. I learned this the hard way. Thought I broke my app.
 9. Adhoc Versioning
    - There was no reason to introduce versioning to non-production hobby code. Planning what 0.X.0 would contain was a naive idea. We probably could have just jumped straight to 0.8.0 once we had something alpha-ready. I feel like I limited my freedom.
@@ -46,7 +47,11 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
       - Major: Big Breaking changes, the whole application architecture has had massive changes to the point where it's working vastly differently
       - Minor: Potentially breaking changes, major features have been added
       - Patch: Bugfix, minor features 
-   - 0.3.1 wouldn't be considered a patch in a professional scenario. Probably opening myself up for mockery by doing things this way, but who cares? The lessons are logged and the learning is good. If a version denotes something important, and there's valuable insights, logging it in the wiki will help other developers see the thought process. Especially for something that's in essence a 'solo hackathon project'.
+   - 0.3.1 wouldn't be considered a patch in a professional scenario. Probably opening myself up for mockery by doing things this way, but who cares? The lessons are logged and the learning is good. If a version denotes something important, and there's valuable insights, logging it in the wiki will help other developers see the thought process. Especially for something that's in essence a 'solo hackathon project'
+10. Audio systems
+   - Everytime I think "x was the hard part, y will be so much more fun", I end up being completely wrong. Sound is an instance of this
+   - I wanted to implement an MPSC queue, but that's not something possible for Javascript without overbloating the project with uneccesary service workers
+   - Programming a pseudo MPSC queue with async javascript is a headache. The web concepts will not translate to c++, but they're good to know
 
 ## Patterns / Paradigms
 
