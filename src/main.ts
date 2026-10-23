@@ -1,7 +1,7 @@
-/* eslint-disable no-unused-vars, no-undef, no-shadow */
 import { World } from './core/world';
 import { GameLoop } from './core/gameLoop';
 import { TypeSafeEventBus } from './core/events';
+import AudioSystem from './core/audioSystem';
 import { createGameState, GameState } from './core/gameState';
 import { createCamera } from './core/camera';
 import type { PlatformServices } from './services/platform';
@@ -10,8 +10,6 @@ import { createDebugHUD } from './platforms/web/debugHUD';
 // Platform factory - will be replaced at build time
 const createPlatform = async (): Promise<PlatformServices> => {
     // This will be tree-shaken based on build config
-    // __PLATFORM__ is a build-time define from Vite, not available at ESLint parse time
-    // eslint-disable-next-line no-undef
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
         const { default: createStubPlatform } = (await import('./platforms/stub/stubBootstrap.js')).default;
         return createStubPlatform();
@@ -26,6 +24,10 @@ const main = async () => {
     const platform = await createPlatform();
     const world = new World();
     const eventBus = new TypeSafeEventBus();
+    // Subscribes to audio events. Preload sounds here once something triggers them,
+    // e.g. await audioSystem.preload('menu_select', 'ui');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const audioSystem = new AudioSystem(platform.audio, eventBus);
 
     const gameState : GameState = createGameState();
 
@@ -37,7 +39,6 @@ const main = async () => {
         _assetLoader?: any,
     ) => Promise<void>;
 
-    // __PLATFORM__ is a build-time define from Vite, not available at ESLint parse time
     if (typeof __PLATFORM__ !== 'undefined' && __PLATFORM__ === 'stub') {
         // Stub platform chunk management (deterministic, same as web)
         const { updateActiveChunks: stubUpdateActiveChunks } = await import('./platforms/stub/stubBootstrap.js');

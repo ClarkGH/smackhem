@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import { GameMode } from './gameState';
 import { AudioCategory } from '../services/audio';
 

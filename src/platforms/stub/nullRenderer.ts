@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import type { Renderer, MeshHandle, TextureHandle } from '../../services/renderer';
 import type { Mat4, Vec3 } from '../../types/common';
 

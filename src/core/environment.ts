@@ -46,7 +46,6 @@ export default class EnvironmentSystem {
 
     private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 };
 
-    // eslint-disable-next-line
     constructor(private cameraFar: number) {} // I assure you, this is useful
 
     public computeTimeOfDay(simTime: number): number {
@@ -56,9 +55,7 @@ export default class EnvironmentSystem {
     private computeSunSpherical(timeOfDay: number, outAzimuth: { value: number }, outElevation: { value: number }): void {
         const angle = (timeOfDay - 0.25) * Math.PI * 2;
         // We are mindfully overriding the function parameter's memory
-        // eslint-disable-next-line
         outAzimuth.value = Math.PI / 2 + angle;
-        // eslint-disable-next-line
         outElevation.value = Math.sin(angle) + this.DECLINATION_OFFSET;
     }
 

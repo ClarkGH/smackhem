@@ -14,7 +14,7 @@
     - [Audio Systems](#audio-systems)
         - [Portability & Separation of Concerns](#portability--separation-of-concerns)
         - [Audio Service Interface](#audio-service-interface)
-        - [Sound Registry & Event Integration](#sound-registry--event-integration)
+        - [Audio System & Event Integration](#audio-system--event-integration)
         - [Buffered vs. Streamed Sounds](#buffered-vs-streamed-sounds)
         - [Web Audio Platform Implementation](#web-audio-platform-implementation)
         - [Stub Platform & Testing (Rule P-1)](#stub-platform--testing-rule-p-1)
@@ -320,47 +320,49 @@ export interface PlaybackHandle {
 }
 
 export interface AudioService {
-    loadSound(soundId: string): Promise<SoundHandle>;
-    play(sound: SoundHandle, category?: AudioCategory): PlaybackHandle;
+    // Category lets the backend decide buffered vs streamed, core never knows which
+    loadSound(soundId: string, category?: AudioCategory): Promise<SoundHandle>;
+    play(sound: SoundHandle, category?: AudioCategory, loop?: boolean): PlaybackHandle;
     setVolume(category: AudioCategory, volume: number): void;
     getVolume(category: AudioCategory): number;
 }
 ```
 
-#### Sound Registry & Event Integration
+#### Audio System & Event Integration
 
-The `SoundRegistry` acts as a human-readable lookup table mapping logical IDs to loaded `SoundHandle`s.
+We dropped the standalone `SoundRegistry`. It isn't needed on the web, and it isn't needed for C++.
+
+Every backend already keeps a `soundId -> decoded buffer` cache: the web keeps `AudioBuffer`s, and a native backend (miniaudio, OpenAL) keeps its own sound objects. A registry in core would be a second copy of that map that has to stay in sync. The one thing it bought us was a synchronous lookup from an event's `soundId`, since `loadSound` is async. That lookup now lives in `AudioSystem` (`src/core/audioSystem.ts`), which owns its handles and the audio event subscriptions. It's the same shape as other systems holding their `TextureHandle`s, and it ports to C++ as one system owning a `std::unordered_map<std::string, SoundHandle>`.
 
 ```typescript
-export class SoundRegistry {
-    private cache = new Map<string, SoundHandle>();
+export default class AudioSystem {
+    private sounds = new Map<string, SoundHandle>();
 
-    public register(id: string, handle: SoundHandle): void {
-        this.cache.set(id, handle);
+    constructor(audio: AudioService, eventBus: TypeSafeEventBus) {
+        eventBus.subscribe('play_sound_requested', (event) => {
+            const handle = this.sounds.get(event.soundId);
+            if (!handle) return; // Never load inside a handler (Pitfall 2)
+            audio.play(handle, event.category);
+        });
+
+        eventBus.subscribe('audio_bus_volume_changed', (event) => {
+            audio.setVolume(event.category, event.volume);
+        });
     }
 
-    public get(id: string): SoundHandle | undefined {
-        return this.cache.get(id);
-    }
+    public async preload(soundId: string, category: AudioCategory): Promise<void>;
 }
 ```
 
-Audio playback connects with the double-buffered event bus using the events already defined in `src/core/events.ts`:
+Sounds are preloaded up front, so playing one is a map lookup at flush time. Core systems only publish intent (Rule I-1):
 
 ```typescript
-// Core system publishes audio intent (Rule I-1: intent, not hardware):
+await audioSystem.preload('menu_select', 'ui');
+
 eventBus.publish({
     type: 'play_sound_requested',
     soundId: 'menu_select',
     category: 'ui',
-});
-
-// Audio orchestration listener receives flushed event:
-eventBus.subscribe('play_sound_requested', (event) => {
-    const handle = soundRegistry.get(event.soundId);
-    if (handle) {
-        audioService.play(handle, event.category);
-    }
 });
 ```
 
@@ -370,6 +372,7 @@ Audio needs vary significantly based on clip length and memory footprint:
 
 - **Short Sounds (SFX / UI)**: Pre-loaded and decoded into memory via `audioService.loadSound()`. Stored as decompressed PCM buffers for instant, low-latency playback across polyphonic voices.
 - **Long Sounds (Music / Ambience / Environmental loops)**: Streaming is not exclusive to music—long ambient loops (rain, wind, river) and heavy sound effects must also be streamed. Decompressing several multi-minute tracks into RAM causes severe buffer volatility (Pitfall 3). The audio backend handles streaming on-demand by `soundId` directly into the designated mix bus, without core needing to know the asset's size or streaming mechanism.
+- **Who decides**: the backend, by the category passed to `loadSound`. On the web, `music` and `ambient` stream through an `HTMLAudioElement`, and everything else is decoded into an `AudioBuffer`. Pass `loop: true` to `play` for loops.
 
 #### Web Audio Platform Implementation
 
@@ -390,7 +393,7 @@ export class WebSoundHandle implements SoundHandle {
 ```
 
 **WebPlaybackHandle & WebAudioService**:
-The web platform requires renewing source nodes upon resumption since Web Audio `AudioBufferSourceNode`s are single-use. `WebAudioService` also handles decoding audio buffers, managing mix buses, and streaming longer tracks via media elements routed into category gain nodes.
+The web platform requires renewing source nodes upon resumption since Web Audio `AudioBufferSourceNode`s are single-use. Browsers also start the `AudioContext` suspended, so `webBootstrap` calls the web-only `resumeContext()` on the first pointer or key press. `WebAudioService` also handles decoding audio buffers, managing mix buses, and streaming longer tracks via media elements routed into category gain nodes.
 
 ```typescript
 export class WebPlaybackHandle implements PlaybackHandle {
@@ -408,17 +411,25 @@ export class WebAudioService implements AudioService {
     private audioContext?: AudioContext;
     private basePath: string;
 
-    constructor(basePath: string = '/assets/audio/', audioContext?: AudioContext) {
+    constructor(basePath: string, audioContext?: AudioContext) {
         this.basePath = basePath;
         this.audioContext = audioContext;
     }
 
-    async loadSound(soundId: string): Promise<WebSoundHandle> {
+    async loadSound(soundId: string, category: AudioCategory = 'sfx'): Promise<SoundHandle> {
         if (this.cache.has(soundId)) {
             return this.cache.get(soundId)!;
         }
 
-        const response = await fetch(`${this.basePath}${soundId}.ogg`);
+        const path = `${this.basePath}${soundId}.ogg`;
+        if (STREAMED_CATEGORIES.has(category)) {
+            // music/ambient: keep only the URL, stream on play
+            const handle = new WebStreamHandle(soundId, path);
+            this.cache.set(soundId, handle);
+            return handle;
+        }
+
+        const response = await fetch(path);
         const arrayBuffer = await response.arrayBuffer();
         const ctx = this.getAudioContext();
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
@@ -428,12 +439,17 @@ export class WebAudioService implements AudioService {
         return handle;
     }
 
-    public play(sound: SoundHandle, category: AudioCategory = 'sfx'): PlaybackHandle {
-        const webSound = sound as WebSoundHandle;
-        if (!webSound.buffer) {
-            throw new Error(`Invalid asset passed to WebAudioService: ${sound.id}`);
+    public play(sound: SoundHandle, category: AudioCategory = 'sfx', loop: boolean = false): PlaybackHandle {
+        const ctx = this.getAudioContext();
+        const output = this.getCategoryGain(category);
+
+        if (sound instanceof WebStreamHandle) {
+            return new WebStreamPlaybackHandle(ctx, sound.url, output, loop);
         }
-        return new WebPlaybackHandle(this.getAudioContext(), webSound.buffer, this.getCategoryGain(category));
+        if (sound instanceof WebSoundHandle) {
+            return new WebPlaybackHandle(ctx, sound.buffer, output, loop);
+        }
+        throw new Error(`Invalid asset passed to WebAudioService: ${sound.id}`);
     }
 }
 ```

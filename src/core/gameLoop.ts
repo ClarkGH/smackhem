@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import type { Renderer, TextureHandle } from '../services/renderer';
 import type { Input, PlayerIntent } from '../services/input';
 import type { TypeSafeEventBus } from './events';

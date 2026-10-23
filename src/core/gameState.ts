@@ -1,4 +1,4 @@
-import { Vec3 } from 'src/types/common';
+import type { Vec3 } from '../types/common';
 import { PLAYER_HEIGHT } from './camera';
 
 export interface TransitionState<T> {

@@ -29,7 +29,6 @@ export default class WebAssetLoader implements AssetLoader {
     /**
      * Load map data (legacy interface - for future use)
      */
-    // eslint-disable-next-line no-unused-vars
     async loadMap(_id: string): Promise<MapData> {
         // Not implemented yet - maps may contain multiple chunks
         // For now, we load chunks individually

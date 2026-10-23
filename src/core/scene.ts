@@ -17,7 +17,6 @@ interface Scene {
 export class Scene2DSystem {
     public scene: Scene;
 
-    // eslint-disable-next-line
     constructor(private eventBus: TypeSafeEventBus) { // I assure you, this variable is in use
         this.scene = this.createScene();
     }
@@ -69,6 +68,7 @@ export class Scene2DSystem {
                 interpolatedState.sceneTransitionProgress = 1.0;
                 discreteState.sceneIsTransitioning = false;
                 discreteState.sceneIsActive = true;
+            // TODO: Review if this runs or why we even wrote this
             } else if (interpolatedState.sceneTransitionProgress <= 0.0) {
                 interpolatedState.sceneTransitionProgress = 0.0;
                 discreteState.sceneIsTransitioning = false;

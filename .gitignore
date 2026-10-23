@@ -33,3 +33,6 @@ pnpm-debug.log*
 *.ntvs*
 *.njsproj
 *.sln
+
+# Claude files
+.claude/*

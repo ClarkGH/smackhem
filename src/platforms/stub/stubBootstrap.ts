@@ -1,6 +1,7 @@
 import NullRenderer from './nullRenderer';
 import StubClock from './stubClock';
 import StubInput from './stubInput';
+import StubAudioService from './stubAudioService';
 import type { PlatformServices } from '../../services/platform';
 import type { Renderer } from '../../services/renderer';
 import {
@@ -113,7 +114,6 @@ export const updateActiveChunks = async (
     world: World,
     playerPosition: Vec3,
     renderer: Renderer,
-    // eslint-disable-next-line no-unused-vars
     _assetLoader?: any,
 ): Promise<void> => {
     const currentChunk = World.getChunkCoords(playerPosition);
@@ -166,6 +166,7 @@ const createStubPlatform = async (): Promise<PlatformServices> => ({
     renderer: new NullRenderer(),
     clock: new StubClock(),
     input: new StubInput(),
+    audio: new StubAudioService(),
     getAspectRatio: () => 16 / 9,
 });
 

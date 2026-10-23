@@ -9,6 +9,7 @@ import type { Vec3 } from '../../types/common';
 import WebAssetLoader from './webAssetLoader';
 import WebGLRenderer from './webGLRenderer';
 import WebClock from './webClock';
+import WebAudioService from './webAudioService';
 
 // PlatformServices interface moved to src/services/platform.ts
 // This export is kept for backward compatibility but should use the shared type
@@ -109,6 +110,7 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
     const input = new WebInputService(canvas);
     const clock = new WebClock();
     const assetLoader = new WebAssetLoader('/chunks/');
+    const audio = new WebAudioService('/assets/audio/');
 
     // Wireframe toggle (press '\' key)
     let wireframeEnabled = false;
@@ -120,10 +122,20 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
         }
     });
 
+    // Browsers block audio until a user gesture, unlock on the first one
+    const unlockAudio = () => {
+        audio.resumeContext();
+        document.removeEventListener('pointerdown', unlockAudio);
+        document.removeEventListener('keydown', unlockAudio);
+    };
+    document.addEventListener('pointerdown', unlockAudio);
+    document.addEventListener('keydown', unlockAudio);
+
     return {
         renderer,
         clock,
         input,
+        audio,
         canvas,
         assetLoader,
         getAspectRatio: () => canvas.width / canvas.height,

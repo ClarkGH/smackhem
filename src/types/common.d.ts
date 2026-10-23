@@ -1,9 +1,6 @@
 import type { Chunk } from '../core/world';
 
 declare global {
-    // 'var' is required for global declarations in TypeScript .d.ts files
-    // vars-on-top doesn't apply to type declaration files
-    // eslint-disable-next-line no-var, vars-on-top, no-unused-vars
     var __PLATFORM__: string | undefined;
 }
 

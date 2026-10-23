@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import type { Renderer, TextureHandle } from '../services/renderer';
 import type { Camera } from './camera';
 import type { GameState } from './gameState';

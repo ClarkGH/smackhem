@@ -1,6 +1,7 @@
 export type AudioCategory = 'master' | 'sfx' | 'music' | 'ambient' | 'ui';
 
 export interface SoundHandle {
+    // Opaque identifier, FFI-friendly and serializable
     readonly id: string;
 }
 
@@ -11,19 +12,9 @@ export interface PlaybackHandle {
 }
 
 export interface AudioService {
-    play(sound: SoundHandle, category?: AudioCategory): PlaybackHandle;
-    setVolume(category: AudioCategory, volume: number): void;
+    // Category lets the backend decide buffered vs streamed, core never knows which
+    loadSound(soundId: string, category?: AudioCategory): Promise<SoundHandle>;
+    play(sound: SoundHandle, category?: AudioCategory, loop?: boolean): PlaybackHandle;
     getVolume(category: AudioCategory): number;
-}
-
-export class SoundRegistry {
-    private cache = new Map<string, SoundHandle>();
-
-    public register(id: string, handle: SoundHandle): void {
-        this.cache.set(id, handle);
-    }
-
-    public get(id: string): SoundHandle | undefined {
-        return this.cache.get(id);
-    }
+    setVolume(category: AudioCategory, volume: number): void;
 }

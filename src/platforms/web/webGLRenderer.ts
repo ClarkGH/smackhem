@@ -220,7 +220,6 @@ export default class WebGLRenderer implements Renderer {
         return program;
     }
 
-    // eslint-disable-next-line class-methods-use-this
     private calculateNormals(vertices: Float32Array): Float32Array {
         const normals = new Float32Array(vertices.length);
 
@@ -620,7 +619,6 @@ export default class WebGLRenderer implements Renderer {
         this.gl.bindVertexArray(null);
     }
 
-    // eslint-disable-next-line class-methods-use-this
     endFrame(): void {
         // Present frame (WebGL handles this automatically)
     }
@@ -815,7 +813,6 @@ export default class WebGLRenderer implements Renderer {
         return handle;
     }
 
-    // eslint-disable-next-line no-unused-vars
     drawTexturedQuad(texture: TextureHandle, transform: Mat4, size: number, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
         const webglTexture = this.textures.get(texture.id);
         if (!webglTexture || !this.textureProgram || !this.quadVAO) {

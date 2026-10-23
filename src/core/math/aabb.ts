@@ -1,4 +1,4 @@
-import { Vec3 } from 'src/types/common';
+import type { Vec3 } from '../../types/common';
 
 export interface AABB {
     min: Vec3;

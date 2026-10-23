@@ -1,6 +1,5 @@
-/* eslint-disable no-unused-vars */
-import { PlayerIntent } from 'src/services/input';
-import { Vec3 } from 'src/types/common';
+import type { PlayerIntent } from '../services/input';
+import type { Vec3 } from '../types/common';
 import { TypeSafeEventBus } from './events';
 import type { GameMode, GameState } from './gameState';
 import { lerpVec3, smoothstep } from './math/mathHelpers';
@@ -81,7 +80,6 @@ export default class Instance3DSystem {
         interpolatedState.instanceCharacterPosition.z = this.transitionStartPos.z;
 
         // Mindfully overriding memory
-        // eslint-disable-next-line
         gameState.discrete.gameMode = 'instance_3d';
         this.publishModeChange(discreteState.gameMode, 'instance_3d');
     }
@@ -106,7 +104,6 @@ export default class Instance3DSystem {
         this.transitionStartPos.z = this.camera.position.z;
 
         // Mindfully overriding memory
-        // eslint-disable-next-line
         gameState.discrete.gameMode = 'world_3d';
         this.publishModeChange(discreteState.gameMode, 'world_3d');
     }

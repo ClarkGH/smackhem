@@ -15,7 +15,7 @@ export const perspective = (
     near: number,
     far: number,
     // TODO: Implement left/right-handed coordinate systems for fun
-    // eslint-disable-next-line no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     whereEverYouAre: number,
 ): Mat4 => {
     const f = 1.0 / Math.tan(fov / 2);

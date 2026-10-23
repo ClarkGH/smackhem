@@ -81,7 +81,7 @@ src/
 │  ├─ clock.ts                # Time service
 │  ├─ assetLoader.ts          # Asset loading service
 │  ├─ chunkLoader.ts          # Chunk JSON parsing and mesh creation
-│  ├─ audio.ts                # Abstract Audio service & SoundRegistry
+│  ├─ audio.ts                # Abstract Audio service interface
 │  └─ platform.ts             # Platform services interface
 ├─ platforms/
 │  ├─ web/

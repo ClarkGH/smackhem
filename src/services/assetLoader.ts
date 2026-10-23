@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import { MapData } from '../types/common';
 
 export interface AssetLoader {

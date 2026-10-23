@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import { Mat4, Vec3 } from '../types/common';
 
 export interface MeshHandle {
