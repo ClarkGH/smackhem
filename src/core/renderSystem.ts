@@ -110,9 +110,6 @@ export default class RenderSystem {
         const discreteState = gameState.discrete;
         const interpolatedState = gameState.interpolated;
 
-        const currentChunkCoords = World.getChunkCoords(camera.position);
-        const currentChunkData = this.world.activeChunks.get(World.getChunkID(currentChunkCoords.x, currentChunkCoords.z));
-
         // 1. Process 2D UI Overlay Pass
         if (discreteState.gameMode === 'scene_2d') {
             const aspect = this.getAspectRatio();
@@ -200,6 +197,9 @@ export default class RenderSystem {
         }
 
         if (debugHUD && discreteState.debugHUDVisible) {
+            // Debug only, so the allocations here don't run every frame for everyone (D-1)
+            const currentChunkCoords = World.getChunkCoords(camera.position);
+            const currentChunkData = this.world.activeChunks.get(World.getChunkID(currentChunkCoords.x, currentChunkCoords.z));
             const rotation = quaternionFromYawPitch(camera.yaw, camera.pitch);
             const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
 

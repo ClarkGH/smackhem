@@ -4,8 +4,9 @@ import {
     expect,
     beforeEach,
     vi,
+    type Mock,
 } from 'vitest';
-import { createGame, type Game } from './game';
+import { createGame, type ChunkUpdater, type Game } from './game';
 import { SETTINGS_STORAGE_KEY } from './core/settings';
 import createStubPlatform, { createChunkUpdater } from './platforms/stub/stubBootstrap';
 import type StubInput from './platforms/stub/stubInput';
@@ -137,6 +138,51 @@ describe('createGame on the stub platform', () => {
             updateChunks: createChunkUpdater(),
         });
         expect(next.settings.volume.master).toBe(0.9);
+    });
+
+    describe('chunk streaming', () => {
+        let updateChunks: Mock<ChunkUpdater>;
+
+        beforeEach(async () => {
+            updateChunks = vi.fn(createChunkUpdater());
+            game = await createGame({ platform, updateChunks });
+            // New Game
+            game.frame();
+            press({ interact: true });
+            updateChunks.mockClear();
+        });
+
+        it('does nothing while the player stays in the same chunk', () => {
+            frames(120);
+
+            expect(updateChunks).not.toHaveBeenCalled();
+        });
+
+        it('streams once each time the player enters another chunk', () => {
+            // Walk forward until the chunk changes, then a little further
+            stub.input.setIntent({ move: { x: 0, y: 1 } });
+            const startZ = game.gameState.interpolated.cameraPosition.z;
+            while (Math.abs(game.gameState.interpolated.cameraPosition.z - startZ) < 12) game.frame();
+            stub.input.reset();
+
+            // Chunks are 10 units, so 12 units crosses exactly one boundary
+            expect(updateChunks).toHaveBeenCalledTimes(1);
+        });
+
+        it('streams around the start again after quitting from far away', () => {
+            stub.input.setIntent({ move: { x: 0, y: 1 } });
+            frames(120);
+            stub.input.reset();
+            updateChunks.mockClear();
+
+            press({ menu: true });
+            click('Quit to Main Menu');
+            click('Yes, quit');
+            frames(2);
+
+            expect(updateChunks).toHaveBeenCalledTimes(1);
+            expect(updateChunks.mock.calls[0][1]).toEqual(game.gameState.interpolated.cameraPosition);
+        });
     });
 
     it('loads chunks for each game separately', async () => {

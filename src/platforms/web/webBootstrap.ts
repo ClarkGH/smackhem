@@ -17,13 +17,12 @@ import WebDisplay from './webDisplay';
 // PlatformServices interface moved to src/services/platform.ts
 // This export is kept for backward compatibility but should use the shared type
 
-// Chunk loading around the player, async from JSON files.
-// A factory, so each game tracks its own loads and last chunk.
+// Chunk loading around a position, async from JSON files.
+// A factory, so each game tracks its own pending loads.
+// createGame only calls it when the player enters another chunk.
 export const createChunkUpdater = () => {
     // Track chunks currently being loaded to avoid duplicate requests
     const pendingChunkLoads = new Set<string>();
-    // Keep track of 1pv camera chunk location.
-    let lastPlayerChunk: { x: number; z: number } | null = null;
 
     return async (
         world: World,
@@ -32,16 +31,6 @@ export const createChunkUpdater = () => {
         assetLoader: WebAssetLoader,
     ): Promise<void> => {
         const currentChunk = World.getChunkCoords(playerPosition);
-
-        if (
-            lastPlayerChunk
-            && lastPlayerChunk.x === currentChunk.x
-            && lastPlayerChunk.z === currentChunk.z
-        ) {
-            return;
-        }
-
-        lastPlayerChunk = currentChunk;
 
         const chunksToLoad = World.getChunksInRadius(
             currentChunk.x,

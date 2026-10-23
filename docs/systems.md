@@ -67,6 +67,7 @@ StaticMesh {
 ### Chunk Streaming
 
 - Player position determines active radius
+- **Only on entering another chunk:** `createGame`'s frame compares the player's chunk coordinates as plain numbers (`World.getChunkIndex`), and calls the platform's chunk updater only when they change. The frames in between allocate nothing: no call, no Promise (M-1). Quitting to the main menu moves the camera back to the start, which counts as a change.
 - Load:
   - Current chunk
   - Adjacent chunks (within `CHUNK_LOAD_RADIUS`)
@@ -91,6 +92,28 @@ This works identically on:
 - Web (async `fetch()` with Promise-based loading)
 - Desktop (future: same async pattern)
 - Console (future: same async pattern)
+
+**Known limits (revisit when they matter):**
+
+Nothing is freed when a chunk unloads, and that is deliberate for now. Two caches keep everything:
+- **Renderer mesh cache:** keyed by shape and size (`cube_1`, `plane_10`, …). Chunks share these meshes.
+- **Asset loader chunk cache:** every chunk ever loaded, so walking back is instant.
+
+So GPU memory grows with the number of *distinct shape sizes*, not with how much the player walks, and memory overall grows with the number of chunks visited. With the current hand-made map this is tiny.
+
+**Don't** simply delete GL buffers in `World.removeChunk`. Meshes are shared between chunks, and the chunk cache still holds their handles, so the deleted buffers would be drawn again (missing geometry, or a crash).
+
+| When | Do | Trade-off |
+|---|---|---|
+| Maps grow large, or long sessions visit many chunks | **Cap the chunk cache** (least recently used chunks dropped). Never delete meshes: the mesh cache is already bounded by the number of distinct sizes. | Revisiting an evicted chunk re-fetches and re-parses it, which can hitch at chunk boundaries. No risk of drawing deleted buffers. |
+| The native port (tight video memory, consoles), or maps with many unique mesh sizes | **Reference-count meshes**: add `disposeMesh` to the `Renderer` interface and free a mesh only when no loaded *or* cached chunk still uses it. This also settles W-2 ("chunks own their meshes"): today the renderer owns them and chunks share them. | Getting the counts wrong means drawing deleted buffers, which is worse than the leak it fixes. Needs careful tests. |
+
+A related race: chunk updates are async on the web. If the player crosses two chunk boundaries before the first update's loads finish, that update can unload chunks the second one needs, leaving a gap until the next crossing. It's rare at walking speed. Fix it with the cache work above, for example by letting only the newest update unload.
+
+**Loading gate (consider when the player can outrun streaming):** today the player can walk into a chunk whose data hasn't arrived yet and briefly see an empty area until it does. Many games instead pause play and show a spinner when the player gets ahead of loading. When it becomes an issue:
+- **When to trigger:** fast travel or vehicles, teleports, loading a save (which drops the player somewhere new), or slow storage and networks.
+- **How it could fit:** each tick, core checks whether the player's chunk and its neighbours are in `world.activeChunks`. If not, it holds the simulation, the same way `isPaused` does, and shows a loading overlay until they arrive. Rendering keeps running so the spinner animates.
+- **Trade-off:** a visible stop is honest and avoids walking into missing geometry, but it interrupts play. Prefer preventing it first, with a larger load radius in the direction of travel or prefetching before teleports, and keep the gate as the fallback.
 
 ### Chunk flow
 

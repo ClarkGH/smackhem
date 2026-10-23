@@ -56,10 +56,13 @@ export class World {
         return this._visibleMeshesBuffer;
     }
 
+    // Chunk index along one axis, a plain number so per-frame checks don't allocate (M-1)
+    static getChunkIndex(coordinate: number): number {
+        return Math.floor((coordinate + CHUNK_SIZE / 2) / CHUNK_SIZE);
+    }
+
     static getChunkCoords(position: Vec3): { x: number; z: number } {
-        const chunkX = Math.floor((position.x + CHUNK_SIZE / 2) / CHUNK_SIZE);
-        const chunkZ = Math.floor((position.z + CHUNK_SIZE / 2) / CHUNK_SIZE);
-        return { x: chunkX, z: chunkZ };
+        return { x: World.getChunkIndex(position.x), z: World.getChunkIndex(position.z) };
     }
 
     static getChunksInRadius(

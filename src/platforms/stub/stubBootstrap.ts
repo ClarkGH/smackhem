@@ -108,64 +108,50 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
 };
 
 /**
- * Chunk loading around the player (stub version), same logic as the web platform.
- * A factory, so each game (and each test) tracks its own last chunk.
+ * Chunk loading around a position (stub version), same logic as the web platform.
+ * A factory to match the web platform's, which keeps per-game load state.
+ * createGame only calls it when the player enters another chunk.
  */
-export const createChunkUpdater = () => {
-    // The chunk the player was last in, nothing to do until it changes
-    let lastPlayerChunk: { x: number; z: number } | null = null;
+export const createChunkUpdater = () => async (
+    world: World,
+    playerPosition: Vec3,
+    renderer: Renderer,
+    _assetLoader?: any,
+): Promise<void> => {
+    const currentChunk = World.getChunkCoords(playerPosition);
 
-    return async (
-        world: World,
-        playerPosition: Vec3,
-        renderer: Renderer,
-        _assetLoader?: any,
-    ): Promise<void> => {
-        const currentChunk = World.getChunkCoords(playerPosition);
+    const chunksToLoad = World.getChunksInRadius(
+        currentChunk.x,
+        currentChunk.z,
+        CHUNK_LOAD_RADIUS,
+    );
 
-        if (
-            lastPlayerChunk
-            && lastPlayerChunk.x === currentChunk.x
-            && lastPlayerChunk.z === currentChunk.z
-        ) {
-            return;
+    // Create set of chunk IDs that should be loaded
+    const shouldBeLoaded = new Set<string>();
+    chunksToLoad.forEach((chunk) => {
+        shouldBeLoaded.add(World.getChunkID(chunk.x, chunk.z));
+    });
+
+    // Load missing chunks
+    chunksToLoad.forEach((chunk) => {
+        const chunkId = World.getChunkID(chunk.x, chunk.z);
+        if (!world.activeChunks.has(chunkId)) {
+            const newChunk = createChunk(chunk.x, chunk.z, renderer);
+            world.addChunk(newChunk);
         }
+    });
 
-        lastPlayerChunk = currentChunk;
+    // Unload chunks outside radius
+    const chunksToUnload: string[] = [];
+    Array.from(world.activeChunks.keys()).forEach((chunkId) => {
+        if (!shouldBeLoaded.has(chunkId)) {
+            chunksToUnload.push(chunkId);
+        }
+    });
 
-        const chunksToLoad = World.getChunksInRadius(
-            currentChunk.x,
-            currentChunk.z,
-            CHUNK_LOAD_RADIUS,
-        );
-
-        // Create set of chunk IDs that should be loaded
-        const shouldBeLoaded = new Set<string>();
-        chunksToLoad.forEach((chunk) => {
-            shouldBeLoaded.add(World.getChunkID(chunk.x, chunk.z));
-        });
-
-        // Load missing chunks
-        chunksToLoad.forEach((chunk) => {
-            const chunkId = World.getChunkID(chunk.x, chunk.z);
-            if (!world.activeChunks.has(chunkId)) {
-                const newChunk = createChunk(chunk.x, chunk.z, renderer);
-                world.addChunk(newChunk);
-            }
-        });
-
-        // Unload chunks outside radius
-        const chunksToUnload: string[] = [];
-        Array.from(world.activeChunks.keys()).forEach((chunkId) => {
-            if (!shouldBeLoaded.has(chunkId)) {
-                chunksToUnload.push(chunkId);
-            }
-        });
-
-        chunksToUnload.forEach((chunkId) => {
-            world.removeChunk(chunkId);
-        });
-    };
+    chunksToUnload.forEach((chunkId) => {
+        world.removeChunk(chunkId);
+    });
 };
 
 const createStubPlatform = async (): Promise<PlatformServices> => ({

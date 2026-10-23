@@ -18,7 +18,8 @@ import type { PlatformServices } from './services/platform';
 import type { Renderer } from './services/renderer';
 import type { Vec3 } from './types/common';
 
-// Loads and unloads world chunks around the player, provided by each platform
+// Loads and unloads world chunks around a position, provided by each platform.
+// Only called when the player enters another chunk, see createGame.
 export type ChunkUpdater = (
     world: World,
     playerPosition: Vec3,
@@ -87,7 +88,11 @@ export const createGame = async ({
     const gameState = createGameState('main_menu');
 
     // Chunks around the starting position, before the first frame
-    await updateChunks(world, createCamera().position, platform.renderer, assetLoader);
+    const start = createCamera().position;
+    await updateChunks(world, start, platform.renderer, assetLoader);
+    // The chunk streamed around last, compared as plain numbers every frame (M-1)
+    let streamedChunkX = World.getChunkIndex(start.x);
+    let streamedChunkZ = World.getChunkIndex(start.z);
 
     const gameLoop = new GameLoop({
         renderer: platform.renderer,
@@ -107,10 +112,18 @@ export const createGame = async ({
         platform.input.update();
         gameLoop.update(platform.clock.getDeltaTime());
 
-        // Chunk loading/unloading follows the player
-        updateChunks(world, gameLoop.getCameraPosition(), platform.renderer, assetLoader).catch((error) => {
-            console.error('Error updating chunks:', error);
-        });
+        // Chunk streaming follows the player, only when they enter another chunk.
+        // Nothing is allocated on the frames in between (no call, no Promise).
+        const position = gameLoop.getCameraPosition();
+        const chunkX = World.getChunkIndex(position.x);
+        const chunkZ = World.getChunkIndex(position.z);
+        if (chunkX !== streamedChunkX || chunkZ !== streamedChunkZ) {
+            streamedChunkX = chunkX;
+            streamedChunkZ = chunkZ;
+            updateChunks(world, position, platform.renderer, assetLoader).catch((error) => {
+                console.error('Error updating chunks:', error);
+            });
+        }
 
         gameLoop.render();
     };
