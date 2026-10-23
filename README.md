@@ -35,7 +35,9 @@ It's been 5 years of studying 3D. I can now say I've "put a pin" on quaternions.
 │  ├─ services/      # services (renderer, input, clock, assetLoader, chunkLoader)
 │  └─ types/         # common types
 ├─ /public           # static assets
+│  ├─ /audio/        # Audio files (audio_id naming, id designates purpose)
 │  └─ /chunks/       # chunk JSON files (offset-based naming: 10000_10000.json)
+├─ /scripts          # utility scripts
 ├─ /docs             # project documentation
 ├─ package.json
 ├─ tsconfig.json
