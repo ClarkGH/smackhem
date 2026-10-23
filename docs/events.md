@@ -15,6 +15,7 @@
         - [Portability & Separation of Concerns](#portability--separation-of-concerns)
         - [Audio Service Interface](#audio-service-interface)
         - [Audio System & Event Integration](#audio-system--event-integration)
+        - [Mode-Driven Audio](#mode-driven-audio)
         - [Buffered vs. Streamed Sounds](#buffered-vs-streamed-sounds)
         - [Web Audio Platform Implementation](#web-audio-platform-implementation)
         - [Stub Platform & Testing (Rule P-1)](#stub-platform--testing-rule-p-1)
@@ -340,33 +341,36 @@ Every backend already keeps a `soundId -> decoded buffer` cache: the web keeps `
 export default class AudioSystem {
     private sounds = new Map<string, SoundHandle>();
 
-    // Live voices per sound
-    private voices = new Map<string, PlaybackHandle[]>();
+    // One voice per sound
+    private voices = new Map<string, PlaybackHandle>();
 
     constructor(audio: AudioService, eventBus: TypeSafeEventBus) {
         eventBus.subscribe('play_sound_requested', (event) => {
             const handle = this.sounds.get(event.soundId);
             if (!handle) return; // Never load inside a handler (Pitfall 2)
-            const playback = audio.play(handle, event.category, event.loop);
 
-            let voices = this.voices.get(event.soundId);
-            if (voices) {
-                pruneFinished(voices); // swap-remove isFinished() voices, no allocation
-            } else {
-                voices = [];
-                this.voices.set(event.soundId, voices);
+            const voice = this.voices.get(event.soundId);
+            if (voice && !voice.isFinished()) {
+                // Loops continue, or resume if paused. One-shots restart.
+                if (event.loop) {
+                    voice.resume();
+                    return;
+                }
+                voice.stop();
             }
-            voices.push(playback);
+
+            this.voices.set(event.soundId, audio.play(handle, event.category, event.loop));
+        });
+
+        eventBus.subscribe('pause_sound_requested', (event) => {
+            this.voices.get(event.soundId)?.pause();
         });
 
         eventBus.subscribe('stop_sound_requested', (event) => {
-            // Stops every live voice of that sound, paused ones included
-            const voices = this.voices.get(event.soundId);
-            if (!voices) return;
-            for (let i = 0; i < voices.length; i += 1) {
-                voices[i].stop();
-            }
-            voices.length = 0;
+            const voice = this.voices.get(event.soundId);
+            if (!voice) return;
+            voice.stop();
+            this.voices.delete(event.soundId);
         });
 
         eventBus.subscribe('audio_bus_volume_changed', (event) => {
@@ -378,25 +382,52 @@ export default class AudioSystem {
 }
 ```
 
-Sounds are preloaded up front, so playing one is a map lookup at flush time. `play_sound_requested` takes an optional `loop`, and `stop_sound_requested` stops every live voice of a sound.
+Sounds are preloaded up front, so playing one is a map lookup at flush time.
 
-Finished voices are found by asking each handle `isFinished()` from the tick, not through end-of-sound callbacks. On native backends those callbacks fire on the audio thread, and calling into core from there would need the MPSC queue or locks. Checking from the tick keeps audio single-threaded, and miniaudio supports it directly (`ma_sound_at_end`). It is `isFinished()` rather than `isPlaying()` so a paused voice is kept and can still be stopped. Voice lists are bounded by sounds played × voices of each playing at once (M-2).
+**One voice per sound.** Like Godot's default `max_polyphony` of 1, or Unity's `AudioSource.Play()`, each sound has at most one live voice:
 
-Core systems only publish intent (Rule I-1). For now `main.ts` starts the night ambience on boot:
+| Request | Voice state | Result |
+|---|---|---|
+| `play_sound_requested` with `loop: true` | playing | Ignored, so asking for ambience again is harmless |
+| `play_sound_requested` with `loop: true` | paused | Resumed, so "start or resume" is one request |
+| `play_sound_requested` without loop | playing | Restarted, so rapid one-shots re-trigger cleanly |
+| any play | none, stopped or finished | A new voice starts |
+| `pause_sound_requested` | any | Paused, can be resumed or stopped later |
+| `stop_sound_requested` | any | Stopped and forgotten |
+
+This absorbs duplicate requests from several fixed ticks landing in one flush, and there are no voice lists to prune. A finished voice sits in the map until the sound plays again, so the map is bounded by the number of audio files shipped (M-2). If a sound ever needs real overlap, like several party members' footsteps, give it a voice limit and stop the oldest voice at the limit.
+
+Voices are checked with `isFinished()` from the tick, not through end-of-sound callbacks. On native backends those callbacks fire on the audio thread, and calling into core from there would need the MPSC queue or locks. Checking from the tick keeps audio single-threaded, and miniaudio supports it directly (`ma_sound_at_end`). It is `isFinished()` rather than `isPlaying()` so a paused voice is kept and can still be stopped.
+
+#### Mode-Driven Audio
+
+Core systems only publish intent (Rule I-1). `src/core/modeAudio.ts` turns `game_mode_changed` into audio requests: `sfx_mode_change` plays on every change, and `ambient_night`
+
+- pauses when entering the 2D scene (`scene_2d`)
+- stops when entering the instance (`instance_3d`)
+- starts or resumes when returning to the world (`world_3d`)
 
 ```typescript
-await audioSystem.preload('ambient_night', 'ambient');
+eventBus.subscribe('game_mode_changed', (event) => {
+    eventBus.publish({ type: 'play_sound_requested', soundId: MODE_CHANGE_SOUND, category: 'sfx' });
 
-eventBus.publish({
-    type: 'play_sound_requested',
-    soundId: 'ambient_night',
-    category: 'ambient',
-    loop: true,
+    switch (event.currentMode) {
+        case 'scene_2d':
+            eventBus.publish({ type: 'pause_sound_requested', soundId: AMBIENT_SOUND });
+            break;
+        case 'instance_3d':
+            eventBus.publish({ type: 'stop_sound_requested', soundId: AMBIENT_SOUND });
+            break;
+        case 'world_3d':
+            playAmbience(eventBus); // looping play_sound_requested
+            break;
+        default:
+            break;
+    }
 });
-
-// Later, from any system:
-eventBus.publish({ type: 'stop_sound_requested', soundId: 'ambient_night' });
 ```
+
+Requests published from inside a handler go into the next flush, so audio follows a mode change one frame later. `main.ts` preloads both sounds (a missing file is logged, not fatal), subscribes these rules, and starts the ambience on boot.
 
 #### Buffered vs. Streamed Sounds
 

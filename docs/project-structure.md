@@ -70,6 +70,8 @@ src/
 │  ├─ gameState.ts            # Game State logic
 │  ├─ input.ts                # Player input logic
 │  ├─ instance.ts             # Instance systems
+│  ├─ modeAudio.ts            # Game mode changes -> audio requests (ambience, mode sound)
+│  ├─ modeAudio.spec.ts       # Scenario tests for mode-driven audio (stub platform)
 │  ├─ modeChange.spec.ts      # Scenario tests for game mode changes (stub platform)
 │  ├─ party.ts                # Party logic
 │  ├─ renderSystem.ts         # Rendering system
@@ -119,7 +121,8 @@ public/
 └─ assets/
    ├─ images/                 # Textures, asset ID naming (e.g. circle-sleep00.png)
    └─ audio/                  # Audio files, file name is the sound ID
-      └─ ambient_night.ogg    # snake_case, led by purpose (e.g. ui_select)
+      ├─ ambient_night.ogg    # snake_case, led by purpose (e.g. ui_select)
+      └─ sfx_mode_change.ogg  # Played on every game mode change
 ```
 
 Chunk files use offset-based naming to prevent negative coordinates in filenames. See [Data Formats](data-formats.md) for details.

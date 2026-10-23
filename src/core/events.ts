@@ -14,6 +14,10 @@ export type GameEvent =
         loop?: boolean
     }
     | {
+        type: 'pause_sound_requested';
+        soundId: string
+    }
+    | {
         type: 'stop_sound_requested';
         soundId: string
     }

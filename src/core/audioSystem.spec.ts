@@ -64,62 +64,100 @@ describe('AudioSystem - event integration', () => {
         warn.mockRestore();
     });
 
-    it('stops every live voice of a sound', async () => {
-        await audioSystem.preload('footstep', 'sfx');
-        await audioSystem.preload('menu_select', 'ui');
-
-        eventBus.publish({ type: 'play_sound_requested', soundId: 'footstep', category: 'sfx' });
-        eventBus.publish({ type: 'play_sound_requested', soundId: 'footstep', category: 'sfx' });
-        eventBus.publish({ type: 'play_sound_requested', soundId: 'menu_select', category: 'ui' });
-        eventBus.flush();
-
-        eventBus.publish({ type: 'stop_sound_requested', soundId: 'footstep' });
-        eventBus.flush();
-
-        const [first, second, other] = audio.voices;
-        expect(first.stopped).toBe(true);
-        expect(second.stopped).toBe(true);
-        expect(other.stopped).toBe(false);
-    });
-
-    it('can stop a paused voice', async () => {
-        await audioSystem.preload('night_ambience', 'ambient');
-
+    const playLoop = (soundId: string): void => {
         eventBus.publish({
             type: 'play_sound_requested',
-            soundId: 'night_ambience',
+            soundId,
             category: 'ambient',
             loop: true,
         });
-        eventBus.flush();
-        audio.voices[0].pause();
+    };
 
-        eventBus.publish({ type: 'stop_sound_requested', soundId: 'night_ambience' });
+    it('keeps the playing voice when a loop is requested again', async () => {
+        await audioSystem.preload('ambient_night', 'ambient');
+
+        playLoop('ambient_night');
+        eventBus.flush();
+        playLoop('ambient_night');
+        eventBus.flush();
+
+        expect(audio.voices).toHaveLength(1);
+        expect(audio.voices[0].isFinished()).toBe(false);
+    });
+
+    it('resumes a paused loop instead of starting another', async () => {
+        await audioSystem.preload('ambient_night', 'ambient');
+
+        playLoop('ambient_night');
+        eventBus.flush();
+        eventBus.publish({ type: 'pause_sound_requested', soundId: 'ambient_night' });
+        eventBus.flush();
+        expect(audio.voices[0].paused).toBe(true);
+
+        playLoop('ambient_night');
+        eventBus.flush();
+
+        expect(audio.voices).toHaveLength(1);
+        expect(audio.voices[0].paused).toBe(false);
+    });
+
+    it('starts a loop again after it was stopped', async () => {
+        await audioSystem.preload('ambient_night', 'ambient');
+
+        playLoop('ambient_night');
+        eventBus.flush();
+        eventBus.publish({ type: 'stop_sound_requested', soundId: 'ambient_night' });
+        eventBus.flush();
+        playLoop('ambient_night');
+        eventBus.flush();
+
+        expect(audio.voices).toHaveLength(2);
+        expect(audio.voices[0].stopped).toBe(true);
+        expect(audio.voices[1].isFinished()).toBe(false);
+    });
+
+    it('restarts a one-shot, leaving one live voice', async () => {
+        await audioSystem.preload('sfx_mode_change', 'sfx');
+
+        // Two requests in the same flush, as from two fixed ticks in one frame
+        eventBus.publish({ type: 'play_sound_requested', soundId: 'sfx_mode_change', category: 'sfx' });
+        eventBus.publish({ type: 'play_sound_requested', soundId: 'sfx_mode_change', category: 'sfx' });
+        eventBus.flush();
+
+        expect(audio.voices).toHaveLength(2);
+        expect(audio.voices[0].stopped).toBe(true);
+        expect(audio.voices[1].isFinished()).toBe(false);
+    });
+
+    it('does not stop a voice that already finished', async () => {
+        await audioSystem.preload('sfx_mode_change', 'sfx');
+
+        eventBus.publish({ type: 'play_sound_requested', soundId: 'sfx_mode_change', category: 'sfx' });
+        eventBus.flush();
+        audio.voices[0].finish();
+
+        const stop = vi.spyOn(audio.voices[0], 'stop');
+        eventBus.publish({ type: 'play_sound_requested', soundId: 'sfx_mode_change', category: 'sfx' });
+        eventBus.flush();
+
+        expect(stop).not.toHaveBeenCalled();
+        expect(audio.voices).toHaveLength(2);
+    });
+
+    it('can stop a paused voice', async () => {
+        await audioSystem.preload('ambient_night', 'ambient');
+
+        playLoop('ambient_night');
+        eventBus.flush();
+        eventBus.publish({ type: 'pause_sound_requested', soundId: 'ambient_night' });
+        eventBus.publish({ type: 'stop_sound_requested', soundId: 'ambient_night' });
         eventBus.flush();
 
         expect(audio.voices[0].stopped).toBe(true);
     });
 
-    it('drops finished voices instead of stopping them again', async () => {
-        await audioSystem.preload('footstep', 'sfx');
-
-        eventBus.publish({ type: 'play_sound_requested', soundId: 'footstep', category: 'sfx' });
-        eventBus.flush();
-        audio.voices[0].finish();
-
-        // The next play prunes the finished voice
-        eventBus.publish({ type: 'play_sound_requested', soundId: 'footstep', category: 'sfx' });
-        eventBus.flush();
-
-        const stop = vi.spyOn(audio.voices[0], 'stop');
-        eventBus.publish({ type: 'stop_sound_requested', soundId: 'footstep' });
-        eventBus.flush();
-
-        expect(stop).not.toHaveBeenCalled();
-        expect(audio.voices[1].stopped).toBe(true);
-    });
-
-    it('ignores stopping a sound with no voices', () => {
+    it('ignores pausing or stopping a sound with no voice', () => {
+        eventBus.publish({ type: 'pause_sound_requested', soundId: 'missing' });
         eventBus.publish({ type: 'stop_sound_requested', soundId: 'missing' });
 
         expect(() => eventBus.flush()).not.toThrow();

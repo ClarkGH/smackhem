@@ -75,4 +75,4 @@ Expect a blank field, without sounds, and with potential errors. Some public ass
 - There are assets not included
   - To add collision/field objects, create chunk JSON files in `public/chunks/`. See [Data Formats](docs/data-formats.md) for chunk file format and naming conventions
   - To add the missing `circle-sleep00.png` asset, add whatever png you want into `public/assets/images` and rename it to match
-  - Audio will not function without matching xyz file-names and audioIds, following the event bus' conventions. The night ambience expects `public/assets/audio/ambient_night.ogg`
+  - Audio will not function without matching xyz file-names and audioIds, following the event bus' conventions. Expected files in `public/assets/audio/`: `ambient_night.ogg` and `sfx_mode_change.ogg`. Missing ones are logged and the game runs without them

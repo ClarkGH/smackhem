@@ -2,6 +2,12 @@ import { World } from './core/world';
 import { GameLoop } from './core/gameLoop';
 import { TypeSafeEventBus } from './core/events';
 import AudioSystem from './core/audioSystem';
+import {
+    AMBIENT_SOUND,
+    MODE_CHANGE_SOUND,
+    playAmbience,
+    subscribeModeAudio,
+} from './core/modeAudio';
 import { createGameState, GameState } from './core/gameState';
 import { createCamera } from './core/camera';
 import type { PlatformServices } from './services/platform';
@@ -26,14 +32,18 @@ const main = async () => {
     const eventBus = new TypeSafeEventBus();
     const audioSystem = new AudioSystem(platform.audio, eventBus);
 
-    // Night ambience loops for now, published as intent and played on the first flush
-    await audioSystem.preload('ambient_night', 'ambient');
-    eventBus.publish({
-        type: 'play_sound_requested',
-        soundId: 'ambient_night',
-        category: 'ambient',
-        loop: true,
+    // Missing audio files are not fatal, the game runs silent (see README)
+    const preloads = await Promise.allSettled([
+        audioSystem.preload(AMBIENT_SOUND, 'ambient'),
+        audioSystem.preload(MODE_CHANGE_SOUND, 'sfx'),
+    ]);
+    preloads.forEach((result) => {
+        if (result.status === 'rejected') console.error('Failed to preload audio:', result.reason);
     });
+
+    subscribeModeAudio(eventBus);
+    // Played on the first flush
+    playAmbience(eventBus);
 
     const gameState : GameState = createGameState();
 
