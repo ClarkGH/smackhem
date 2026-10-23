@@ -6,9 +6,9 @@ import { World } from './world';
 import EnvironmentSystem from './environment';
 import { Vec3, Mat4 } from '../types/common';
 import { getCameraMatrix, INSTANCE_CHARACTER_SIZE } from './camera';
-import { SCENE_TILE_SIZE } from './scene';
+import { SCENE_HEIGHT_PX, SCENE_TILE_SIZE, SCENE_WIDTH_PX } from './scene';
 import {
-    matrixMultiplyInto, smoothstep, orthographic, quaternionFromYawPitch, quaternionApplyToVector,
+    matrixMultiplyInto, smoothstep, orthographic, fitLogicalOrtho, quaternionFromYawPitch, quaternionApplyToVector,
 } from './math/mathHelpers';
 
 export default class RenderSystem {
@@ -24,6 +24,11 @@ export default class RenderSystem {
     private readonly sceneSpriteTransform: Mat4;
 
     private readonly sceneOrthoProj: Mat4;
+
+    // Viewport the scene projection was last built for, rebuilt only when it changes (M-1)
+    private sceneOrthoWidth = 0;
+
+    private sceneOrthoHeight = 0;
 
     constructor(
         private renderer: Renderer,
@@ -125,11 +130,16 @@ export default class RenderSystem {
             const width = this.renderer.getViewportWidth?.() ?? 800;
             const height = this.renderer.getViewportHeight?.() ?? 600;
 
-            const orthoProj = orthographic(0, width, height, 0, 0.1, 100.0);
-            const orthoElements = orthoProj.elements;
-            const sceneOrthoElements = this.sceneOrthoProj.elements;
-            for (let i = 0; i < 16; i += 1) {
-                sceneOrthoElements[i] = orthoElements[i];
+            if (width !== this.sceneOrthoWidth || height !== this.sceneOrthoHeight) {
+                this.sceneOrthoWidth = width;
+                this.sceneOrthoHeight = height;
+                const bounds = fitLogicalOrtho(width, height, SCENE_WIDTH_PX, SCENE_HEIGHT_PX);
+                const orthoProj = orthographic(bounds.left, bounds.right, bounds.bottom, bounds.top, 0.1, 100.0);
+                const orthoElements = orthoProj.elements;
+                const sceneOrthoElements = this.sceneOrthoProj.elements;
+                for (let i = 0; i < 16; i += 1) {
+                    sceneOrthoElements[i] = orthoElements[i];
+                }
             }
 
             if (this.renderer.clear) {

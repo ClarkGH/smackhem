@@ -4,6 +4,7 @@
 
 - [Renderer Interface](#renderer-interface)
 - [WebGL Implementation](#webgl-implementation)
+- [Display Size and Resolution](#display-size-and-resolution)
 - [Future Native Renderer](#future-native-renderer)
 - [Lighting System](#lighting-system)
   - [Directional Light Direction](#directional-light-direction)
@@ -49,6 +50,21 @@ interface Renderer {
 - World geometry: No textures, grayscale directional lighting (ambient + diffuse)
 - 2D sprites: Textures supported (RGBA with alpha blending), **lighting in progress**
 - Depth test only (world geometry and sprites)
+
+## Display Size and Resolution
+
+**On the web, the page decides the game's size, not the game.** On itch.io the game runs in an iframe: either the size chosen at upload ("Embed in page"), or the whole browser window ("Click to launch in fullscreen"). itch can also add its own fullscreen button. So:
+
+- **The canvas fills its container** (`#app`, which fills the page or iframe) and follows every resize. Nothing is hard-coded to 800×600 any more.
+- **Render scale** (Settings: 50%, 75%, 100%) sets how many pixels the canvas draws: container size × scale, with the browser stretching it to fit. It trades sharpness for performance. It's the web's version of a resolution setting.
+- **Window Size** (native PC only) picks the window's size, defaulting to the display's own resolution. The web hides it, because `DisplayService.capabilities()` reports no window control there.
+- **Any aspect ratio works.**
+  - The 3D view reads its aspect from the canvas every frame.
+  - The 2D scene keeps a fixed logical 800×600 space, and `fitLogicalOrtho` widens its projection so it stays centered and undistorted, with extra space at the sides or above and below.
+  - The projection is rebuilt only when the viewport size changes.
+- **Fullscreen** goes on the container, so the menu and debug overlays come along. It's a request:
+  - The browser can refuse it, for example in an iframe without fullscreen permission. Then the menu item is greyed out and points to the page's own button.
+  - Escape exits it natively. `settings.fullscreen` follows what the platform reports (`bindDisplay`), and it's never saved.
 
 ## Future Native Renderer
 
@@ -397,9 +413,10 @@ No GPU calls should appear outside the renderer layer. All WebGL/GPU operations 
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state management, and audio systems
+- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
-- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
-- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Controls](controls.md)** - Keyboard, mouse and controller bindings
+- **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure
-- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

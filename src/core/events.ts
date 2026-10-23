@@ -22,6 +22,10 @@ export type GameEvent =
         soundId: string
     }
     | {
+        // No payload, subscribers read the shared Settings
+        type: 'settings_changed';
+    }
+    | {
         type: 'audio_bus_volume_changed';
         category: AudioCategory;
         volume: number;

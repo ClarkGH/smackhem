@@ -2,13 +2,12 @@ import { World } from './core/world';
 import { GameLoop } from './core/gameLoop';
 import { TypeSafeEventBus } from './core/events';
 import AudioSystem from './core/audioSystem';
-import {
-    AMBIENT_SOUND,
-    MODE_CHANGE_SOUND,
-    playAmbience,
-    subscribeModeAudio,
-} from './core/modeAudio';
+import { AMBIENT_SOUND, MODE_CHANGE_SOUND, subscribeModeAudio } from './core/modeAudio';
+import { MENU_SELECT_SOUND } from './core/menuSystem';
 import { createGameState, GameState } from './core/gameState';
+import { parseSettings, serializeSettings, SETTINGS_STORAGE_KEY } from './core/settings';
+import { bindDisplay } from './core/displaySettings';
+import type { AudioCategory } from './services/audio';
 import { createCamera } from './core/camera';
 import type { PlatformServices } from './services/platform';
 import { createDebugHUD } from './platforms/web/debugHUD';
@@ -32,20 +31,33 @@ const main = async () => {
     const eventBus = new TypeSafeEventBus();
     const audioSystem = new AudioSystem(platform.audio, eventBus);
 
+    // Saved settings over the defaults, saved again whenever the menu changes one
+    const settings = parseSettings(platform.storage.get(SETTINGS_STORAGE_KEY));
+    eventBus.subscribe('settings_changed', () => {
+        platform.storage.set(SETTINGS_STORAGE_KEY, serializeSettings(settings));
+    });
+    // Render scale and window size apply now, fullscreen follows the platform
+    bindDisplay(eventBus, settings, platform.display);
+    // Saved volumes reach the mix buses on the first flush
+    (Object.keys(settings.volume) as AudioCategory[]).forEach((category) => {
+        eventBus.publish({ type: 'audio_bus_volume_changed', category, volume: settings.volume[category] });
+    });
+
     // Missing audio files are not fatal, the game runs silent (see README)
     const preloads = await Promise.allSettled([
         audioSystem.preload(AMBIENT_SOUND, 'ambient'),
         audioSystem.preload(MODE_CHANGE_SOUND, 'sfx'),
+        audioSystem.preload(MENU_SELECT_SOUND, 'ui'),
     ]);
     preloads.forEach((result) => {
         if (result.status === 'rejected') console.error('Failed to preload audio:', result.reason);
     });
 
+    // The ambience starts on New Game, when the mode changes to world_3d
     subscribeModeAudio(eventBus);
-    // Played on the first flush
-    playAmbience(eventBus);
 
-    const gameState : GameState = createGameState();
+    // Boots into the start-up menu, the world renders frozen behind it
+    const gameState : GameState = createGameState('main_menu');
 
     // Type parameters are intentionally unused (they're for type checking only)
     let updateActiveChunks: (
@@ -97,6 +109,9 @@ const main = async () => {
         eventBus,
         gameState,
         debugHUD,
+        platform.menu,
+        settings,
+        platform.display.capabilities(),
     );
 
     const loop = () => {

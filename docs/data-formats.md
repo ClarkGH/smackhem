@@ -3,6 +3,8 @@
 ## Table of Contents
 
 - [Map Data (JSON)](#map-data-json)
+- [Settings (JSON)](#settings-json)
+- [Save Data (planned)](#save-data-planned)
 - [Navigation](#navigation)
 
 ## Map Data (JSON)
@@ -148,14 +150,58 @@ Pure data. No logic. Portable forever.
 **Empty Chunk Fallback:**
 When a chunk file is missing or fails to load, the system automatically creates an empty chunk containing only a floor plane at the chunk's world coordinates. This ensures the game continues to function even if chunk files haven't been created yet.
 
+## Settings (JSON)
+
+Player settings are stored as JSON under the key `smackhem.settings`: localStorage on the web, and a file later on native platforms. They're written whenever a setting changes.
+
+```json
+{
+    "volume": { "master": 1, "music": 1, "ambient": 0.8, "sfx": 1, "ui": 1 },
+    "mouseSensitivity": 1.2,
+    "invertMouseY": false,
+    "controllerSensitivity": 1,
+    "invertControllerY": true,
+    "reducedMotion": false,
+    "menuTextScale": 1,
+    "renderScale": 1,
+    "windowResolution": null
+}
+```
+
+**Loading never trusts the file.** `parseSettings` starts from the defaults and only takes values that pass:
+- **Volumes** are clamped to 0–1, and **sensitivities** to 0.2–2.
+- **`menuTextScale`** must be 1, 1.5 or 2, **`renderScale`** must be 0.5, 0.75 or 1, and **`windowResolution`** must be `null` or one of the presets.
+- **Anything** missing, mistyped or unknown keeps its default, and corrupt JSON gives the full defaults.
+- **`fullscreen`** is never saved or restored, because browsers can't enter fullscreen without a user gesture.
+
+## Save Data (planned)
+
+Only the seam exists (`src/services/save.ts`); the save system isn't built yet.
+
+- **When:** save points and autosave only, taken in `world_3d` with nothing transitioning. A save is a snapshot of a stable moment and never stores transition state.
+- **Shape:**
+
+```typescript
+interface SaveData {
+    version: 1;
+    slot: 'auto' | 'save_point';
+    world: { cameraPosition: Vec3; cameraYaw: number; simulationTime: number };
+    flags: Record<string, boolean>; // event/quest flags, empty until that system exists
+}
+```
+
+- **Timestamps:** `savedAt` is stamped by the platform, so core never reads the clock (T-2).
+- **At rest:** saves will be stored encrypted and obfuscated, not as readable JSON. The platform's `SaveService` does this, and core always sees plain `SaveData`. A save that fails to decrypt or validate is treated as corrupt or missing, never a crash.
+
 ## Navigation
 
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
-- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state management, and audio systems
+- **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
+- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
-- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
+- **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Controls](controls.md)** - Keyboard, mouse and controller bindings
 - **[Project Structure](project-structure.md)** - Code organization and project structure
-- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

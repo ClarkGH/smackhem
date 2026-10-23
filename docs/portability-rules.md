@@ -337,10 +337,11 @@ Break them knowingly. With intent and not ignorance.
 
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
-- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state management, and audio systems
+- **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
+- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
-- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
-- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Controls](controls.md)** - Keyboard, mouse and controller bindings
+- **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure
-- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

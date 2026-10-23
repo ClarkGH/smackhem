@@ -3,6 +3,11 @@
     <head>
         <meta charset="UTF-8" />
         <title>Smackhem</title>
+        <style>
+            /* The game fills the page, or the iframe it's embedded in (itch.io) */
+            html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+            #app { position: relative; width: 100vw; height: 100vh; }
+        </style>
         <script type="module" src="/main.ts"></script>
     </head>
 

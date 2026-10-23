@@ -18,27 +18,25 @@ export const createDebugHUD = (canvas: HTMLCanvasElement): {
     toggle: () => void;
     isVisible: () => boolean;
 } => {
-    // Create 2D canvas overlay positioned on top of WebGL canvas
+    // 2D canvas overlay covering the WebGL canvas inside its container, so fullscreen takes it along
     const overlay = document.createElement('canvas');
 
-    // Position overlay to match canvas
+    // Same drawing size as the game canvas. Assigning a size clears the canvas, so only when it changes.
     const updateOverlaySize = () => {
-        const rect = canvas.getBoundingClientRect();
-        overlay.style.position = 'absolute';
-        overlay.style.left = `${rect.left}px`;
-        overlay.style.top = `${rect.top}px`;
-        overlay.style.width = `${canvas.width}px`;
-        overlay.style.height = `${canvas.height}px`;
-        overlay.width = canvas.width;
-        overlay.height = canvas.height;
+        if (overlay.width !== canvas.width) overlay.width = canvas.width;
+        if (overlay.height !== canvas.height) overlay.height = canvas.height;
     };
 
     updateOverlaySize();
+    overlay.style.position = 'absolute';
+    overlay.style.left = '0';
+    overlay.style.top = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
     overlay.style.pointerEvents = 'none';
     overlay.style.zIndex = '1000';
-    overlay.style.position = 'absolute';
     overlay.style.backgroundColor = 'transparent';
-    document.body.appendChild(overlay);
+    (canvas.parentElement ?? document.body).appendChild(overlay);
 
     // Update overlay size when window resizes
     window.addEventListener('resize', updateOverlaySize);

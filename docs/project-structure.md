@@ -64,22 +64,31 @@ src/
 │  ├─ audioSystem.spec.ts     # Tests for audio event handling (stub audio)
 │  ├─ camera.ts               # 3D camera math and logic
 │  ├─ collision.ts            # Collision logic
+│  ├─ displaySettings.ts      # Applies display settings, mirrors the platform's fullscreen state
+│  ├─ displaySettings.spec.ts # Fullscreen requests, refusals and outside changes (stub display)
 │  ├─ environment.ts          # Enviroment systems
 │  ├─ events.ts               # Eventing pub/sub systems
 │  ├─ gameLoop.ts             # Game loop logic
 │  ├─ gameState.ts            # Game State logic
 │  ├─ input.ts                # Player input logic
 │  ├─ instance.ts             # Instance systems
+│  ├─ look.spec.ts            # Look timing: mouse once per frame, stick per tick (stub platform)
+│  ├─ menu.ts                 # Menu screen type
+│  ├─ menuSystem.ts           # Start-up menu: screens, navigation, New Game
+│  ├─ menuSystem.spec.ts      # Menu tests, direct and through GameLoop (stub platform)
 │  ├─ modeAudio.ts            # Game mode changes -> audio requests (ambience, mode sound)
 │  ├─ modeAudio.spec.ts       # Scenario tests for mode-driven audio (stub platform)
 │  ├─ modeChange.spec.ts      # Scenario tests for game mode changes (stub platform)
 │  ├─ party.ts                # Party logic
 │  ├─ renderSystem.ts         # Rendering system
 │  ├─ scene.ts                # Scene system
+│  ├─ settings.ts             # Player settings, defaults, and validated load/save as JSON
+│  ├─ settings.spec.ts        # Settings parsing, clamping and storage round-trip
 │  ├─ world.ts                # World and chunking logic
 │  └─ math/                   # Shared engine math logic
 │     ├─ aabb.ts              # Axis aligned bounding box
-│     └─ mathHelpers.ts       # Matrix/vector/etc math helper methods
+│     ├─ mathHelpers.ts       # Matrix/vector/etc math helper methods
+│     └─ mathHelpers.spec.ts  # fitLogicalOrtho at 4:3, 16:9, 16:10 and tall viewports
 ├─ services/
 │  ├─ renderer.ts             # Abstract Renderer interface
 │  ├─ input.ts                # Abstract Input service
@@ -87,6 +96,10 @@ src/
 │  ├─ assetLoader.ts          # Asset loading service
 │  ├─ chunkLoader.ts          # Chunk JSON parsing and mesh creation
 │  ├─ audio.ts                # Abstract Audio service interface
+│  ├─ display.ts              # Display service: render scale, window size, fullscreen
+│  ├─ menuOverlay.ts          # Menu overlay interface and the MenuView it draws
+│  ├─ save.ts                 # Save data and save service (seam only, not implemented)
+│  ├─ storage.ts              # Key-value storage service (settings, later saves)
 │  └─ platform.ts             # Platform services interface
 ├─ platforms/
 │  ├─ web/
@@ -94,13 +107,22 @@ src/
 │  │  ├─ webClock.ts          # Web platform clock implementation
 │  │  ├─ webGLRenderer.ts     # Renderer specifically for webGL
 │  │  ├─ webInput.ts          # Web input state management
+│  │  ├─ webInput.spec.ts     # Gamepad mapping tests (faked navigator.getGamepads)
 │  │  ├─ webInputService.ts   # Web input service implementation
 │  │  ├─ webAssetLoader.ts    # Web asset loader (chunks)
 │  │  ├─ webAudioService.ts   # Web audio playback and mixing service
+│  │  ├─ webMenuOverlay.ts    # Menu drawn as text on a 2D canvas overlay, hit-tests the mouse
+│  │  ├─ menuHitTest.ts       # Mouse position to menu item, and menu scrolling (pure math)
+│  │  ├─ menuHitTest.spec.ts  # Hit-test, CSS-scaling and scrolling tests
+│  │  ├─ localStorageStore.ts # Key-value storage on localStorage, never throws
+│  │  ├─ webDisplay.ts        # Canvas fills its container, render scale, fullscreen on the container
 │  │  └─ debugHUD.ts          # Debug HUD overlay
 │  ├─ stub/
 │  │  ├─ nullRenderer.ts      # Stub renderer for testing/validation
 │  │  ├─ nullRenderer.spec.ts # Tests for stub renderer
+│  │  ├─ nullMenuOverlay.ts   # Stub menu overlay, keeps the last view for tests
+│  │  ├─ memoryStore.ts       # Stub key-value storage, in memory
+│  │  ├─ stubDisplay.ts       # Stub display, records requests, tests play the platform's side
 │  │  ├─ stubBootstrap.ts     # Stub platform bootstrap
 │  │  ├─ stubClock.ts         # Stub clock implementation
 │  │  ├─ stubInput.ts         # Stub input implementation
@@ -121,8 +143,9 @@ public/
 └─ assets/
    ├─ images/                 # Textures, asset ID naming (e.g. circle-sleep00.png)
    └─ audio/                  # Audio files, file name is the sound ID
-      ├─ ambient_night.ogg    # snake_case, led by purpose (e.g. ui_select)
-      └─ sfx_mode_change.ogg  # Played on every game mode change
+      ├─ ambient_night.ogg    # snake_case, led by purpose. All placeholders for now
+      ├─ sfx_mode_change.ogg  # Played on every game mode change
+      └─ ui_menu_select.ogg   # Played when a menu item is chosen
 ```
 
 Chunk files use offset-based naming to prevent negative coordinates in filenames. See [Data Formats](data-formats.md) for details.
@@ -160,9 +183,10 @@ No rewrites. Just additions.
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
-- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state management, and audio systems
+- **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
+- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
-- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
-- **[Data Formats](data-formats.md)** - Data format specifications
-- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path
+- **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Controls](controls.md)** - Keyboard, mouse and controller bindings
+- **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

@@ -30,7 +30,7 @@ export interface InterpolatedState {
     sceneTransitionProgress: number;
 }
 
-export type GameMode = 'world_3d' | 'instance_3d' | 'scene_2d';
+export type GameMode = 'main_menu' | 'world_3d' | 'instance_3d' | 'scene_2d';
 
 // TODO: Establish a differentiation between exploration in the world and in the instance
 export interface DiscreteState {
@@ -55,7 +55,7 @@ export interface GameState {
     discrete: DiscreteState;
 }
 
-export const createGameState = (): GameState => ({
+export const createGameState = (initialMode: GameMode = 'world_3d'): GameState => ({
     interpolated: {
         cameraPosition: { x: 0, y: PLAYER_HEIGHT, z: 0 },
         cameraYaw: 0,
@@ -67,7 +67,7 @@ export const createGameState = (): GameState => ({
         sceneTransitionProgress: 0,
     },
     discrete: {
-        gameMode: 'world_3d',
+        gameMode: initialMode,
         isTimeFrozen: false,
         isPaused: false,
         debugHUDVisible: false,

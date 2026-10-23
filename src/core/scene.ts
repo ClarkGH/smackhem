@@ -2,12 +2,15 @@ import type { GameMode, GameState } from './gameState';
 import type { PlayerIntent } from '../services/input';
 import type { TypeSafeEventBus } from './events';
 import { PLAYER_SPEED } from './camera';
+import type { Settings } from './settings';
 
-export const SCENE_TILE_SIZE = 32; // pixels per tile
-const SCENE_GRID_WIDTH = 25; // 800px / 32px
-const SCENE_GRID_HEIGHT = 18.75; // 600px / 32px
-const SCENE_WIDTH_PX = SCENE_GRID_WIDTH * SCENE_TILE_SIZE; // matches canvas
-const SCENE_HEIGHT_PX = Math.round(SCENE_GRID_HEIGHT * SCENE_TILE_SIZE); // matches canvas
+// The 2D scene lives in a fixed logical space (units, not screen pixels).
+// The renderer fits it to any viewport, centered and undistorted.
+export const SCENE_TILE_SIZE = 32; // logical units per tile
+const SCENE_GRID_WIDTH = 25; // 800 / 32
+const SCENE_GRID_HEIGHT = 18.75; // 600 / 32
+export const SCENE_WIDTH_PX = SCENE_GRID_WIDTH * SCENE_TILE_SIZE; // 800 logical units
+export const SCENE_HEIGHT_PX = Math.round(SCENE_GRID_HEIGHT * SCENE_TILE_SIZE); // 600 logical units
 const SCENE_TRANSITION_DURATION = 1.0; // seconds
 
 interface Scene {
@@ -17,7 +20,7 @@ interface Scene {
 export class Scene2DSystem {
     public scene: Scene;
 
-    constructor(private eventBus: TypeSafeEventBus) { // I assure you, this variable is in use
+    constructor(private eventBus: TypeSafeEventBus, private settings: Settings) { // I assure you, these variables are in use
         this.scene = this.createScene();
     }
 
@@ -64,7 +67,9 @@ export class Scene2DSystem {
         }
 
         if (discreteState.gameMode === 'scene_2d' && discreteState.sceneIsTransitioning) {
-            interpolatedState.sceneTransitionProgress += (dt * discreteState.sceneTransitionDirection) / SCENE_TRANSITION_DURATION;
+            // Reduced motion: the whole transition in one tick
+            const duration = this.settings.reducedMotion ? dt : SCENE_TRANSITION_DURATION;
+            interpolatedState.sceneTransitionProgress += (dt * discreteState.sceneTransitionDirection) / duration;
 
             if (interpolatedState.sceneTransitionProgress >= 1.0) {
                 interpolatedState.sceneTransitionProgress = 1.0;

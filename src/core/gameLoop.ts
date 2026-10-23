@@ -1,5 +1,7 @@
 import type { Renderer, TextureHandle } from '../services/renderer';
 import type { Input, PlayerIntent } from '../services/input';
+import type { MenuOverlay } from '../services/menuOverlay';
+import type { DisplayCapabilities } from '../services/display';
 import type { TypeSafeEventBus } from './events';
 import {
     createCamera,
@@ -25,10 +27,18 @@ import {
 } from './scene';
 import { GameState } from './gameState';
 import Instance3DSystem from './instance';
+import MenuSystem from './menuSystem';
+import { createDefaultSettings, type Settings } from './settings';
 import EnvironmentSystem from './environment';
 import RenderSystem from './renderSystem';
 
 const FIXED_DT = 1 / 60;
+
+// Radians per unit of mouse movement
+const MOUSE_LOOK_SCALE = 0.005;
+
+// Radians per second at full stick tilt
+const STICK_TURN_SPEED = 2.5;
 
 export interface DebugHUD {
     render: (_info: {
@@ -54,6 +64,8 @@ export class GameLoop {
     private scene2DSystem: Scene2DSystem;
 
     private instance3DSystem: Instance3DSystem;
+
+    private menuSystem: MenuSystem;
 
     private eventBus: TypeSafeEventBus;
 
@@ -81,6 +93,11 @@ export class GameLoop {
 
     private debugHUD?: DebugHUD;
 
+    private menuOverlay?: MenuOverlay;
+
+    // Shared, changed in place by the menu
+    private settings: Settings;
+
     // Constants
     private readonly SUN_SIZE = 0.5; // Radius of sun orb (sphere)
 
@@ -95,6 +112,17 @@ export class GameLoop {
 
     private readonly wallDebugMesh;
 
+    // Mouse look waiting for the next tick, so a frame that runs no tick doesn't drop it
+    private readonly pendingLook = { yaw: 0, pitch: 0 };
+
+    // Camera as it was before the latest tick
+    private readonly previousCamera = {
+        x: 0, y: 0, z: 0, yaw: 0, pitch: 0,
+    };
+
+    // What gets drawn: a blend of the last two ticks, so motion is smooth at any refresh rate
+    private readonly renderCamera: Camera = createCamera();
+
     // Pre-allocated scratch fields
     private readonly wallDebugTransform: Mat4 = identity();
 
@@ -108,6 +136,9 @@ export class GameLoop {
         eventBus: TypeSafeEventBus,
         gameState: GameState,
         debugHUD?: DebugHUD,
+        menuOverlay?: MenuOverlay,
+        settings?: Settings,
+        displayCapabilities?: DisplayCapabilities,
     ) {
         this.renderer = renderer;
         this.input = input;
@@ -115,19 +146,23 @@ export class GameLoop {
         this.getAspectRatio = getAspectRatio;
         this.eventBus = eventBus;
         this.gameState = gameState;
-        this.scene2DSystem = new Scene2DSystem(this.eventBus);
+        this.settings = settings ?? createDefaultSettings();
+        this.scene2DSystem = new Scene2DSystem(this.eventBus, this.settings);
+        this.menuSystem = new MenuSystem(this.eventBus, this.settings, displayCapabilities);
         this.debugHUD = debugHUD;
+        this.menuOverlay = menuOverlay;
 
         // Core objects
         this.camera = createCamera();
         this.collisionContext = createCollisionContext();
-        this.instance3DSystem = new Instance3DSystem(this.collisionContext, this.world, this.camera, this.eventBus);
+        this.instance3DSystem = new Instance3DSystem(this.collisionContext, this.world, this.camera, this.eventBus, this.settings);
         this.environmentSystem = new EnvironmentSystem(this.camera.far);
 
         // Seed camera
         this.camera.position = { ...this.gameState.interpolated.cameraPosition };
         this.camera.yaw = this.gameState.interpolated.cameraYaw;
         this.camera.pitch = this.gameState.interpolated.cameraPitch;
+        this.snapshotCamera();
 
         // Mesh objects
         this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE * 10, 16);
@@ -165,6 +200,25 @@ export class GameLoop {
         const discreteState = this.gameState.discrete;
         const interpolatedState = this.gameState.interpolated;
 
+        // Mouse look is a distance, used up by the first tick in any mode so it can't pile up in menus.
+        // Stick look is a rate, applied every tick. Each device has its own sensitivity and invert.
+        const { settings } = this;
+        const mouseScale = MOUSE_LOOK_SCALE * settings.mouseSensitivity;
+        const stickScale = STICK_TURN_SPEED * settings.controllerSensitivity * dt;
+        const mouseInvert = settings.invertMouseY ? -1 : 1;
+        const stickInvert = settings.invertControllerY ? -1 : 1;
+        const lookYaw = this.pendingLook.yaw * mouseScale + (intent.lookRate?.yaw ?? 0) * stickScale;
+        const lookPitch = this.pendingLook.pitch * mouseScale * mouseInvert
+            + (intent.lookRate?.pitch ?? 0) * stickScale * stickInvert;
+        this.pendingLook.yaw = 0;
+        this.pendingLook.pitch = 0;
+
+        // The menu owns the tick, so confirming New Game can't also reach the scene's interact
+        if (discreteState.gameMode === 'main_menu') {
+            this.menuSystem.update(this.gameState, intent);
+            return;
+        }
+
         this.scene2DSystem.update(dt, this.gameState, intent);
         this.instance3DSystem.update(dt, this.gameState, intent);
 
@@ -181,9 +235,8 @@ export class GameLoop {
         // Normal 3D simulation updates
         interpolatedState.simulationTime += dt;
 
-        const sensitivity = 0.005;
-        this.camera.yaw += intent.look.yaw * sensitivity;
-        this.camera.pitch -= intent.look.pitch * sensitivity;
+        this.camera.yaw += lookYaw;
+        this.camera.pitch -= lookPitch;
 
         const limit = Math.PI / 2 - 0.01;
         this.camera.pitch = Math.max(-limit, Math.min(limit, this.camera.pitch));
@@ -226,6 +279,8 @@ export class GameLoop {
         this.accumulator += deltaTime;
 
         const intentSnapshot = this.input.getIntent();
+        this.pendingLook.yaw += intentSnapshot.look.yaw;
+        this.pendingLook.pitch += intentSnapshot.look.pitch;
 
         if (intentSnapshot.toggleDebugHUD) {
             if (this.debugHUD) {
@@ -245,11 +300,15 @@ export class GameLoop {
         }
 
         while (this.accumulator >= FIXED_DT) {
+            this.snapshotCamera();
             this.updateSimulation(FIXED_DT, intentSnapshot);
 
             // Consume edge-triggered actions to prevent double-consumption
             intentSnapshot.interact = false;
             intentSnapshot.pause = false;
+            intentSnapshot.navigate = undefined;
+            intentSnapshot.back = false;
+            intentSnapshot.menuPointer = undefined;
 
             this.accumulator -= FIXED_DT;
         }
@@ -257,12 +316,43 @@ export class GameLoop {
         this.eventBus.flush();
     }
 
+    // Copies values: camera.position is replaced, not mutated, by some systems
+    private snapshotCamera(): void {
+        const prev = this.previousCamera;
+        prev.x = this.camera.position.x;
+        prev.y = this.camera.position.y;
+        prev.z = this.camera.position.z;
+        prev.yaw = this.camera.yaw;
+        prev.pitch = this.camera.pitch;
+    }
+
+    /**
+     * The camera to draw: between the previous and current tick, by how far the clock is into the next one.
+     * Rendering trails the simulation by up to one tick (about 16ms), the usual cost of this approach.
+     */
+    public getRenderCamera(): Readonly<Camera> {
+        const alpha = this.accumulator / FIXED_DT;
+        const prev = this.previousCamera;
+        const render = this.renderCamera;
+        render.position.x = prev.x + (this.camera.position.x - prev.x) * alpha;
+        render.position.y = prev.y + (this.camera.position.y - prev.y) * alpha;
+        render.position.z = prev.z + (this.camera.position.z - prev.z) * alpha;
+        render.yaw = prev.yaw + (this.camera.yaw - prev.yaw) * alpha;
+        render.pitch = prev.pitch + (this.camera.pitch - prev.pitch) * alpha;
+        return render;
+    }
+
     public render(): void {
-        this.environmentSystem.update(this.gameState, this.camera.position, 1.0, 1.0);
+        const renderCamera = this.getRenderCamera();
+        this.environmentSystem.update(this.gameState, renderCamera.position, 1.0, 1.0);
+
+        if (this.menuOverlay && this.menuSystem.consumeViewChanged()) {
+            this.menuOverlay.render(this.gameState.discrete.gameMode === 'main_menu' ? this.menuSystem.getView() : null);
+        }
 
         this.renderSystem.render(
             this.gameState,
-            this.camera,
+            renderCamera,
             this.partyMemberTexture1,
             this.debugHUD,
             this.WALL_DEBUG_COLOR,

@@ -26,6 +26,8 @@
   - [Party Structure](#party-structure)
   - [Party/Enemy Behavior](#partyenemy-behavior)
 - [Collision System](#collision-system)
+- [Scene System](#scene-system)
+- [Menu System](#menu-system)
 - [Navigation](#navigation)
 
 ## World System
@@ -230,9 +232,11 @@ interface PlayerIntent {
 
 ### Bare Web Input Backend
 
-- Keyboard → move
-- Mouse → look
-- Gamepad → move/look
+- Keyboard → move, interact, instance toggle, menu navigation
+- Mouse → look (`look`, a distance)
+- Gamepad → move, look (`lookRate`, a turn rate), and the same actions as the keyboard on A / B / Y and the D-pad
+
+The full list of bindings is in [Controls](controls.md).
 
 ### Console Input Backend (Future)
 
@@ -256,11 +260,11 @@ const instance3DSystem = new Instance3DSystem(this.collisionContext, this.world,
 ### Instance Transition
 
 - **Freeze/Unfreeze**: Currently triggered by space key, freezes the 3D world (timer, sun/moon, game simulation)
-- **Camera Pitch**: Transitions to 0 degrees (horizontal) when entering instance mode, and stays level after exiting
+- **Camera Pitch**: Transitions to 0 degrees (horizontal) when entering instance mode, and stays level after exiting. With Reduced Motion it levels at once instead of easing
 - **Character Transition**: Circle character transitions from camera position forward along the XZ plane into frozen 3D scene
   - Start: Camera's X/Z position at floor level
   - End: Position 3 units forward from camera along forward direction, at floor level
-  - Duration: 1.0 second (fixed timestep)
+  - Duration: 1.0 second (fixed timestep), or a single tick with Reduced Motion on
   - Interpolation: Linear interpolation (lerp) with smoothstep easing for smooth animation
 - **Position Calculation**: Starts at camera position, slides forward along camera's forward vector in XZ plane
 - **Transition State**: Managed by instance system, tracks progress and direction
@@ -371,14 +375,38 @@ This is console-friendly and debuggable.
 
 The 2D scene system (more TBD).
 
+## Menu System
+
+`MenuSystem` (`src/core/menuSystem.ts`) runs the start-up menu while the game mode is `main_menu`. It owns which screen is open and which item is selected. It works only from input intent, so keyboard, controller and (later) mouse all go through the same code.
+
+- **Screens:** main → settings → accessibility. Main has New Game, Continue, Load Game and Settings. Continue and Load stay disabled until the save system exists.
+- **Navigation:**
+  - `navigate.y` moves the selection (+1 is up), wrapping around and skipping disabled items;
+  - `interact` chooses the selected item;
+  - `back` goes up one level and reselects the item that opened the screen.
+- **New Game:** sets `world_3d` and publishes `game_mode_changed`, using the same previous-mode pattern as the scene and instance systems.
+- **The menu owns the tick:** in `main_menu`, `GameLoop.updateSimulation` runs only the menu and returns. So one press of interact can't confirm New Game and also enter the 2D scene.
+- **Sound:** choosing an enabled item, or going back, plays `ui_menu_select` on the `ui` bus. Moving the selection and disabled items stay silent.
+- **Settings rows:** Master/Music/Ambient/SFX/UI volume (steps of 10%), Mouse Sensitivity and Controller Sensitivity (0.2×–2×, steps of 0.1), Invert Mouse Y and Invert Controller Y, Render Scale, Window Size (native only), Fullscreen, then Accessibility and Back.
+  - **Display rows depend on the platform:** the screens are built from `DisplayCapabilities`. Window Size is hidden on the web, and Fullscreen is greyed out where the browser won't allow it. The menu also redraws on any `settings_changed`, so the Fullscreen value stays true when Escape exits fullscreen. See [Rendering](rendering.md#display-size-and-resolution).
+  - **Changing values:** ←/→, A/D, the D-pad or the `< >` arrows step a value, silently (the changing value is the feedback). Confirm flips a toggle, with the select sound, and does nothing on a slider.
+  - **Effects:** every change publishes `settings_changed`. A volume change also publishes `audio_bus_volume_changed`.
+- **Accessibility rows** (Settings → Accessibility):
+  - **Reduced Motion:** instance and 2D scene transitions finish in one tick, and the camera levels at once instead of easing.
+  - **Menu Text Size:** 1×, 1.5× or 2×. It reaches the overlay through `MenuView.textScale`, and long screens scroll at bigger sizes.
+- **Long screens scroll:** a list that doesn't fit scrolls only as far as needed to keep the selection on screen, so hovering a visible row never moves the list.
+- **Mouse:** the platform overlay hit-tests what it drew and sends `menuPointer { index, clicked, step? }`, never coordinates. Hover selects (disabled items included, they just can't be chosen), a click chooses, and `step` is for the `< >` arrows on value rows. It runs through the same code as keyboard and controller.
+- **Drawing:** the menu never draws. It describes itself as a `MenuView` (title, items, selection, text scale), rebuilt only when something changes (M-1). `GameLoop.render` hands it to the platform's `MenuOverlay`, or `null` to hide it once the game starts.
+
 ## Navigation
 
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
-- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state management, and audio systems
+- **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
+- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
-- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Controls](controls.md)** - Keyboard, mouse and controller bindings
+- **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure
-- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

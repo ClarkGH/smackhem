@@ -272,9 +272,10 @@ Column major skips full columns of size M to reach the correct column then adds 
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
-- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state management, and audio systems
-- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
-- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
+- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
+- **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Controls](controls.md)** - Keyboard, mouse and controller bindings
+- **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure
-- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

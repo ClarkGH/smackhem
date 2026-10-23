@@ -2,6 +2,9 @@ import NullRenderer from './nullRenderer';
 import StubClock from './stubClock';
 import StubInput from './stubInput';
 import StubAudioService from './stubAudioService';
+import NullMenuOverlay from './nullMenuOverlay';
+import MemoryStore from './memoryStore';
+import StubDisplay from './stubDisplay';
 import type { PlatformServices } from '../../services/platform';
 import type { Renderer } from '../../services/renderer';
 import {
@@ -167,6 +170,9 @@ const createStubPlatform = async (): Promise<PlatformServices> => ({
     clock: new StubClock(),
     input: new StubInput(),
     audio: new StubAudioService(),
+    menu: new NullMenuOverlay(),
+    storage: new MemoryStore(),
+    display: new StubDisplay(),
     getAspectRatio: () => 16 / 9,
 });
 

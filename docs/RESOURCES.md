@@ -15,5 +15,7 @@ These resources are inclusive of paradigms I have used, or related to what I am 
 
 We've used or are using the following royalty free and open source CC0 (creative commons zero) audio. While credit isn't legally necessary, we don't care, check their work out.
 
+All sounds in the engine are considered placeholders and subject to change.
+
 1. Pixabay - [Ambient night by U_vr5icvkppa](https://pixabay.com/sound-effects/nature-nature-ambience-323729/)
 2. Pixabay - [Menu select by skyscarper_seven](https://pixabay.com/sound-effects/film-special-effects-click-buttons-ui-menu-sounds-effects-button-13-205396/)

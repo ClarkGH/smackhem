@@ -15,6 +15,7 @@
         - [Portability & Separation of Concerns](#portability--separation-of-concerns)
         - [Audio Service Interface](#audio-service-interface)
         - [Audio System & Event Integration](#audio-system--event-integration)
+        - [Settings Events](#settings-events)
         - [Mode-Driven Audio](#mode-driven-audio)
         - [Buffered vs. Streamed Sounds](#buffered-vs-streamed-sounds)
         - [Web Audio Platform Implementation](#web-audio-platform-implementation)
@@ -225,11 +226,19 @@ Initial implementation assumes game state will be updated per tick, rendering wi
    └── 3. Render Pass ─────> Lerp(StateBuffer.Previous, StateBuffer.Current, Alpha) ──> WebGL/OpenGl Draw
 ```
 
+**Implemented so far: the camera.** Before each tick, `GameLoop` copies the camera's position, yaw and pitch. At render time it draws a blend of that copy and the current camera, with `alpha = accumulator / FIXED_DT` (how far the clock is into the next tick). That removes judder when the display refresh and the 60 Hz simulation don't line up: 144 Hz screens, or frames that run 0 or 2 ticks. The trade-off is that rendering trails the simulation by up to one tick (about 16 ms).
+
+Not interpolated yet: the instance character and the 2D scene character. They move during short transitions, where it hasn't been noticeable. When loading a save teleports the camera, the blend should be skipped for that frame, or the first frame would draw a point halfway along the jump.
+
+(Screen tearing, horizontal split lines, is a different problem. It comes from how the browser and the OS present frames, for example NVIDIA on X11, and the game can't fix it.)
+
 ### Audio Systems
 
 Audio needs to be playable, pauseable, streamable, and stopable. For game engines requiring low latency and precision playback, the strategy is to fetch audio files as binary ArrayBuffers, decode them into raw PCM buffers (e.g. Web Audio `AudioBuffer`), and wrap them behind platform-agnostic handles.
 
-Original sound fx will be created as lossless .wav, then exported and coverted into .ogg directly into smackhem/public/assets/audio/. The file name is the sound ID: snake_case, led by its purpose (`ui_select.ogg`, `ambient_night.ogg`). Non-original audio is open source, royalty free, and free for commercial use. Sources are linked in the credits section of **[RESOURCES](RESOURCES.md)**.
+Original sound fx will be created as lossless .wav, then exported and coverted into .ogg directly into smackhem/public/assets/audio/. The file name is the sound ID: snake_case, led by its purpose (`ui_menu_select.ogg`, `ambient_night.ogg`).
+
+**Every current sound is a placeholder and subject to change:** `ambient_night`, `sfx_mode_change` and `ui_menu_select` (currently the same file as `sfx_mode_change`). Sound IDs are the stable contract, so replacing a file needs no code change. Non-original audio is open source, royalty free, and free for commercial use. Sources are linked in the credits section of **[RESOURCES](RESOURCES.md)**.
 
 #### Sound Compression
 
@@ -397,7 +406,13 @@ Sounds are preloaded up front, so playing one is a map lookup at flush time.
 
 This absorbs duplicate requests from several fixed ticks landing in one flush, and there are no voice lists to prune. A finished voice sits in the map until the sound plays again, so the map is bounded by the number of audio files shipped (M-2). If a sound ever needs real overlap, like several party members' footsteps, give it a voice limit and stop the oldest voice at the limit.
 
+**Volume.** `audio_bus_volume_changed` is published by the Settings menu each time a volume steps, and by `main.ts` once per bus at boot, to apply the saved volumes. `AudioSystem` passes it to `setVolume`.
+
 Voices are checked with `isFinished()` from the tick, not through end-of-sound callbacks. On native backends those callbacks fire on the audio thread, and calling into core from there would need the MPSC queue or locks. Checking from the tick keeps audio single-threaded, and miniaudio supports it directly (`ma_sound_at_end`). It is `isFinished()` rather than `isPlaying()` so a paused voice is kept and can still be stopped.
+
+#### Settings Events
+
+`settings_changed` has no payload. Settings live in one shared `Settings` object (`src/core/settings.ts`), which the menu changes in place, so subscribers read it directly. `main.ts` subscribes and saves the settings to storage. `bindDisplay` (`src/core/displaySettings.ts`) subscribes and applies render scale, window size and fullscreen to the platform. When the platform reports a fullscreen change itself (a refusal, Escape, the page's button), it updates `settings.fullscreen` and publishes `settings_changed` so the menu redraws. Look sensitivity and invert need no event: `GameLoop` reads them every tick.
 
 #### Mode-Driven Audio
 
@@ -427,7 +442,7 @@ eventBus.subscribe('game_mode_changed', (event) => {
 });
 ```
 
-Requests published from inside a handler go into the next flush, so audio follows a mode change one frame later. `main.ts` preloads both sounds (a missing file is logged, not fatal), subscribes these rules, and starts the ambience on boot.
+Requests published from inside a handler go into the next flush, so audio follows a mode change one frame later. `main.ts` preloads the sounds (a missing file is logged, not fatal) and subscribes these rules. The game boots into the start-up menu in silence, and the ambience starts when New Game changes the mode to `world_3d`. That keypress also unlocks browser audio.
 
 #### Buffered vs. Streamed Sounds
 
@@ -535,9 +550,10 @@ To uphold the deletion test (Rule P-1), a `StubAudioService` is provided in `src
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
-- **[Rendering](rendering.md)** - Rendering system, lighting, and day/night cycle
+- **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
 - **[Camera](camera.md)** - Camera system and mathematical formulas
-- **[Systems](systems.md)** - World, party, input, collision, and geometry systems
-- **[Data Formats](data-formats.md)** - Data format specifications
+- **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Controls](controls.md)** - Keyboard, mouse and controller bindings
+- **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure
-- **[Porting Strategy](porting-strategy.md)** - Porting approach, FFI constraints, and learning path
+- **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

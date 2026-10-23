@@ -10,12 +10,8 @@ import { createGameState, type GameState } from './gameState';
 import { GameLoop } from './gameLoop';
 import { World } from './world';
 import AudioSystem from './audioSystem';
-import {
-    AMBIENT_SOUND,
-    MODE_CHANGE_SOUND,
-    playAmbience,
-    subscribeModeAudio,
-} from './modeAudio';
+import { AMBIENT_SOUND, MODE_CHANGE_SOUND, subscribeModeAudio } from './modeAudio';
+import { MENU_SELECT_SOUND } from './menuSystem';
 import NullRenderer from '../platforms/stub/nullRenderer';
 import StubInput from '../platforms/stub/stubInput';
 import StubAudioService, { type StubPlaybackHandle } from '../platforms/stub/stubAudioService';
@@ -49,12 +45,13 @@ describe('mode-driven audio - scenario (stub platform)', () => {
         vi.spyOn(console, 'log').mockImplementation(() => {});
 
         input = new StubInput();
-        gameState = createGameState();
+        gameState = createGameState('main_menu');
         audio = new StubAudioService();
         const eventBus = new TypeSafeEventBus();
         const audioSystem = new AudioSystem(audio, eventBus);
         await audioSystem.preload(AMBIENT_SOUND, 'ambient');
         await audioSystem.preload(MODE_CHANGE_SOUND, 'sfx');
+        await audioSystem.preload(MENU_SELECT_SOUND, 'ui');
 
         gameLoop = new GameLoop(
             new NullRenderer(),
@@ -66,16 +63,24 @@ describe('mode-driven audio - scenario (stub platform)', () => {
         );
 
         subscribeModeAudio(eventBus);
-        playAmbience(eventBus);
         tick(1);
     });
 
-    it('starts the ambience on boot', () => {
+    // New Game is the first entry in the start-up menu
+    const startNewGame = (): void => press({ interact: true });
+
+    it('is silent in the menu and starts the ambience on New Game', () => {
+        expect(voicesOf(AMBIENT_SOUND)).toHaveLength(0);
+
+        startNewGame();
+
+        expect(gameState.discrete.gameMode).toBe('world_3d');
         expect(voicesOf(AMBIENT_SOUND)).toHaveLength(1);
         expect(voicesOf(AMBIENT_SOUND)[0].isFinished()).toBe(false);
     });
 
     it('pauses the ambience in the 2D scene and resumes it on return', () => {
+        startNewGame();
         press({ interact: true });
         expect(gameState.discrete.gameMode).toBe('scene_2d');
         expect(voicesOf(AMBIENT_SOUND)[0].paused).toBe(true);
@@ -87,6 +92,7 @@ describe('mode-driven audio - scenario (stub platform)', () => {
     });
 
     it('stops the ambience in the instance and starts it again on return', () => {
+        startNewGame();
         press({ pause: true });
         expect(gameState.discrete.gameMode).toBe('instance_3d');
         expect(voicesOf(AMBIENT_SOUND)[0].stopped).toBe(true);
@@ -101,10 +107,11 @@ describe('mode-driven audio - scenario (stub platform)', () => {
         expect(ambience[1].isFinished()).toBe(false);
     });
 
-    it('plays the mode change sound on every change', () => {
+    it('plays the mode change sound on every change, New Game included', () => {
+        startNewGame();
         press({ interact: true });
         press({ interact: true });
 
-        expect(voicesOf(MODE_CHANGE_SOUND)).toHaveLength(2);
+        expect(voicesOf(MODE_CHANGE_SOUND)).toHaveLength(3);
     });
 });

@@ -32,6 +32,41 @@ export const perspective = (
     return { elements: e };
 };
 
+export interface OrthoBounds {
+    left: number;
+    right: number;
+    bottom: number;
+    top: number;
+}
+
+/**
+ * Orthographic bounds that show a fixed logical area (y down) centered and undistorted
+ * in a viewport of any shape. The extra space goes to the sides (wider viewport)
+ * or above and below (taller viewport).
+ */
+export const fitLogicalOrtho = (
+    viewWidth: number,
+    viewHeight: number,
+    logicalWidth: number,
+    logicalHeight: number,
+): OrthoBounds => {
+    const viewAspect = viewWidth / viewHeight;
+    const logicalAspect = logicalWidth / logicalHeight;
+
+    // 0 - pad, not -pad, so an exact fit gives 0 rather than -0
+    if (viewAspect > logicalAspect) {
+        const pad = (logicalHeight * viewAspect - logicalWidth) / 2;
+        return {
+            left: 0 - pad, right: logicalWidth + pad, bottom: logicalHeight, top: 0,
+        };
+    }
+
+    const pad = (logicalWidth / viewAspect - logicalHeight) / 2;
+    return {
+        left: 0, right: logicalWidth, bottom: logicalHeight + pad, top: 0 - pad,
+    };
+};
+
 export const orthographic = (
     left: number,
     right: number,

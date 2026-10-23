@@ -10,6 +10,9 @@ import WebAssetLoader from './webAssetLoader';
 import WebGLRenderer from './webGLRenderer';
 import WebClock from './webClock';
 import WebAudioService from './webAudioService';
+import WebMenuOverlay from './webMenuOverlay';
+import LocalStorageStore from './localStorageStore';
+import WebDisplay from './webDisplay';
 
 // PlatformServices interface moved to src/services/platform.ts
 // This export is kept for backward compatibility but should use the shared type
@@ -100,22 +103,38 @@ export const updateActiveChunks = async (
 };
 
 export const createWebPlatform = async (): Promise<PlatformServices & { canvas: HTMLCanvasElement; assetLoader: WebAssetLoader }> => {
-    // DOM setup
+    // DOM setup: the canvas fills #app, which fills the page (or an itch.io iframe).
+    // The menu and debug overlays sit on top of it inside the same container.
+    let container = document.getElementById('app');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'app';
+        document.body.appendChild(container);
+    }
     const canvas = document.createElement('canvas');
-    canvas.width = 800; // TODO: Variable width
-    canvas.height = 600; // TODO: Variable height
-    document.body.appendChild(canvas);
+    canvas.style.display = 'block';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    container.appendChild(canvas);
+
+    // Before the renderer and overlays, so the canvas already has its real size
+    const display = new WebDisplay(container, canvas);
 
     const renderer = new WebGLRenderer(canvas);
     const input = new WebInputService(canvas);
     const clock = new WebClock();
     const assetLoader = new WebAssetLoader('/chunks/');
     const audio = new WebAudioService('/assets/audio/');
+    const menu = new WebMenuOverlay(canvas, {
+        pointer: (pointer) => input.pointMenu(pointer),
+        back: () => input.pressBack(),
+    });
 
-    // Wireframe toggle (press '\' key)
+    // Wireframe toggle on F4 (debug keys live on the F-keys, see docs/controls.md)
     let wireframeEnabled = false;
     document.addEventListener('keydown', (e) => {
-        if (e.key === '\\') {
+        if (e.key === 'F4') {
+            e.preventDefault();
             wireframeEnabled = !wireframeEnabled;
             renderer.setWireframe(wireframeEnabled);
             console.log(`Wireframe: ${wireframeEnabled ? 'ON' : 'OFF'}`);
@@ -136,6 +155,9 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
         clock,
         input,
         audio,
+        menu,
+        storage: new LocalStorageStore(),
+        display,
         canvas,
         assetLoader,
         getAspectRatio: () => canvas.width / canvas.height,

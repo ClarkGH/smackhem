@@ -17,6 +17,7 @@ import {
     type CollisionContext,
 } from './collision';
 import { World } from './world';
+import type { Settings } from './settings';
 
 const TRANSITION_DURATION = 1;
 
@@ -35,6 +36,7 @@ export default class Instance3DSystem {
         private world: World,
         private camera: Camera,
         private eventBus: TypeSafeEventBus,
+        private settings: Settings,
     ) {
         console.log('2D Instance System Instantiated');
     }
@@ -126,9 +128,11 @@ export default class Instance3DSystem {
         const interpolatedState = gameState.interpolated;
 
         if (discreteState.isTimeFrozen && discreteState.instanceIsTransitioning) {
+            // Reduced motion: the whole transition in one tick
+            const duration = this.settings.reducedMotion ? dt : TRANSITION_DURATION;
             interpolatedState.instanceTransitionProgress += (
                 dt * discreteState.instanceTransitionDirection
-            ) / TRANSITION_DURATION;
+            ) / duration;
 
             if (interpolatedState.instanceTransitionProgress >= 1.0) {
                 interpolatedState.instanceTransitionProgress = 1.0;
@@ -174,7 +178,8 @@ export default class Instance3DSystem {
             const pitchTransitionSpeed = 2.0;
             const pitchDelta = (discreteState.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
 
-            if (Math.abs(pitchDelta) < 0.001) {
+            // Reduced motion levels the camera at once instead of easing
+            if (Math.abs(pitchDelta) < 0.001 || this.settings.reducedMotion) {
                 this.camera.pitch = discreteState.targetPitch;
                 interpolatedState.cameraPitch = discreteState.targetPitch;
                 discreteState.isTransitioningPitch = false;

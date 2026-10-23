@@ -12,6 +12,7 @@ import { World } from './world';
 import NullRenderer from '../platforms/stub/nullRenderer';
 import StubInput from '../platforms/stub/stubInput';
 import type { PlayerIntent } from '../services/input';
+import { createDefaultSettings } from './settings';
 
 const FIXED_DT = 1 / 60;
 
@@ -103,5 +104,83 @@ describe('game_mode_changed - scenario (stub platform)', () => {
         press({ interact: true });
 
         expect(gameState.discrete.gameMode).not.toBe('scene_2d');
+    });
+});
+
+describe('reduced motion - scenario (stub platform)', () => {
+    const createLoop = (reducedMotion: boolean) => {
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        const input = new StubInput();
+        const gameState = createGameState();
+        const settings = createDefaultSettings();
+        settings.reducedMotion = reducedMotion;
+        const gameLoop = new GameLoop(
+            new NullRenderer(),
+            input,
+            new World(),
+            () => 16 / 9,
+            new TypeSafeEventBus(),
+            gameState,
+            undefined,
+            undefined,
+            settings,
+        );
+        const press = (intent: Partial<PlayerIntent>): void => {
+            input.setIntent(intent);
+            gameLoop.update(FIXED_DT);
+            input.reset();
+        };
+        const tick = (count: number): void => {
+            for (let i = 0; i < count; i += 1) gameLoop.update(FIXED_DT);
+        };
+        return {
+            input, gameState, gameLoop, press, tick,
+        };
+    };
+
+    it('enters and leaves the instance within a couple of ticks', () => {
+        const { gameState, press, tick } = createLoop(true);
+
+        press({ pause: true });
+        tick(1);
+        expect(gameState.discrete.instanceIsActive).toBe(true);
+
+        press({ pause: true });
+        tick(1);
+        expect(gameState.discrete.gameMode).toBe('world_3d');
+    });
+
+    it('takes most of a second without it', () => {
+        const { gameState, press, tick } = createLoop(false);
+
+        press({ pause: true });
+        tick(1);
+        expect(gameState.discrete.instanceIsActive).toBe(false);
+    });
+
+    it('levels the camera at once on entering the instance', () => {
+        const {
+            input, gameState, gameLoop, press,
+        } = createLoop(true);
+
+        // Look down a little first
+        input.setIntent({ lookRate: { yaw: 0, pitch: 1 } });
+        gameLoop.update(FIXED_DT * 10);
+        input.reset();
+        expect(gameState.interpolated.cameraPitch).not.toBe(0);
+
+        press({ pause: true });
+
+        expect(gameState.interpolated.cameraPitch).toBe(0);
+        expect(gameState.discrete.isTransitioningPitch).toBe(false);
+    });
+
+    it('opens the 2D scene in one tick', () => {
+        const { gameState, press } = createLoop(true);
+
+        press({ interact: true });
+
+        expect(gameState.discrete.gameMode).toBe('scene_2d');
+        expect(gameState.discrete.sceneIsActive).toBe(true);
     });
 });
