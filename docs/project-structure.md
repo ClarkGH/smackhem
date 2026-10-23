@@ -111,11 +111,20 @@ src/
 
 ```text
 public/
-└─ chunks/              # Chunk JSON files
-   └─ {fileX}_{fileZ}.json  # Offset-based naming (fileX = chunkX + 10000)
+├─ chunks/              # Chunk JSON files
+│  └─ {fileX}_{fileZ}.json  # Offset-based naming (fileX = chunkX + 10000)
+└─ audio/               # Public Audio files
+   └─ example_audio.ogg # SoundID-based naming (e.g. menu_click)
 ```
 
 Chunk files use offset-based naming to prevent negative coordinates in filenames. See [Data Formats](data-formats.md) for details.
+
+## Scripts Directory Structure
+
+```text
+scripts/
+└─ audio-aliases.sh # FFMPEG trim and compression scripts
+```
 
 ## Root Level Configuration
 

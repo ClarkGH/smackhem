@@ -230,6 +230,54 @@ Audio needs to be playable, pauseable, streamable, and stopable. For game engine
 
 Original sound fx will be created as lossless .wav, then exported and coverted into .ogg directly into smackhem/public/assets/audio/. Non-original audio is open source, royalty free, and free for commercial use. Sources are linked in the credits section of **[RESOURCES](RESOURCES.md)**.
 
+#### Sound Compression
+
+For simplicity's sake, there's a set of bash scripts in `scripts/audio-aliases.sh` that will compress and cut dead-air from sound files.
+
+To run, source the file `source scripts/audio-aliases.sh`.
+
+Alternatively, you can run the script via bash.
+
+##### To compress and trim:
+
+Run only the commands without sourcing
+
+```bash
+bash scripts/audio-aliases.sh --trim
+```
+
+Sourced
+
+```bash
+mp32ogg-trim menu-select.mp3
+# or
+wav2ogg-trim footstep.wav
+# or multiple
+wav2ogg-trim jump.wav land.wav hit.wav
+# or all audio files in current dir
+audio2ogg-trim
+```
+
+##### To compress, not trim:
+
+Run only the commands without sourcing
+
+```bash
+bash scripts/audio-aliases.sh
+```
+
+With sourcing
+
+```bash
+mp32ogg night-time.mp3
+# or
+wav2ogg overworld_theme.wav
+# or multiple
+wav2ogg jump.wav land.wav hit.wav
+# or all
+audio2ogg
+```
+
 #### Portability & Separation of Concerns
 
 Asset loading in Smackhem originally risked becoming a monolithic "God Asset Loader" combining chunks, textures, and maps. For audio, **Portability First** demands strict separation:
