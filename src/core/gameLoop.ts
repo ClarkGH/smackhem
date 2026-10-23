@@ -25,7 +25,7 @@ import type { Vec3, Mat4 } from '../types/common';
 import {
     Scene2DSystem,
 } from './scene';
-import { GameState } from './gameState';
+import { createGameState, GameState } from './gameState';
 import Instance3DSystem from './instance';
 import MenuSystem from './menuSystem';
 import { createDefaultSettings, type Settings } from './settings';
@@ -183,6 +183,8 @@ export class GameLoop {
             console.log(`event - ${event.type}\n`, `curr mode: ${event.currentMode}\n`, `prev mode: ${event.previousMode}`);
         });
 
+        this.eventBus.subscribe('quit_to_main_menu_requested', () => this.quitToMainMenu());
+
         // Load party textures asynchronously
         this.loadPartyTextures();
     }
@@ -213,8 +215,16 @@ export class GameLoop {
         this.pendingLook.yaw = 0;
         this.pendingLook.pitch = 0;
 
-        // The menu owns the tick, so confirming New Game can't also reach the scene's interact
-        if (discreteState.gameMode === 'main_menu') {
+        // The menu button pauses play. Nothing else runs this tick.
+        if (intent.menu && discreteState.gameMode !== 'main_menu' && !discreteState.isPaused) {
+            discreteState.isPaused = true;
+            this.menuSystem.openPause();
+            return;
+        }
+
+        // The menu owns the tick, so confirming New Game can't also reach the scene's interact.
+        // Paused, the simulation stops: no movement, transitions or day/night.
+        if (discreteState.gameMode === 'main_menu' || discreteState.isPaused) {
             this.menuSystem.update(this.gameState, intent);
             return;
         }
@@ -291,7 +301,8 @@ export class GameLoop {
             }
         }
 
-        if (intentSnapshot.pause) {
+        // The instance toggle, not the pause menu, and not while paused
+        if (intentSnapshot.pause && !this.gameState.discrete.isPaused) {
             if (this.gameState.discrete.isTimeFrozen) {
                 this.instance3DSystem.unPropagateInstance(this.gameState);
             } else {
@@ -308,12 +319,35 @@ export class GameLoop {
             intentSnapshot.pause = false;
             intentSnapshot.navigate = undefined;
             intentSnapshot.back = false;
+            intentSnapshot.menu = false;
             intentSnapshot.menuPointer = undefined;
 
             this.accumulator -= FIXED_DT;
         }
 
         this.eventBus.flush();
+    }
+
+    /**
+     * Throws the run away and goes back to the main menu as if freshly booted.
+     * The GameState object is shared, so its contents are replaced rather than the object itself.
+     */
+    private quitToMainMenu(): void {
+        const previousMode = this.gameState.discrete.gameMode;
+        const fresh = createGameState('main_menu');
+        this.gameState.discrete = fresh.discrete;
+        this.gameState.interpolated = fresh.interpolated;
+
+        this.camera.position = { ...fresh.interpolated.cameraPosition };
+        this.camera.yaw = fresh.interpolated.cameraYaw;
+        this.camera.pitch = fresh.interpolated.cameraPitch;
+        // No blending from where the run ended
+        this.snapshotCamera();
+        this.pendingLook.yaw = 0;
+        this.pendingLook.pitch = 0;
+
+        this.menuSystem.reset();
+        this.eventBus.publish({ type: 'game_mode_changed', previousMode, currentMode: 'main_menu' });
     }
 
     // Copies values: camera.position is replaced, not mutated, by some systems
@@ -347,7 +381,8 @@ export class GameLoop {
         this.environmentSystem.update(this.gameState, renderCamera.position, 1.0, 1.0);
 
         if (this.menuOverlay && this.menuSystem.consumeViewChanged()) {
-            this.menuOverlay.render(this.gameState.discrete.gameMode === 'main_menu' ? this.menuSystem.getView() : null);
+            const { gameMode, isPaused } = this.gameState.discrete;
+            this.menuOverlay.render(gameMode === 'main_menu' || isPaused ? this.menuSystem.getView() : null);
         }
 
         this.renderSystem.render(

@@ -1,4 +1,4 @@
-export type PlayerIntentAction = 'Look' | 'Interact' | 'Pause' | 'ToggleDebugHUD' | 'Back';
+export type PlayerIntentAction = 'Look' | 'Interact' | 'Pause' | 'ToggleDebugHUD' | 'Back' | 'Menu';
 
 export interface InputState {
     actions: Record<PlayerIntentAction, boolean>;
@@ -26,6 +26,7 @@ export const createInputState = (): InputState => ({
         Pause: false,
         ToggleDebugHUD: false,
         Back: false,
+        Menu: false,
     },
     axes: {
         lookX: 0,

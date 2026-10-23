@@ -29,6 +29,9 @@ export type GameEvent =
         type: 'audio_bus_volume_changed';
         category: AudioCategory;
         volume: number;
+    }
+    | {
+        type: 'quit_to_main_menu_requested';
     };
 
 type ExtractEvent<K extends GameEvent['type']> = Extract<GameEvent, { type: K }>;

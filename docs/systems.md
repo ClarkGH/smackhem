@@ -377,15 +377,24 @@ The 2D scene system (more TBD).
 
 ## Menu System
 
-`MenuSystem` (`src/core/menuSystem.ts`) runs the start-up menu while the game mode is `main_menu`. It owns which screen is open and which item is selected. It works only from input intent, so keyboard, controller and (later) mouse all go through the same code.
+`MenuSystem` (`src/core/menuSystem.ts`) runs the start-up menu while the game mode is `main_menu`, and the pause menu while `DiscreteState.isPaused` is set. It owns which screen is open and which item is selected. It works only from input intent, so keyboard, controller and mouse all go through the same code.
 
-- **Screens:** main → settings → accessibility. Main has New Game, Continue, Load Game and Settings. Continue and Load stay disabled until the save system exists.
+- **Screens:**
+  - **Main** (main → settings → accessibility): New Game, Continue, Load Game and Settings. Continue and Load stay disabled until the save system exists.
+  - **Pause** (pause → settings → accessibility, and pause → quit confirm): Resume, Settings, Quit to Main Menu.
+  - **Shared screens:** Settings and Accessibility are the same screens in both menus.
 - **Navigation:**
   - `navigate.y` moves the selection (+1 is up), wrapping around and skipping disabled items;
   - `interact` chooses the selected item;
-  - `back` goes up one level and reselects the item that opened the screen.
+  - `back` goes up one level to wherever the screen was opened from, with the item that opened it selected. The menu keeps a stack of the screens you came through, because Settings opens from both menus.
+- **The pause menu:**
+  - **Opening:** the menu button (`menu`: Escape or Start) during play sets `isPaused`. The game mode doesn't change, so Resume returns to the world, the instance or the 2D scene.
+  - **While paused**, `GameLoop` runs only the menu: no movement, transitions or day/night. The instance toggle is ignored. Ambience keeps playing.
+  - **Closing:** Escape steps back one level, and at the Pause screen it resumes. Start closes the pause menu from any screen (Escape sends both `back` and `menu`, and `back` wins).
+  - **Quit to Main Menu** asks first, with No selected. Yes publishes `quit_to_main_menu_requested`, and `GameLoop` resets to a fresh boot: new game state (the shared `GameState` object keeps its identity, its contents are replaced), the camera at the start with no render blending, the menu back on its first screen, and `game_mode_changed` to `main_menu`.
+  - **Lost cursor:** on the web, losing the captured cursor during play (Escape, switching windows) also opens the pause menu, because browsers may not pass that Escape on to the page.
 - **New Game:** sets `world_3d` and publishes `game_mode_changed`, using the same previous-mode pattern as the scene and instance systems.
-- **The menu owns the tick:** in `main_menu`, `GameLoop.updateSimulation` runs only the menu and returns. So one press of interact can't confirm New Game and also enter the 2D scene.
+- **The menu owns the tick:** in `main_menu` or while paused, `GameLoop.updateSimulation` runs only the menu and returns. So one press of interact can't confirm New Game and also enter the 2D scene.
 - **Sound:** choosing an enabled item, or going back, plays `ui_menu_select` on the `ui` bus. Moving the selection and disabled items stay silent.
 - **Settings rows:** Master/Music/Ambient/SFX/UI volume (steps of 10%), Mouse Sensitivity and Controller Sensitivity (0.2×–2×, steps of 0.1), Invert Mouse Y and Invert Controller Y, Render Scale, Window Size (native only), Fullscreen, then Accessibility and Back.
   - **Display rows depend on the platform:** the screens are built from `DisplayCapabilities`. Window Size is hidden on the web, and Fullscreen is greyed out where the browser won't allow it. The menu also redraws on any `settings_changed`, so the Fullscreen value stays true when Escape exits fullscreen. See [Rendering](rendering.md#display-size-and-resolution).

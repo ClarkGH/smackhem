@@ -20,7 +20,16 @@ import type { MenuView } from '../services/menuOverlay';
 
 export const MENU_SELECT_SOUND = 'ui_menu_select';
 
-type MenuAction = 'new_game' | 'continue' | 'load' | 'open_settings' | 'open_accessibility' | 'back';
+type MenuAction =
+    | 'new_game'
+    | 'continue'
+    | 'load'
+    | 'resume'
+    | 'open_settings'
+    | 'open_accessibility'
+    | 'open_quit_confirm'
+    | 'quit'
+    | 'back';
 
 // A value row: stepped with left/right or the < > arrows
 type MenuSetting =
@@ -42,10 +51,6 @@ interface MenuItem {
 interface MenuScreenData {
     title: string;
     items: MenuItem[];
-    // Screen that back returns to, null for the root
-    parent: MenuScreen | null;
-    // Item on the parent that opens this screen, reselected on the way back
-    openedBy: MenuAction | null;
 }
 
 const actionItem = (label: string, action: MenuAction, disabled = false): MenuItem => ({ label, action, disabled });
@@ -77,8 +82,22 @@ const buildScreens = (capabilities: DisplayCapabilities): Record<MenuScreen, Men
             actionItem('Load Game', 'load', true),
             actionItem('Settings', 'open_settings'),
         ],
-        parent: null,
-        openedBy: null,
+    },
+    pause: {
+        title: 'Paused',
+        items: [
+            actionItem('Resume', 'resume'),
+            actionItem('Settings', 'open_settings'),
+            actionItem('Quit to Main Menu', 'open_quit_confirm'),
+        ],
+    },
+    // No comes first, so a stray confirm never throws the run away
+    quit_confirm: {
+        title: 'Quit to main menu? Progress will be lost.',
+        items: [
+            actionItem('No', 'back'),
+            actionItem('Yes, quit', 'quit'),
+        ],
     },
     settings: {
         title: 'Settings',
@@ -96,8 +115,6 @@ const buildScreens = (capabilities: DisplayCapabilities): Record<MenuScreen, Men
             actionItem('Accessibility', 'open_accessibility'),
             actionItem('Back', 'back'),
         ],
-        parent: 'main',
-        openedBy: 'open_settings',
     },
     accessibility: {
         title: 'Accessibility',
@@ -106,8 +123,6 @@ const buildScreens = (capabilities: DisplayCapabilities): Record<MenuScreen, Men
             settingItem('Menu Text Size', { kind: 'textScale' }),
             actionItem('Back', 'back'),
         ],
-        parent: 'settings',
-        openedBy: 'open_accessibility',
     },
 });
 
@@ -129,6 +144,10 @@ export class MenuSystem {
     private screen: MenuScreen = 'main';
 
     private selected: number;
+
+    // Screens we came through, so back returns to wherever a screen was opened from
+    // (Settings opens from both the main menu and the pause menu). Empty on main and pause.
+    private history: Array<{ screen: MenuScreen; selected: number }> = [];
 
     private view: MenuView | null = null;
 
@@ -161,11 +180,28 @@ export class MenuSystem {
             this.adjust(intent.navigate.x > 0 ? 1 : -1);
         }
 
+        // Escape sets back and menu together, back wins so it steps back one level.
+        // menu alone (Start) closes the pause menu from any screen.
         if (intent.back) {
-            this.goBack();
+            this.goBack(gameState);
+        } else if (intent.menu && this.isPauseMenu()) {
+            this.playSelectSound();
+            this.resume(gameState);
         } else if (intent.interact) {
             this.choose(gameState);
         }
+    }
+
+    // Opened by GameLoop when the menu button is pressed during play
+    public openPause(): void {
+        this.history = [];
+        this.openScreen('pause');
+    }
+
+    // Back to the main menu's first screen, used after quitting
+    public reset(): void {
+        this.history = [];
+        this.openScreen('main');
     }
 
     // Mouse, from the overlay's hit-test. Same paths as keyboard and controller.
@@ -254,6 +290,16 @@ export class MenuSystem {
                 break;
             case 'open_accessibility':
                 this.openScreen('accessibility');
+                break;
+            case 'resume':
+                this.resume(gameState);
+                break;
+            case 'open_quit_confirm':
+                this.openScreen('quit_confirm');
+                break;
+            case 'quit':
+                // GameLoop resets everything, including this menu
+                this.eventBus.publish({ type: 'quit_to_main_menu_requested' });
                 break;
             case 'back':
                 this.returnToParent();
@@ -348,28 +394,48 @@ export class MenuSystem {
         }
     }
 
-    private goBack(): void {
-        if (!this.screens[this.screen].parent) return;
-        this.playSelectSound();
-        this.returnToParent();
+    private goBack(gameState: GameState): void {
+        if (this.history.length > 0) {
+            this.playSelectSound();
+            this.returnToParent();
+        } else if (this.screen === 'pause') {
+            // Back on the pause menu itself resumes, like pressing Escape again in most games
+            this.playSelectSound();
+            this.resume(gameState);
+        }
+        // Back on the main menu does nothing, there's nowhere to go
     }
 
+    // Whether the open screen belongs to the pause menu, rather than the main menu
+    private isPauseMenu(): boolean {
+        const root = this.history.length > 0 ? this.history[0].screen : this.screen;
+        return root === 'pause';
+    }
+
+    // Opening a screen from another remembers where we came from, root screens use openPause/reset
     private openScreen(screen: MenuScreen): void {
+        if (screen !== 'main' && screen !== 'pause') {
+            this.history.push({ screen: this.screen, selected: this.selected });
+        }
         this.screen = screen;
         this.selected = firstEnabled(this.screens[screen].items);
         this.markChanged();
     }
 
+    // Back to the screen this one was opened from, with the item that opened it selected
     private returnToParent(): void {
-        const { parent, openedBy } = this.screens[this.screen];
-        if (!parent) return;
+        const previous = this.history.pop();
+        if (!previous) return;
+        this.screen = previous.screen;
+        this.selected = previous.selected;
+        this.markChanged();
+    }
 
-        const parentItems = this.screens[parent].items;
-        this.screen = parent;
-        this.selected = firstEnabled(parentItems);
-        for (let i = 0; i < parentItems.length; i += 1) {
-            if (parentItems[i].action === openedBy) this.selected = i;
-        }
+    private resume(gameState: GameState): void {
+        // Mindfully overriding memory
+        gameState.discrete.isPaused = false;
+        this.history = [];
+        // Leaving the menu, the overlay hides
         this.markChanged();
     }
 

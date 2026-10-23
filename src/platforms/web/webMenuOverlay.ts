@@ -15,6 +15,8 @@ type MenuPointer = NonNullable<PlayerIntent['menuPointer']>;
 export interface MenuOverlayInput {
     pointer: (pointer: MenuPointer) => void;
     back: () => void;
+    // Shown or hidden, so the input service knows a released cursor was the menu's doing
+    opened: (open: boolean) => void;
 }
 
 /**
@@ -91,6 +93,8 @@ export default class WebMenuOverlay implements MenuOverlay {
 
     public render(view: MenuView | null): void {
         this.view = view;
+        // Before releasing the cursor below, so that release isn't read as a pause request
+        this.input.opened(view !== null);
         // The cursor belongs to the menu while it's open
         if (view && document.pointerLockElement) {
             document.exitPointerLock();

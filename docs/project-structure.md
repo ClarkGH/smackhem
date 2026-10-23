@@ -80,6 +80,7 @@ src/
 │  ├─ modeAudio.spec.ts       # Scenario tests for mode-driven audio (stub platform)
 │  ├─ modeChange.spec.ts      # Scenario tests for game mode changes (stub platform)
 │  ├─ party.ts                # Party logic
+│  ├─ pause.spec.ts           # Pause, resume and quit-to-menu scenarios (stub platform)
 │  ├─ renderSystem.ts         # Rendering system
 │  ├─ scene.ts                # Scene system
 │  ├─ settings.ts             # Player settings, defaults, and validated load/save as JSON

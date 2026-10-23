@@ -36,6 +36,11 @@ export class WebInputService implements Input {
         this.webState.back = true;
     }
 
+    // From the menu overlay, see WebInputState.menuOpen
+    public setMenuOpen(open: boolean): void {
+        this.webState.menuOpen = open;
+    }
+
     public getIntent(): PlayerIntent {
         const intent: PlayerIntent = {
             move: {
@@ -55,6 +60,7 @@ export class WebInputService implements Input {
             toggleDebugHUD: this.coreState.actions.ToggleDebugHUD,
             toggleCamera: this.coreState.actions.Look,
             back: this.coreState.actions.Back,
+            menu: this.coreState.actions.Menu,
             navigate: {
                 x: Math.sign(this.coreState.navigate.x) as Step,
                 y: Math.sign(this.coreState.navigate.y) as Step,
@@ -68,6 +74,7 @@ export class WebInputService implements Input {
         if (this.coreState.actions.Pause) this.coreState.actions.Pause = false;
         if (this.coreState.actions.ToggleDebugHUD) this.coreState.actions.ToggleDebugHUD = false;
         this.coreState.actions.Back = false;
+        this.coreState.actions.Menu = false;
         this.coreState.navigate.x = 0;
         this.coreState.navigate.y = 0;
 

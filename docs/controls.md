@@ -36,7 +36,7 @@ Controller buttons act on the press, not while held. The sticks ignore drift bel
 | Interact / talk | E | A | ✅ |
 | 2D scene toggle *(temporary, uses interact)* | E | A | ✅ |
 | Instance toggle *(temporary)* | Space | Y | ✅ |
-| Pause menu | Escape | Start | 🔜 reserved, not built |
+| Pause menu | Escape | Start | ✅ |
 
 ## Menus
 
@@ -49,6 +49,8 @@ Controller buttons act on the press, not while held. The sticks ignore drift bel
 | Select with the mouse | Hover (disabled items highlight but can't be chosen) | — | ✅ |
 
 Back on the main menu does nothing: there's no screen above it.
+
+**In the pause menu:** Escape (or Backspace, B, right-click) steps back one level, and at the Pause screen it resumes. Start closes the pause menu from any screen. On the web, losing the captured cursor during play (pressing Escape, switching windows) also pauses; click the world after resuming to capture it again.
 
 In fullscreen, Escape belongs to the browser and leaves fullscreen, so use Backspace (or B) to go back in menus there.
 

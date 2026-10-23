@@ -15,6 +15,7 @@
         - [Portability & Separation of Concerns](#portability--separation-of-concerns)
         - [Audio Service Interface](#audio-service-interface)
         - [Audio System & Event Integration](#audio-system--event-integration)
+        - [Menu Events](#menu-events)
         - [Settings Events](#settings-events)
         - [Mode-Driven Audio](#mode-driven-audio)
         - [Buffered vs. Streamed Sounds](#buffered-vs-streamed-sounds)
@@ -410,6 +411,10 @@ This absorbs duplicate requests from several fixed ticks landing in one flush, a
 
 Voices are checked with `isFinished()` from the tick, not through end-of-sound callbacks. On native backends those callbacks fire on the audio thread, and calling into core from there would need the MPSC queue or locks. Checking from the tick keeps audio single-threaded, and miniaudio supports it directly (`ma_sound_at_end`). It is `isFinished()` rather than `isPlaying()` so a paused voice is kept and can still be stopped.
 
+#### Menu Events
+
+`quit_to_main_menu_requested` has no payload. The pause menu publishes it when Quit is confirmed, and `GameLoop` handles it by resetting to a fresh boot: game state, camera and menu, followed by `game_mode_changed` to `main_menu`. Pausing and resuming publish nothing; they only set `DiscreteState.isPaused`.
+
 #### Settings Events
 
 `settings_changed` has no payload. Settings live in one shared `Settings` object (`src/core/settings.ts`), which the menu changes in place, so subscribers read it directly. `main.ts` subscribes and saves the settings to storage. `bindDisplay` (`src/core/displaySettings.ts`) subscribes and applies render scale, window size and fullscreen to the platform. When the platform reports a fullscreen change itself (a refusal, Escape, the page's button), it updates `settings.fullscreen` and publishes `settings_changed` so the menu redraws. Look sensitivity and invert need no event: `GameLoop` reads them every tick.
@@ -421,6 +426,9 @@ Core systems only publish intent (Rule I-1). `src/core/modeAudio.ts` turns `game
 - pauses when entering the 2D scene (`scene_2d`)
 - stops when entering the instance (`instance_3d`)
 - starts or resumes when returning to the world (`world_3d`)
+- stops when quitting to the main menu (`main_menu`)
+
+The pause menu isn't a mode change, so the ambience keeps playing while paused.
 
 ```typescript
 eventBus.subscribe('game_mode_changed', (event) => {

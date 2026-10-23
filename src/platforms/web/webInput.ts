@@ -19,6 +19,7 @@ const PAD_BUTTON = {
     A: 0,
     B: 1,
     Y: 3,
+    START: 9,
     UP: 12,
     DOWN: 13,
     LEFT: 14,
@@ -42,6 +43,10 @@ export interface WebInputState {
     pause: boolean;
     interact: boolean;
     back: boolean;
+    // The menu button: Escape, Start, or losing the cursor during play
+    menu: boolean;
+    // Whether a menu is showing, so losing the cursor to it isn't read as a pause request
+    menuOpen: boolean;
     // Last menu step pressed this frame
     navigate: { x: number; y: number };
     // Previous frame's gamepad state, to act on presses rather than holds
@@ -62,6 +67,8 @@ export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => (
     pause: false,
     interact: false,
     back: false,
+    menu: false,
+    menuOpen: false,
     navigate: { x: 0, y: 0 },
     padButtons: [],
     padStickStep: { x: 0, y: 0 },
@@ -99,6 +106,10 @@ export const setupWebInput = (
             webState.back = true;
             e.preventDefault();
         }
+        // Escape is also the menu button: it opens the pause menu during play
+        if (e.key === 'Escape') {
+            webState.menu = true;
+        }
         // Embedded in a page (itch.io), these would scroll it around the game
         if (e.key.startsWith('Arrow') || e.key === 'Enter') {
             e.preventDefault();
@@ -120,6 +131,13 @@ export const setupWebInput = (
 
     canvas.addEventListener('click', () => {
         canvas.requestPointerLock();
+    });
+    // Browsers release the cursor on Escape and may not pass that Escape on to the page,
+    // so losing the cursor during play counts as the menu button. A menu releasing it doesn't.
+    document.addEventListener('pointerlockchange', () => {
+        if (!document.pointerLockElement && !webState.menuOpen) {
+            webState.menu = true;
+        }
     });
     // e.g. an iframe without pointer lock permission
     document.addEventListener('pointerlockerror', () => {
@@ -155,6 +173,8 @@ export const syncWebInput = (
     webState.interact = false;
     let back = webState.back;
     webState.back = false;
+    let menu = webState.menu;
+    webState.menu = false;
     let navigateX = webState.navigate.x;
     let navigateY = webState.navigate.y;
     webState.navigate.x = 0;
@@ -207,6 +227,7 @@ export const syncWebInput = (
         const padA = justPressed(PAD_BUTTON.A);
         const padB = justPressed(PAD_BUTTON.B);
         const padY = justPressed(PAD_BUTTON.Y);
+        const padStart = justPressed(PAD_BUTTON.START);
         const padUp = justPressed(PAD_BUTTON.UP);
         const padDown = justPressed(PAD_BUTTON.DOWN);
         const padLeft = justPressed(PAD_BUTTON.LEFT);
@@ -215,6 +236,7 @@ export const syncWebInput = (
         if (padA) interact = true;
         if (padB) back = true;
         if (padY) pause = true;
+        if (padStart) menu = true;
         if (padUp) navigateY = 1;
         if (padDown) navigateY = -1;
         if (padLeft) navigateX = -1;
@@ -241,6 +263,7 @@ export const syncWebInput = (
     if (pause) coreState.actions.Pause = true;
     if (toggleDebugHUD) coreState.actions.ToggleDebugHUD = true;
     if (back) coreState.actions.Back = true;
+    if (menu) coreState.actions.Menu = true;
     if (navigateX !== 0) coreState.navigate.x = navigateX;
     if (navigateY !== 0) coreState.navigate.y = navigateY;
 

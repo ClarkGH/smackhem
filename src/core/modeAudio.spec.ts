@@ -114,4 +114,26 @@ describe('mode-driven audio - scenario (stub platform)', () => {
 
         expect(voicesOf(MODE_CHANGE_SOUND)).toHaveLength(3);
     });
+
+    it('keeps the ambience playing while paused', () => {
+        startNewGame();
+
+        press({ menu: true });
+
+        expect(gameState.discrete.isPaused).toBe(true);
+        expect(voicesOf(AMBIENT_SOUND)[0].isFinished()).toBe(false);
+        expect(voicesOf(AMBIENT_SOUND)[0].paused).toBe(false);
+    });
+
+    it('stops the ambience when quitting to the main menu', () => {
+        startNewGame();
+        press({ menu: true });
+        // Pause menu: Resume, Settings, Quit to Main Menu. The confirm screen opens on No.
+        press({ menuPointer: { index: 2, clicked: true } });
+        press({ menuPointer: { index: 1, clicked: true } });
+        tick(1);
+
+        expect(gameState.discrete.gameMode).toBe('main_menu');
+        expect(voicesOf(AMBIENT_SOUND)[0].stopped).toBe(true);
+    });
 });

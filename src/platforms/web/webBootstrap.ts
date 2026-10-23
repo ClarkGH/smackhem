@@ -128,6 +128,7 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
     const menu = new WebMenuOverlay(canvas, {
         pointer: (pointer) => input.pointMenu(pointer),
         back: () => input.pressBack(),
+        opened: (open) => input.setMenuOpen(open),
     });
 
     // Wireframe toggle on F4 (debug keys live on the F-keys, see docs/controls.md)

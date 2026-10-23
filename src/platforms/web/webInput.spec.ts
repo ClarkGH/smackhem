@@ -32,6 +32,7 @@ describe('web gamepad mapping', () => {
         core.actions.Interact = false;
         core.actions.Back = false;
         core.actions.Pause = false;
+        core.actions.Menu = false;
         core.navigate.x = 0;
         core.navigate.y = 0;
         return snapshot;
@@ -58,6 +59,13 @@ describe('web gamepad mapping', () => {
         expect(state.actions.Interact).toBe(true);
         expect(state.actions.Back).toBe(true);
         expect(state.actions.Pause).toBe(true);
+    });
+
+    it('maps Start to the menu button', () => {
+        pad.buttons[9].pressed = true;
+
+        expect(frame().actions.Menu).toBe(true);
+        expect(frame().actions.Menu).toBe(false);
     });
 
     it('acts on the press, not while the button is held', () => {

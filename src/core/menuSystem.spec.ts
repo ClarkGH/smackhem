@@ -346,6 +346,94 @@ describe('MenuSystem', () => {
         expect(menu.getView().textScale).toBe(2);
     });
 
+    describe('pause menu', () => {
+        const quitRequests = (): number => events.filter((e) => e.type === 'quit_to_main_menu_requested').length;
+
+        beforeEach(() => {
+            gameState.discrete.gameMode = 'world_3d';
+            gameState.discrete.isPaused = true;
+            eventBus.subscribe('quit_to_main_menu_requested', (e) => { events.push(e); });
+            menu.openPause();
+        });
+
+        it('opens on Resume', () => {
+            expect(menu.getView().title).toBe('Paused');
+            expect(selectedLabel()).toBe('Resume');
+        });
+
+        it('resumes the game', () => {
+            send({ interact: true });
+
+            expect(gameState.discrete.isPaused).toBe(false);
+            expect(gameState.discrete.gameMode).toBe('world_3d');
+        });
+
+        it('backs out of Settings to the pause menu, not the main menu', () => {
+            click('Settings');
+            expect(menu.getView().title).toBe('Settings');
+
+            send({ back: true });
+            expect(menu.getView().title).toBe('Paused');
+            expect(selectedLabel()).toBe('Settings');
+        });
+
+        it('resumes on back from the pause menu itself', () => {
+            send({ back: true });
+
+            expect(gameState.discrete.isPaused).toBe(false);
+        });
+
+        it('Escape steps back one level, Start closes it from any screen', () => {
+            click('Settings');
+            click('Accessibility');
+
+            // Escape: back and menu together
+            send({ back: true, menu: true });
+            expect(menu.getView().title).toBe('Settings');
+            expect(gameState.discrete.isPaused).toBe(true);
+
+            // Start: menu alone
+            send({ menu: true });
+            expect(gameState.discrete.isPaused).toBe(false);
+        });
+
+        it('asks before quitting, with No selected', () => {
+            click('Quit to Main Menu');
+
+            expect(menu.getView().title).toBe('Quit to main menu? Progress will be lost.');
+            expect(selectedLabel()).toBe('No');
+
+            send({ interact: true });
+            expect(menu.getView().title).toBe('Paused');
+            expect(selectedLabel()).toBe('Quit to Main Menu');
+            expect(quitRequests()).toBe(0);
+        });
+
+        it('requests the quit on Yes', () => {
+            click('Quit to Main Menu');
+            click('Yes, quit');
+
+            expect(quitRequests()).toBe(1);
+        });
+
+        it('resets to the main menu', () => {
+            click('Settings');
+
+            menu.reset();
+
+            expect(menu.getView().title).toBe('Smackhem');
+            expect(selectedLabel()).toBe('New Game');
+        });
+    });
+
+    it('the menu button does nothing on the main menu', () => {
+        send({ menu: true });
+        send({ back: true, menu: true });
+
+        expect(menu.getView().title).toBe('Smackhem');
+        expect(gameState.discrete.gameMode).toBe('main_menu');
+    });
+
     it('only reports view changes when something changed', () => {
         expect(menu.consumeViewChanged()).toBe(true);
         expect(menu.consumeViewChanged()).toBe(false);
