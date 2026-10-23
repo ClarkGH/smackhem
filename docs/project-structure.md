@@ -60,41 +60,41 @@ This pattern:
 ```text
 src/
 ├─ core/
-│  ├─ camera.ts              # 3D camera math and logic
-│  ├─ collision.ts           # Collision logic
-│  ├─ environment.ts         # Enviroment systems
-│  ├─ events.ts              # Eventing pub/sub systems
-│  ├─ gameLoop.ts            # Game loop logic
-│  ├─ gameState.ts           # Game State logic
-│  ├─ input.ts               # Player input logic
-│  ├─ instance.ts            # Instance systems
-│  ├─ party.ts               # Party logic
-│  ├─ renderSystem.ts        # Rendering system
-│  ├─ scene.ts               # Scene system
-│  ├─ world.ts               # World and chunking logic
-│  └─ math/                  # Shared engine math logic
-│     ├─ aabb.ts             # Axis aligned bounding box
-│     └─ mathHelpers.ts      # Matrix/vector/etc math helper methods
+│  ├─ camera.ts               # 3D camera math and logic
+│  ├─ collision.ts            # Collision logic
+│  ├─ environment.ts          # Enviroment systems
+│  ├─ events.ts               # Eventing pub/sub systems
+│  ├─ gameLoop.ts             # Game loop logic
+│  ├─ gameState.ts            # Game State logic
+│  ├─ input.ts                # Player input logic
+│  ├─ instance.ts             # Instance systems
+│  ├─ party.ts                # Party logic
+│  ├─ renderSystem.ts         # Rendering system
+│  ├─ scene.ts                # Scene system
+│  ├─ world.ts                # World and chunking logic
+│  └─ math/                   # Shared engine math logic
+│     ├─ aabb.ts              # Axis aligned bounding box
+│     └─ mathHelpers.ts       # Matrix/vector/etc math helper methods
 ├─ services/
-│  ├─ renderer.ts            # Abstract Renderer interface
-│  ├─ input.ts               # Abstract Input service
-│  ├─ clock.ts               # Time service
-│  ├─ assetLoader.ts         # Asset loading service
-│  ├─ chunkLoader.ts         # Chunk JSON parsing and mesh creation
-│  ├─ audio.ts               # Abstract Audio service & SoundRegistry
-│  └─ platform.ts           # Platform services interface
+│  ├─ renderer.ts             # Abstract Renderer interface
+│  ├─ input.ts                # Abstract Input service
+│  ├─ clock.ts                # Time service
+│  ├─ assetLoader.ts          # Asset loading service
+│  ├─ chunkLoader.ts          # Chunk JSON parsing and mesh creation
+│  ├─ audio.ts                # Abstract Audio service & SoundRegistry
+│  └─ platform.ts             # Platform services interface
 ├─ platforms/
 │  ├─ web/
-│  │  ├─ webBootstrap.ts     # Bootstraps the webGL game engine
-│  │  ├─ webClock.ts         # Web platform clock implementation
-│  │  ├─ webGLRenderer.ts    # Renderer specifically for webGL
-│  │  ├─ webInput.ts         # Web input state management
-│  │  ├─ webInputService.ts  # Web input service implementation
-│  │  ├─ webAssetLoader.ts   # Web asset loader (chunks)
-│  │  ├─ webAudioService.ts  # Web audio playback and mixing service
-│  │  └─ debugHUD.ts         # Debug HUD overlay
+│  │  ├─ webBootstrap.ts      # Bootstraps the webGL game engine
+│  │  ├─ webClock.ts          # Web platform clock implementation
+│  │  ├─ webGLRenderer.ts     # Renderer specifically for webGL
+│  │  ├─ webInput.ts          # Web input state management
+│  │  ├─ webInputService.ts   # Web input service implementation
+│  │  ├─ webAssetLoader.ts    # Web asset loader (chunks)
+│  │  ├─ webAudioService.ts   # Web audio playback and mixing service
+│  │  └─ debugHUD.ts          # Debug HUD overlay
 │  ├─ stub/
-│  │  ├─ nullRenderer.ts     # Stub renderer for testing/validation
+│  │  ├─ nullRenderer.ts      # Stub renderer for testing/validation
 │  │  ├─ nullRenderer.spec.ts # Tests for stub renderer
 │  │  ├─ stubBootstrap.ts     # Stub platform bootstrap
 │  │  ├─ stubClock.ts         # Stub clock implementation
@@ -102,7 +102,7 @@ src/
 │  │  └─ stubAudioService.ts  # Stub audio service implementation
 │  └─ cpu/                    # CPU platform (future)
 ├─ types/
-│  └─ common.d.ts            # Common type definitions
+│  └─ common.d.ts             # Common type definitions
 ├─ index.html                 # HTML entry point for web platform
 └─ main.ts                    # Entry point
 ```
@@ -111,10 +111,10 @@ src/
 
 ```text
 public/
-├─ chunks/              # Chunk JSON files
-│  └─ {fileX}_{fileZ}.json  # Offset-based naming (fileX = chunkX + 10000)
-└─ audio/               # Public Audio files
-   └─ example_audio.ogg # SoundID-based naming (e.g. menu_click)
+├─ chunks/                    # Chunk JSON files
+│  └─ {fileX}_{fileZ}.json    # Offset-based naming (fileX = chunkX + 10000)
+└─ audio/                     # Public Audio files
+   └─ example_audio.ogg       # SoundID-based naming (e.g. menu_click)
 ```
 
 Chunk files use offset-based naming to prevent negative coordinates in filenames. See [Data Formats](data-formats.md) for details.
@@ -123,7 +123,7 @@ Chunk files use offset-based naming to prevent negative coordinates in filenames
 
 ```text
 scripts/
-└─ audio-aliases.sh # FFMPEG trim and compression scripts
+└─ audio-aliases.sh           # FFMPEG trim and compression scripts
 ```
 
 ## Root Level Configuration
