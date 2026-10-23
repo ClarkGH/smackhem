@@ -12,7 +12,7 @@ These resources are inclusive of paradigms I have used, or related to what I am 
 
 ## Credit
 
-We've used or am using the following royalty free and open source sound effects.
+We've used or are using the following royalty free and open source audio.
 
-1. [Ambient night](https://pixabay.com/sound-effects/nature-nature-ambience-323729/)
-2. [Menu select](https://pixabay.com/sound-effects/film-special-effects-click-buttons-ui-menu-sounds-effects-button-13-205396/)
+1. Pixabay - [Ambient night by U_vr5icvkppa](https://pixabay.com/sound-effects/nature-nature-ambience-323729/)
+2. Pixabay - [Menu select by skyscarper_seven](https://pixabay.com/sound-effects/film-special-effects-click-buttons-ui-menu-sounds-effects-button-13-205396/)

@@ -228,7 +228,7 @@ Initial implementation assumes game state will be updated per tick, rendering wi
 
 Audio needs to be playable, pauseable, streamable, and stopable. For game engines requiring low latency and precision playback, the strategy is to fetch audio files as binary ArrayBuffers, decode them into raw PCM buffers (e.g. Web Audio `AudioBuffer`), and wrap them behind platform-agnostic handles.
 
-Sounds will be created as lossless .wav, then exported and coverted into .ogg directly into smackhem/public/assets/audio/.
+Original sound fx will be created as lossless .wav, then exported and coverted into .ogg directly into smackhem/public/assets/audio/. Non-original audio is open source, royalty free, and free for commercial use. Sources are linked in the credits section of **[RESOURCES](RESOURCES.md)**.
 
 #### Portability & Separation of Concerns
 
