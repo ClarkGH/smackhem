@@ -11,20 +11,23 @@ export default class StubInput implements Input {
         toggleCamera: false,
     };
 
+    /**
+     * Like the web input service: one-shot actions (presses, menu steps, mouse movement) are
+     * cleared once read, so each setIntent press is seen by exactly one frame.
+     * Held inputs (move, stick lookRate) stay until changed or reset().
+     */
     getIntent(): PlayerIntent {
-        // Return current intent (will be reset after use if requested)
         const currentIntent = { ...this.intent };
 
-        // Reset transient flags after retrieval
-        if (this.intent.toggleCamera) {
-            this.intent.toggleCamera = false;
-        }
-        if (this.intent.toggleDebugHUD) {
-            this.intent.toggleDebugHUD = false;
-        }
-        if (this.intent.pause) {
-            this.intent.pause = false;
-        }
+        this.intent.toggleCamera = false;
+        this.intent.toggleDebugHUD = false;
+        this.intent.pause = false;
+        this.intent.interact = false;
+        this.intent.back = false;
+        this.intent.menu = false;
+        this.intent.navigate = undefined;
+        this.intent.menuPointer = undefined;
+        this.intent.look = { yaw: 0, pitch: 0 };
 
         return currentIntent;
     }

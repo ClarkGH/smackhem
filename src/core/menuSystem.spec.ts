@@ -3,20 +3,13 @@ import {
     it,
     expect,
     beforeEach,
-    vi,
 } from 'vitest';
 import { TypeSafeEventBus, type GameEvent } from './events';
 import { createGameState, type GameState } from './gameState';
-import { GameLoop } from './gameLoop';
-import { World } from './world';
 import MenuSystem, { MENU_SELECT_SOUND } from './menuSystem';
 import { createDefaultSettings, type Settings } from './settings';
-import NullRenderer from '../platforms/stub/nullRenderer';
-import NullMenuOverlay from '../platforms/stub/nullMenuOverlay';
-import StubInput from '../platforms/stub/stubInput';
 import type { PlayerIntent } from '../services/input';
-
-const FIXED_DT = 1 / 60;
+import { createScenario, FIXED_DT, type Scenario } from '../testing/scenario';
 
 const UP: PlayerIntent['navigate'] = { x: 0, y: 1 };
 const DOWN: PlayerIntent['navigate'] = { x: 0, y: -1 };
@@ -444,68 +437,41 @@ describe('MenuSystem', () => {
 });
 
 describe('MenuSystem - scenario through GameLoop (stub platform)', () => {
-    let input: StubInput;
-    let gameState: GameState;
-    let gameLoop: GameLoop;
-    let overlay: NullMenuOverlay;
-
-    const press = (intent: Partial<PlayerIntent>): void => {
-        input.setIntent(intent);
-        gameLoop.update(FIXED_DT);
-        input.reset();
-        gameLoop.render();
-    };
+    let scenario: Scenario;
 
     beforeEach(() => {
-        vi.spyOn(console, 'log').mockImplementation(() => {});
-        globalThis.requestAnimationFrame = () => 0;
-
-        input = new StubInput();
-        gameState = createGameState('main_menu');
-        overlay = new NullMenuOverlay();
-        gameLoop = new GameLoop(
-            new NullRenderer(),
-            input,
-            new World(),
-            () => 16 / 9,
-            new TypeSafeEventBus(),
-            gameState,
-            undefined,
-            overlay,
-        );
-        gameLoop.render();
+        scenario = createScenario({ mode: 'main_menu' });
     });
 
     it('shows the menu, then hides it on New Game', () => {
-        expect(overlay.lastView?.title).toBe('Smackhem');
+        expect(scenario.overlay.lastView?.title).toBe('Smackhem');
 
-        press({ interact: true });
+        scenario.press({ interact: true });
 
-        expect(gameState.discrete.gameMode).toBe('world_3d');
-        expect(overlay.lastView).toBeNull();
+        expect(scenario.gameState.discrete.gameMode).toBe('world_3d');
+        expect(scenario.overlay.lastView).toBeNull();
     });
 
     it('confirming New Game does not also enter the 2D scene', () => {
         // One press, but the frame runs several fixed ticks on the same intent snapshot
-        input.setIntent({ interact: true });
-        gameLoop.update(FIXED_DT * 3);
-        input.reset();
+        scenario.input.setIntent({ interact: true });
+        scenario.frame(FIXED_DT * 3);
 
-        expect(gameState.discrete.gameMode).toBe('world_3d');
+        expect(scenario.gameState.discrete.gameMode).toBe('world_3d');
     });
 
     it('the instance key does nothing in the menu', () => {
-        press({ pause: true });
+        scenario.press({ pause: true });
 
-        expect(gameState.discrete.gameMode).toBe('main_menu');
-        expect(gameState.discrete.isTimeFrozen).toBe(false);
+        expect(scenario.gameState.discrete.gameMode).toBe('main_menu');
+        expect(scenario.gameState.discrete.isTimeFrozen).toBe(false);
     });
 
     it('only redraws the overlay when the menu changes', () => {
-        const before = overlay.renderCount;
-        gameLoop.render();
-        gameLoop.render();
+        const before = scenario.overlay.renderCount;
+        scenario.gameLoop.render();
+        scenario.gameLoop.render();
 
-        expect(overlay.renderCount).toBe(before);
+        expect(scenario.overlay.renderCount).toBe(before);
     });
 });

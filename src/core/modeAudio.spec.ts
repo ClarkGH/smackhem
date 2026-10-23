@@ -3,78 +3,52 @@ import {
     it,
     expect,
     beforeEach,
-    vi,
 } from 'vitest';
-import { TypeSafeEventBus } from './events';
-import { createGameState, type GameState } from './gameState';
-import { GameLoop } from './gameLoop';
-import { World } from './world';
 import AudioSystem from './audioSystem';
 import { AMBIENT_SOUND, MODE_CHANGE_SOUND, subscribeModeAudio } from './modeAudio';
 import { MENU_SELECT_SOUND } from './menuSystem';
-import NullRenderer from '../platforms/stub/nullRenderer';
-import StubInput from '../platforms/stub/stubInput';
 import StubAudioService, { type StubPlaybackHandle } from '../platforms/stub/stubAudioService';
 import type { PlayerIntent } from '../services/input';
-
-const FIXED_DT = 1 / 60;
+import { createScenario, type Scenario } from '../testing/scenario';
 
 describe('mode-driven audio - scenario (stub platform)', () => {
-    let input: StubInput;
-    let gameState: GameState;
-    let gameLoop: GameLoop;
+    let scenario: Scenario;
     let audio: StubAudioService;
 
-    // Mode events are flushed at the end of an update, the audio requests they publish on the next
+    // Mode changes are handled at the end of a frame, and the audio requests they publish
+    // on the next one, so let one more frame run before checking sounds
     const press = (intent: Partial<PlayerIntent>): void => {
-        input.setIntent(intent);
-        gameLoop.update(FIXED_DT);
-        input.reset();
-        gameLoop.update(FIXED_DT);
+        scenario.press(intent);
+        scenario.tick();
     };
 
-    const tick = (count: number): void => {
-        for (let i = 0; i < count; i += 1) {
-            gameLoop.update(FIXED_DT);
-        }
+    const click = (label: string): void => {
+        scenario.click(label);
+        scenario.tick();
     };
 
     const voicesOf = (soundId: string): StubPlaybackHandle[] => audio.voices.filter((v) => v.id === soundId);
 
     beforeEach(async () => {
-        vi.spyOn(console, 'log').mockImplementation(() => {});
-
-        input = new StubInput();
-        gameState = createGameState('main_menu');
+        scenario = createScenario({ mode: 'main_menu' });
         audio = new StubAudioService();
-        const eventBus = new TypeSafeEventBus();
-        const audioSystem = new AudioSystem(audio, eventBus);
+        const audioSystem = new AudioSystem(audio, scenario.eventBus);
         await audioSystem.preload(AMBIENT_SOUND, 'ambient');
         await audioSystem.preload(MODE_CHANGE_SOUND, 'sfx');
         await audioSystem.preload(MENU_SELECT_SOUND, 'ui');
-
-        gameLoop = new GameLoop(
-            new NullRenderer(),
-            input,
-            new World(),
-            () => 16 / 9,
-            eventBus,
-            gameState,
-        );
-
-        subscribeModeAudio(eventBus);
-        tick(1);
+        subscribeModeAudio(scenario.eventBus);
     });
 
     // New Game is the first entry in the start-up menu
     const startNewGame = (): void => press({ interact: true });
 
     it('is silent in the menu and starts the ambience on New Game', () => {
+        scenario.tick();
         expect(voicesOf(AMBIENT_SOUND)).toHaveLength(0);
 
         startNewGame();
 
-        expect(gameState.discrete.gameMode).toBe('world_3d');
+        expect(scenario.gameState.discrete.gameMode).toBe('world_3d');
         expect(voicesOf(AMBIENT_SOUND)).toHaveLength(1);
         expect(voicesOf(AMBIENT_SOUND)[0].isFinished()).toBe(false);
     });
@@ -82,11 +56,11 @@ describe('mode-driven audio - scenario (stub platform)', () => {
     it('pauses the ambience in the 2D scene and resumes it on return', () => {
         startNewGame();
         press({ interact: true });
-        expect(gameState.discrete.gameMode).toBe('scene_2d');
+        expect(scenario.gameState.discrete.gameMode).toBe('scene_2d');
         expect(voicesOf(AMBIENT_SOUND)[0].paused).toBe(true);
 
         press({ interact: true });
-        expect(gameState.discrete.gameMode).toBe('world_3d');
+        expect(scenario.gameState.discrete.gameMode).toBe('world_3d');
         expect(voicesOf(AMBIENT_SOUND)).toHaveLength(1);
         expect(voicesOf(AMBIENT_SOUND)[0].paused).toBe(false);
     });
@@ -94,13 +68,13 @@ describe('mode-driven audio - scenario (stub platform)', () => {
     it('stops the ambience in the instance and starts it again on return', () => {
         startNewGame();
         press({ pause: true });
-        expect(gameState.discrete.gameMode).toBe('instance_3d');
+        expect(scenario.gameState.discrete.gameMode).toBe('instance_3d');
         expect(voicesOf(AMBIENT_SOUND)[0].stopped).toBe(true);
 
         press({ pause: true });
         // Mode returns to world_3d when the exit transition finishes
-        tick(120);
-        expect(gameState.discrete.gameMode).toBe('world_3d');
+        scenario.tick(120);
+        expect(scenario.gameState.discrete.gameMode).toBe('world_3d');
 
         const ambience = voicesOf(AMBIENT_SOUND);
         expect(ambience).toHaveLength(2);
@@ -120,7 +94,7 @@ describe('mode-driven audio - scenario (stub platform)', () => {
 
         press({ menu: true });
 
-        expect(gameState.discrete.isPaused).toBe(true);
+        expect(scenario.gameState.discrete.isPaused).toBe(true);
         expect(voicesOf(AMBIENT_SOUND)[0].isFinished()).toBe(false);
         expect(voicesOf(AMBIENT_SOUND)[0].paused).toBe(false);
     });
@@ -128,12 +102,12 @@ describe('mode-driven audio - scenario (stub platform)', () => {
     it('stops the ambience when quitting to the main menu', () => {
         startNewGame();
         press({ menu: true });
-        // Pause menu: Resume, Settings, Quit to Main Menu. The confirm screen opens on No.
-        press({ menuPointer: { index: 2, clicked: true } });
-        press({ menuPointer: { index: 1, clicked: true } });
-        tick(1);
+        click('Quit to Main Menu');
+        click('Yes, quit');
+        // One flush deeper than a mode change: quit request -> reset and mode change -> stop request
+        scenario.tick();
 
-        expect(gameState.discrete.gameMode).toBe('main_menu');
+        expect(scenario.gameState.discrete.gameMode).toBe('main_menu');
         expect(voicesOf(AMBIENT_SOUND)[0].stopped).toBe(true);
     });
 });

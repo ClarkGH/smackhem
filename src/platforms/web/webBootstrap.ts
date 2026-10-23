@@ -17,89 +17,91 @@ import WebDisplay from './webDisplay';
 // PlatformServices interface moved to src/services/platform.ts
 // This export is kept for backward compatibility but should use the shared type
 
-// Track chunks currently being loaded to avoid duplicate requests
-const pendingChunkLoads = new Set<string>();
-// Keep track of 1pv camera chunk location.
-let lastPlayerChunk: { x: number; z: number } | null = null;
+// Chunk loading around the player, async from JSON files.
+// A factory, so each game tracks its own loads and last chunk.
+export const createChunkUpdater = () => {
+    // Track chunks currently being loaded to avoid duplicate requests
+    const pendingChunkLoads = new Set<string>();
+    // Keep track of 1pv camera chunk location.
+    let lastPlayerChunk: { x: number; z: number } | null = null;
 
-// Update active chunks based on player position (platform-specific chunk management)
-// Uses async chunk loading from JSON files
-export const updateActiveChunks = async (
-    world: World,
-    playerPosition: Vec3,
-    renderer: Renderer,
-    assetLoader: WebAssetLoader,
-): Promise<void> => {
-    const currentChunk = World.getChunkCoords(playerPosition);
+    return async (
+        world: World,
+        playerPosition: Vec3,
+        renderer: Renderer,
+        assetLoader: WebAssetLoader,
+    ): Promise<void> => {
+        const currentChunk = World.getChunkCoords(playerPosition);
 
-    if (
-        lastPlayerChunk
-        && lastPlayerChunk.x === currentChunk.x
-        && lastPlayerChunk.z === currentChunk.z
-    ) {
-        return;
-    }
-
-    lastPlayerChunk = currentChunk;
-
-    const chunksToLoad = World.getChunksInRadius(
-        currentChunk.x,
-        currentChunk.z,
-        CHUNK_LOAD_RADIUS,
-    );
-
-    // Create set of chunk IDs that should be loaded
-    const shouldBeLoaded = new Set<string>();
-    chunksToLoad.forEach((chunk) => {
-        shouldBeLoaded.add(World.getChunkID(chunk.x, chunk.z));
-    });
-
-    // Load missing chunks (parallel loading for performance)
-    const loadPromises: Promise<void>[] = [];
-
-    chunksToLoad.forEach((chunk) => {
-        const chunkId = World.getChunkID(chunk.x, chunk.z);
-
-        // Skip if already loaded or currently loading
-        if (world.activeChunks.has(chunkId) || pendingChunkLoads.has(chunkId)) {
+        if (
+            lastPlayerChunk
+            && lastPlayerChunk.x === currentChunk.x
+            && lastPlayerChunk.z === currentChunk.z
+        ) {
             return;
         }
 
-        // Mark as loading
-        pendingChunkLoads.add(chunkId);
+        lastPlayerChunk = currentChunk;
 
-        // Load chunk asynchronously
-        const loadPromise = assetLoader
-            .loadChunk(chunkId, chunk.x, chunk.z, renderer)
-            .then((newChunk) => {
-                // Add chunk to world when loaded
-                world.addChunk(newChunk);
-                pendingChunkLoads.delete(chunkId);
-            })
-            .catch((error) => {
-                console.error(`Failed to load chunk ${chunkId}:`, error);
-                pendingChunkLoads.delete(chunkId);
-            });
+        const chunksToLoad = World.getChunksInRadius(
+            currentChunk.x,
+            currentChunk.z,
+            CHUNK_LOAD_RADIUS,
+        );
 
-        loadPromises.push(loadPromise);
-    });
+        // Create set of chunk IDs that should be loaded
+        const shouldBeLoaded = new Set<string>();
+        chunksToLoad.forEach((chunk) => {
+            shouldBeLoaded.add(World.getChunkID(chunk.x, chunk.z));
+        });
 
-    // Wait for all chunks to load (non-blocking in game loop, but tracks completion)
-    await Promise.all(loadPromises);
+        // Load missing chunks (parallel loading for performance)
+        const loadPromises: Promise<void>[] = [];
 
-    // Unload chunks outside radius
-    const chunksToUnload: string[] = [];
-    Array.from(world.activeChunks.keys()).forEach((chunkId) => {
-        if (!shouldBeLoaded.has(chunkId)) {
-            chunksToUnload.push(chunkId);
-        }
-    });
+        chunksToLoad.forEach((chunk) => {
+            const chunkId = World.getChunkID(chunk.x, chunk.z);
 
-    chunksToUnload.forEach((chunkId) => {
-        world.removeChunk(chunkId);
-        // Clean up pending load if chunk is being unloaded before it finishes loading
-        pendingChunkLoads.delete(chunkId);
-    });
+            // Skip if already loaded or currently loading
+            if (world.activeChunks.has(chunkId) || pendingChunkLoads.has(chunkId)) {
+                return;
+            }
+
+            // Mark as loading
+            pendingChunkLoads.add(chunkId);
+
+            // Load chunk asynchronously
+            const loadPromise = assetLoader
+                .loadChunk(chunkId, chunk.x, chunk.z, renderer)
+                .then((newChunk) => {
+                    // Add chunk to world when loaded
+                    world.addChunk(newChunk);
+                    pendingChunkLoads.delete(chunkId);
+                })
+                .catch((error) => {
+                    console.error(`Failed to load chunk ${chunkId}:`, error);
+                    pendingChunkLoads.delete(chunkId);
+                });
+
+            loadPromises.push(loadPromise);
+        });
+
+        // Wait for all chunks to load (non-blocking in game loop, but tracks completion)
+        await Promise.all(loadPromises);
+
+        // Unload chunks outside radius
+        const chunksToUnload: string[] = [];
+        Array.from(world.activeChunks.keys()).forEach((chunkId) => {
+            if (!shouldBeLoaded.has(chunkId)) {
+                chunksToUnload.push(chunkId);
+            }
+        });
+
+        chunksToUnload.forEach((chunkId) => {
+            world.removeChunk(chunkId);
+            // Clean up pending load if chunk is being unloaded before it finishes loading
+            pendingChunkLoads.delete(chunkId);
+        });
+    };
 };
 
 export const createWebPlatform = async (): Promise<PlatformServices & { canvas: HTMLCanvasElement; assetLoader: WebAssetLoader }> => {

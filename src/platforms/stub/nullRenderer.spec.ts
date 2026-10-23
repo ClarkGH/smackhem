@@ -23,18 +23,17 @@ describe('NullRenderer - Portability Validation (RULE P-1)', () => {
         renderer = new NullRenderer();
         input = new StubInput();
         world = new World();
-        globalThis.requestAnimationFrame = () => 0;
     });
 
     it('core compiles and runs with stub renderer', () => {
-        expect(() => new GameLoop(
+        expect(() => new GameLoop({
             renderer,
             input,
             world,
-            () => 16 / 9,
-            new TypeSafeEventBus(),
-            createGameState(),
-        )).not.toThrow();
+            getAspectRatio: () => 16 / 9,
+            eventBus: new TypeSafeEventBus(),
+            gameState: createGameState(),
+        })).not.toThrow();
     });
 
     it('can create all mesh types with unique handles', () => {
@@ -156,7 +155,6 @@ describe('StubPlatform - Chunk streaming smoke test', () => {
         input = new StubInput();
         clock = new StubClock();
         world = new World();
-        globalThis.requestAnimationFrame = () => 0;
 
         // A small real chunk grid, built the same way the stub platform builds
         // it during actual play - not a hand-rolled fixture that could drift
@@ -165,7 +163,14 @@ describe('StubPlatform - Chunk streaming smoke test', () => {
             world.addChunk(createChunk(x, z, renderer));
         });
 
-        gameLoop = new GameLoop(renderer, input, world, () => 16 / 9, new TypeSafeEventBus(), createGameState());
+        gameLoop = new GameLoop({
+            renderer,
+            input,
+            world,
+            getAspectRatio: () => 16 / 9,
+            eventBus: new TypeSafeEventBus(),
+            gameState: createGameState(),
+        });
         clock.setFixedDeltaTime(1 / 60);
     });
 
@@ -219,16 +224,15 @@ describe('StubPlatform - Full Integration Test', () => {
         input = new StubInput();
         clock = new StubClock();
         world = new World();
-        globalThis.requestAnimationFrame = () => 0;
 
-        gameLoop = new GameLoop(
+        gameLoop = new GameLoop({
             renderer,
             input,
             world,
-            () => 16 / 9,
-            new TypeSafeEventBus(),
-            createGameState(),
-        );
+            getAspectRatio: () => 16 / 9,
+            eventBus: new TypeSafeEventBus(),
+            gameState: createGameState(),
+        });
     });
 
     it('can run full game loop update and render cycles', () => {

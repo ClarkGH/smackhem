@@ -32,7 +32,8 @@ import { createDefaultSettings, type Settings } from './settings';
 import EnvironmentSystem from './environment';
 import RenderSystem from './renderSystem';
 
-const FIXED_DT = 1 / 60;
+// Simulation step, 60 ticks per second. Exported so tests step the loop exactly.
+export const FIXED_DT = 1 / 60;
 
 // Radians per unit of mouse movement
 const MOUSE_LOOK_SCALE = 0.005;
@@ -55,6 +56,21 @@ export interface DebugHUD {
     }) => void;
     toggle: () => void;
     isVisible: () => boolean;
+}
+
+export interface GameLoopOptions {
+    renderer: Renderer;
+    input: Input;
+    world: World;
+    getAspectRatio: () => number;
+    eventBus: TypeSafeEventBus;
+    gameState: GameState;
+    debugHUD?: DebugHUD;
+    menuOverlay?: MenuOverlay;
+    // Shared with the menu and main.ts, defaults when left out
+    settings?: Settings;
+    // What the platform's display can do, nothing when left out
+    displayCapabilities?: DisplayCapabilities;
 }
 
 export class GameLoop {
@@ -128,18 +144,18 @@ export class GameLoop {
 
     private readonly wallDebugMVP: Mat4 = identity();
 
-    constructor(
-        renderer: Renderer,
-        input: Input,
-        world: World,
-        getAspectRatio: () => number,
-        eventBus: TypeSafeEventBus,
-        gameState: GameState,
-        debugHUD?: DebugHUD,
-        menuOverlay?: MenuOverlay,
-        settings?: Settings,
-        displayCapabilities?: DisplayCapabilities,
-    ) {
+    constructor({
+        renderer,
+        input,
+        world,
+        getAspectRatio,
+        eventBus,
+        gameState,
+        debugHUD,
+        menuOverlay,
+        settings,
+        displayCapabilities,
+    }: GameLoopOptions) {
         this.renderer = renderer;
         this.input = input;
         this.world = world;

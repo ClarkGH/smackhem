@@ -7,6 +7,7 @@
 - [Project Directory Structure](#project-directory-structure)
 - [Public Directory Structure](#public-directory-structure)
 - [Root Level Configuration](#root-level-configuration)
+- [Testing](#testing)
 - [Future Structure](#future-structure)
 - [Navigation](#navigation)
 
@@ -109,6 +110,11 @@ src/
 │  │  ├─ webGLRenderer.ts     # Renderer specifically for webGL
 │  │  ├─ webInput.ts          # Web input state management
 │  │  ├─ webInput.spec.ts     # Gamepad mapping tests (faked navigator.getGamepads)
+│  │  ├─ webInputService.spec.ts # Keys, menu pointer priority, losing the cursor (fake DOM)
+│  │  ├─ webAudioService.spec.ts # Playback, loading, autoplay retry, and the AudioService contract
+│  │  ├─ webDisplay.spec.ts   # Canvas sizing, render scale, fullscreen and refusals (fake DOM)
+│  │  ├─ webMenuOverlay.spec.ts # Drawing, mouse hit areas against drawn text, scrolling (fake DOM)
+│  │  ├─ localStorageStore.spec.ts # Blocked storage, and the KeyValueStore contract
 │  │  ├─ webInputService.ts   # Web input service implementation
 │  │  ├─ webAssetLoader.ts    # Web asset loader (chunks)
 │  │  ├─ webAudioService.ts   # Web audio playback and mixing service
@@ -129,10 +135,16 @@ src/
 │  │  ├─ stubInput.ts         # Stub input implementation
 │  │  └─ stubAudioService.ts  # Stub audio service implementation
 │  └─ cpu/                    # CPU platform (future)
+├─ testing/                   # Test-only helpers, never imported by the game
+│  ├─ scenario.ts             # Scenario harness: real GameLoop on the stub platform
+│  ├─ fakeDom.ts              # Minimal document/window/canvas fakes for web platform tests
+│  └─ fakeWebAudio.ts         # Minimal AudioContext/Audio/fetch fakes for web audio tests
 ├─ types/
 │  └─ common.d.ts             # Common type definitions
 ├─ index.html                 # HTML entry point for web platform
-└─ main.ts                    # Entry point
+├─ game.ts                    # createGame(platform): wires settings, display, audio, chunks, GameLoop
+├─ game.spec.ts               # Boot smoke test: createGame on the stub platform, a whole session
+└─ main.ts                    # Entry point: picks the platform, runs game.frame() every animation frame
 ```
 
 ## Public Directory Structure
@@ -169,6 +181,18 @@ Root level configuration:
 - `LICENSE` - Project license
 - `README.md` - Project documentation
 - `docs/` - Project documentation directory
+
+## Testing
+
+Specs sit next to the code they test (`*.spec.ts`). `pnpm test` runs them all, `pnpm test:coverage` adds a coverage report.
+
+- **Scenario tests** (`src/testing/scenario.ts`): `createScenario()` runs the real `GameLoop` on the stub platform, one fixed tick per frame, and gives `press`, `tick`, `frame` and `click`. Use it for anything that crosses systems (modes, menus, look, audio rules) instead of building a loop by hand.
+  - **Timing rule:** events flush at the end of each frame, so a request published while handling an event (e.g. audio reacting to a mode change) is handled on the next frame.
+- **The stub platform behaves like the real one.** `StubInput` clears one-shot actions once read, like `WebInputService`, so a `press` is seen by exactly one frame.
+- **Contract tests:** the same suite runs against a stub and its web implementation (`AudioService`, `KeyValueStore`), so passing on the stub means the same thing as passing on the real backend. Add one when adding a service.
+- **Web platform tests:** browser APIs are replaced by small fakes (`fakeDom.ts`, `fakeWebAudio.ts`) that only implement what our code calls. No DOM library.
+- **Boot smoke test** (`src/game.spec.ts`): the same wiring `main.ts` runs, on the stub platform, through a whole session.
+- **Clean state:** `vitest.config.ts` restores spies, mocks and stubbed globals after every test.
 
 ## Future Structure
 

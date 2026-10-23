@@ -1,77 +1,44 @@
-import {
-    describe,
-    it,
-    expect,
-    vi,
-} from 'vitest';
-import { TypeSafeEventBus } from './events';
-import { createGameState, type GameMode, type GameState } from './gameState';
-import { GameLoop } from './gameLoop';
-import { World } from './world';
+import { describe, it, expect } from 'vitest';
 import { createDefaultSettings, type Settings } from './settings';
-import NullRenderer from '../platforms/stub/nullRenderer';
-import StubInput from '../platforms/stub/stubInput';
+import { createScenario, FIXED_DT } from '../testing/scenario';
 
-const FIXED_DT = 1 / 60;
 // Keeps float error from dropping the last tick of a multi-tick frame
 const EPSILON = 1e-9;
 
-const createLoop = (
-    mode: GameMode = 'world_3d',
-    settings: Settings = createDefaultSettings(),
-): { input: StubInput; gameState: GameState; gameLoop: GameLoop } => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const input = new StubInput();
-    const gameState = createGameState(mode);
-    const gameLoop = new GameLoop(
-        new NullRenderer(),
-        input,
-        new World(),
-        () => 16 / 9,
-        new TypeSafeEventBus(),
-        gameState,
-        undefined,
-        undefined,
-        settings,
-    );
-    return { input, gameState, gameLoop };
-};
-
 describe('look - scenario (stub platform)', () => {
     it('applies the same mouse movement once, however many ticks the frame runs', () => {
-        const oneTick = createLoop();
+        const oneTick = createScenario();
         oneTick.input.setIntent({ look: { yaw: 100, pitch: 0 } });
-        oneTick.gameLoop.update(FIXED_DT + EPSILON);
+        oneTick.frame(FIXED_DT);
 
-        const threeTicks = createLoop();
+        const threeTicks = createScenario();
         threeTicks.input.setIntent({ look: { yaw: 100, pitch: 0 } });
-        threeTicks.gameLoop.update(FIXED_DT * 3 + EPSILON);
+        threeTicks.frame(FIXED_DT * 3 + EPSILON);
 
         expect(oneTick.gameState.interpolated.cameraYaw).not.toBe(0);
         expect(threeTicks.gameState.interpolated.cameraYaw).toBeCloseTo(oneTick.gameState.interpolated.cameraYaw);
     });
 
     it('keeps mouse movement from a frame that runs no tick', () => {
-        const { input, gameState, gameLoop } = createLoop();
+        const { input, gameState, frame } = createScenario();
 
         // Half a tick: no simulation this frame
         input.setIntent({ look: { yaw: 100, pitch: 0 } });
-        gameLoop.update(FIXED_DT / 2);
+        frame(FIXED_DT / 2);
         expect(gameState.interpolated.cameraYaw).toBe(0);
 
         // The next frame completes the tick without new movement
-        input.reset();
-        gameLoop.update(FIXED_DT / 2 + EPSILON);
+        frame(FIXED_DT / 2 + EPSILON);
         expect(gameState.interpolated.cameraYaw).not.toBe(0);
     });
 
     it('turns at a steady rate while the stick is held', () => {
-        const { input, gameState, gameLoop } = createLoop();
+        const { input, gameState, tick } = createScenario();
         input.setIntent({ lookRate: { yaw: 1, pitch: 0 } });
 
-        gameLoop.update(FIXED_DT + EPSILON);
+        tick();
         const afterOne = gameState.interpolated.cameraYaw;
-        gameLoop.update(FIXED_DT);
+        tick();
         const afterTwo = gameState.interpolated.cameraYaw;
 
         expect(afterOne).toBeGreaterThan(0);
@@ -79,16 +46,11 @@ describe('look - scenario (stub platform)', () => {
     });
 
     it('drops mouse movement made in the menu, so New Game starts without a jolt', () => {
-        const { input, gameState, gameLoop } = createLoop('main_menu');
+        const { gameState, press, tick } = createScenario({ mode: 'main_menu' });
 
-        input.setIntent({ look: { yaw: 500, pitch: 0 } });
-        gameLoop.update(FIXED_DT + EPSILON);
-        input.reset();
-
-        input.setIntent({ interact: true });
-        gameLoop.update(FIXED_DT);
-        input.reset();
-        gameLoop.update(FIXED_DT);
+        press({ look: { yaw: 500, pitch: 0 } });
+        press({ interact: true });
+        tick();
 
         expect(gameState.discrete.gameMode).toBe('world_3d');
         expect(gameState.interpolated.cameraYaw).toBe(0);
@@ -97,12 +59,14 @@ describe('look - scenario (stub platform)', () => {
 
 describe('render interpolation - scenario (stub platform)', () => {
     it('draws the camera between the last two ticks', () => {
-        const { input, gameState, gameLoop } = createLoop();
+        const {
+            input, gameState, gameLoop, tick, frame,
+        } = createScenario();
         const startZ = gameState.interpolated.cameraPosition.z;
 
         // One tick of walking forward
         input.setIntent({ move: { x: 0, y: 1 } });
-        gameLoop.update(FIXED_DT + EPSILON);
+        tick();
         input.reset();
         const tickZ = gameState.interpolated.cameraPosition.z;
         expect(tickZ).not.toBeCloseTo(startZ);
@@ -111,19 +75,21 @@ describe('render interpolation - scenario (stub platform)', () => {
         expect(gameLoop.getRenderCamera().position.z).toBeCloseTo(startZ);
 
         // Half a tick later, it's halfway
-        gameLoop.update(FIXED_DT / 2);
+        frame(FIXED_DT / 2);
         expect(gameLoop.getRenderCamera().position.z).toBeCloseTo((startZ + tickZ) / 2);
     });
 
     it('blends turning the same way', () => {
-        const { input, gameState, gameLoop } = createLoop();
+        const {
+            input, gameState, gameLoop, tick, frame,
+        } = createScenario();
 
         input.setIntent({ lookRate: { yaw: 1, pitch: 0 } });
-        gameLoop.update(FIXED_DT + EPSILON);
+        tick();
         input.reset();
         const tickYaw = gameState.interpolated.cameraYaw;
 
-        gameLoop.update(FIXED_DT / 4);
+        frame(FIXED_DT / 4);
 
         expect(gameLoop.getRenderCamera().yaw).toBeCloseTo(tickYaw / 4);
     });
@@ -132,9 +98,8 @@ describe('render interpolation - scenario (stub platform)', () => {
 describe('look settings - scenario (stub platform)', () => {
     // Yaw and pitch after one tick of the given input
     const lookOnce = (settings: Settings, mouse: number, stick: number): { yaw: number; pitch: number } => {
-        const { input, gameState, gameLoop } = createLoop('world_3d', settings);
-        input.setIntent({ look: { yaw: mouse, pitch: mouse }, lookRate: { yaw: stick, pitch: stick } });
-        gameLoop.update(FIXED_DT + EPSILON);
+        const { gameState, press } = createScenario({ settings });
+        press({ look: { yaw: mouse, pitch: mouse }, lookRate: { yaw: stick, pitch: stick } });
         return { yaw: gameState.interpolated.cameraYaw, pitch: gameState.interpolated.cameraPitch };
     };
 
