@@ -1,19 +1,19 @@
 import { World } from './core/world';
 import { GameLoop, type DebugHUD } from './core/gameLoop';
 import { TypeSafeEventBus } from './core/events';
-import AudioSystem from './core/audioSystem';
-import { AMBIENT_SOUND, MODE_CHANGE_SOUND, subscribeModeAudio } from './core/modeAudio';
-import { MENU_SELECT_SOUND } from './core/menuSystem';
+import AudioSystem from './core/audio/audioSystem';
+import { AMBIENT_SOUND, MODE_CHANGE_SOUND, subscribeModeAudio } from './core/audio/modeAudio';
+import { MENU_SELECT_SOUND } from './core/menu/menuSystem';
 import { createGameState, type GameState } from './core/gameState';
 import {
     parseSettings,
     serializeSettings,
     SETTINGS_STORAGE_KEY,
     type Settings,
-} from './core/settings';
-import { bindDisplay } from './core/displaySettings';
+} from './core/settings/settings';
+import { bindDisplay } from './core/settings/displaySettings';
 import { createCamera } from './core/camera';
-import type { DebugSettings } from './core/debugSettings';
+import type { DebugSettings } from './core/settings/debugSettings';
 import type { AudioCategory } from './services/audio';
 import type { PlatformServices } from './services/platform';
 import type { Renderer } from './services/renderer';

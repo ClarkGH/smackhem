@@ -63,7 +63,7 @@ Draws are recorded, not drawn on the spot: `endFrame` replays them in call order
 - World geometry: No textures, directional lighting (ambient + diffuse) with shadows
 - 2D sprites: Textures supported (RGBA with alpha blending), lit and shadowed
 - Depth test only (world geometry and sprites)
-- Draw calls are recorded in a `DrawList` (`platforms/web/drawList.ts`) and replayed in `endFrame`
+- Draw calls are recorded in a `DrawList` (`platforms/web/rendering/drawList.ts`) and replayed in `endFrame`
 
 ## Display Size and Resolution
 
@@ -388,7 +388,7 @@ interface Renderer {
 2. `endFrame`: if strength > 0, the **depth pass** draws every recorded non-light-source mesh, then every billboard, into a 2048² depth texture, from the light.
 3. The **lit pass** replays the recording as before, sampling that texture.
 
-The light's view-projection (`platforms/web/shadowMath.ts`) is orthographic: sunlight is parallel, so shadows don't grow or shrink with distance from the light. It covers ±40 units around the camera (80 units / 2048 texels ≈ 3.9 cm per texel) and ±100 units along the light. Its centre snaps to whole texels: otherwise every small camera move re-rasterises shadow edges at slightly different spots and they crawl ("shimmer").
+The light's view-projection (`platforms/web/rendering/shadowMath.ts`) is orthographic: sunlight is parallel, so shadows don't grow or shrink with distance from the light. It covers ±40 units around the camera (80 units / 2048 texels ≈ 3.9 cm per texel) and ±100 units along the light. Its centre snaps to whole texels: otherwise every small camera move re-rasterises shadow edges at slightly different spots and they crawl ("shimmer").
 
 ### Sampling: Acne, Peter-Panning and Soft Edges
 

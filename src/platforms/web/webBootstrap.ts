@@ -4,13 +4,13 @@ import {
     World,
     CHUNK_LOAD_RADIUS,
 } from '../../core/world';
-import { WebInputService } from './webInputService';
+import { WebInputService } from './input/webInputService';
 import type { Vec3 } from '../../types/common';
 import WebAssetLoader from './webAssetLoader';
-import WebGLRenderer from './webGLRenderer';
+import WebGLRenderer from './rendering/webGLRenderer';
 import WebClock from './webClock';
-import WebAudioService from './webAudioService';
-import WebMenuOverlay from './webMenuOverlay';
+import WebAudioService from './audio/webAudioService';
+import WebMenuOverlay from './menu/webMenuOverlay';
 import LocalStorageStore from './localStorageStore';
 import WebDisplay from './webDisplay';
 

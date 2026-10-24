@@ -1,6 +1,6 @@
 import { createGame, type GameSetup } from './game';
 import { createDebugHUD } from './platforms/web/debugHUD';
-import { createDebugSettings } from './core/debugSettings';
+import { createDebugSettings } from './core/settings/debugSettings';
 
 // Platform setup - the other platform is tree-shaken based on build config
 const setUpPlatform = async (): Promise<GameSetup> => {

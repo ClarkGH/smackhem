@@ -27,11 +27,11 @@ import {
 } from './scene';
 import { createGameState, GameState } from './gameState';
 import Instance3DSystem from './instance';
-import MenuSystem from './menuSystem';
-import { createDefaultSettings, type Settings } from './settings';
-import type { DebugSettings } from './debugSettings';
-import EnvironmentSystem from './environment';
-import RenderSystem from './renderSystem';
+import MenuSystem from './menu/menuSystem';
+import { createDefaultSettings, type Settings } from './settings/settings';
+import type { DebugSettings } from './settings/debugSettings';
+import EnvironmentSystem from './lighting/environment';
+import RenderSystem from './lighting/renderSystem';
 
 // Simulation step, 60 ticks per second. Exported so tests step the loop exactly.
 export const FIXED_DT = 1 / 60;

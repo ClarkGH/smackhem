@@ -17,7 +17,7 @@ import {
     type CollisionContext,
 } from './collision';
 import { World } from './world';
-import type { Settings } from './settings';
+import type { Settings } from './settings/settings';
 
 const TRANSITION_DURATION = 1;
 

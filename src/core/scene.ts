@@ -2,7 +2,7 @@ import type { GameMode, GameState } from './gameState';
 import type { PlayerIntent } from '../services/input';
 import type { TypeSafeEventBus } from './events';
 import { PLAYER_SPEED } from './camera';
-import type { Settings } from './settings';
+import type { Settings } from './settings/settings';
 
 // The 2D scene lives in a fixed logical space (units, not screen pixels).
 // The renderer fits it to any viewport, centered and undistorted.

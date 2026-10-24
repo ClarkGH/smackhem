@@ -400,7 +400,7 @@ The 2D scene system (more TBD).
 
 ## Menu System
 
-`MenuSystem` (`src/core/menuSystem.ts`) runs the start-up menu while the game mode is `main_menu`, and the pause menu while `DiscreteState.isPaused` is set. It owns which screen is open and which item is selected. It works only from input intent, so keyboard, controller and mouse all go through the same code.
+`MenuSystem` (`src/core/menu/menuSystem.ts`) runs the start-up menu while the game mode is `main_menu`, and the pause menu while `DiscreteState.isPaused` is set. It owns which screen is open and which item is selected. It works only from input intent, so keyboard, controller and mouse all go through the same code.
 
 - **Screens:**
   - **Main** (main → settings → accessibility): New Game, Continue, Load Game and Settings. Continue and Load stay disabled until the save system exists.

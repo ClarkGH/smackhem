@@ -7,7 +7,7 @@ import {
     type Mock,
 } from 'vitest';
 import { createGame, type ChunkUpdater, type Game } from './game';
-import { SETTINGS_STORAGE_KEY } from './core/settings';
+import { SETTINGS_STORAGE_KEY } from './core/settings/settings';
 import createStubPlatform, { createChunkUpdater } from './platforms/stub/stubBootstrap';
 import type StubInput from './platforms/stub/stubInput';
 import type StubClock from './platforms/stub/stubClock';

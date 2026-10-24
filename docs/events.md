@@ -345,7 +345,7 @@ export interface AudioService {
 
 We dropped the standalone `SoundRegistry`. It isn't needed on the web, and it isn't needed for C++.
 
-Every backend already keeps a `soundId -> decoded buffer` cache: the web keeps `AudioBuffer`s, and a native backend (miniaudio, OpenAL) keeps its own sound objects. A registry in core would be a second copy of that map that has to stay in sync. The one thing it bought us was a synchronous lookup from an event's `soundId`, since `loadSound` is async. That lookup now lives in `AudioSystem` (`src/core/audioSystem.ts`), which owns its handles and the audio event subscriptions. It's the same shape as other systems holding their `TextureHandle`s, and it ports to C++ as one system owning a `std::unordered_map<std::string, SoundHandle>`.
+Every backend already keeps a `soundId -> decoded buffer` cache: the web keeps `AudioBuffer`s, and a native backend (miniaudio, OpenAL) keeps its own sound objects. A registry in core would be a second copy of that map that has to stay in sync. The one thing it bought us was a synchronous lookup from an event's `soundId`, since `loadSound` is async. That lookup now lives in `AudioSystem` (`src/core/audio/audioSystem.ts`), which owns its handles and the audio event subscriptions. It's the same shape as other systems holding their `TextureHandle`s, and it ports to C++ as one system owning a `std::unordered_map<std::string, SoundHandle>`.
 
 ```typescript
 export default class AudioSystem {
@@ -417,11 +417,11 @@ Voices are checked with `isFinished()` from the tick, not through end-of-sound c
 
 #### Settings Events
 
-`settings_changed` has no payload. Settings live in one shared `Settings` object (`src/core/settings.ts`), which the menu changes in place, so subscribers read it directly. `main.ts` subscribes and saves the settings to storage. `bindDisplay` (`src/core/displaySettings.ts`) subscribes and applies render scale, window size and fullscreen to the platform. When the platform reports a fullscreen change itself (a refusal, Escape, the page's button), it updates `settings.fullscreen` and publishes `settings_changed` so the menu redraws. Look sensitivity and invert need no event: `GameLoop` reads them every tick.
+`settings_changed` has no payload. Settings live in one shared `Settings` object (`src/core/settings/settings.ts`), which the menu changes in place, so subscribers read it directly. `main.ts` subscribes and saves the settings to storage. `bindDisplay` (`src/core/settings/displaySettings.ts`) subscribes and applies render scale, window size and fullscreen to the platform. When the platform reports a fullscreen change itself (a refusal, Escape, the page's button), it updates `settings.fullscreen` and publishes `settings_changed` so the menu redraws. Look sensitivity and invert need no event: `GameLoop` reads them every tick.
 
 #### Mode-Driven Audio
 
-Core systems only publish intent (Rule I-1). `src/core/modeAudio.ts` turns `game_mode_changed` into audio requests: `sfx_mode_change` plays on every change, and `ambient_night`
+Core systems only publish intent (Rule I-1). `src/core/audio/modeAudio.ts` turns `game_mode_changed` into audio requests: `sfx_mode_change` plays on every change, and `ambient_night`
 
 - pauses when entering the 2D scene (`scene_2d`)
 - stops when entering the instance (`instance_3d`)

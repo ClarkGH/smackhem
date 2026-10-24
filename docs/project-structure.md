@@ -61,32 +61,40 @@ This pattern:
 ```text
 src/
 ├─ core/
-│  ├─ audioSystem.ts          # Owns sound handles, turns audio events into AudioService calls
-│  ├─ audioSystem.spec.ts     # Tests for audio event handling (stub audio)
 │  ├─ camera.ts               # 3D camera math and logic
 │  ├─ collision.ts            # Collision logic
-│  ├─ displaySettings.ts      # Applies display settings, mirrors the platform's fullscreen state
-│  ├─ displaySettings.spec.ts # Fullscreen requests, refusals and outside changes (stub display)
-│  ├─ environment.ts          # Enviroment systems
 │  ├─ events.ts               # Eventing pub/sub systems
 │  ├─ gameLoop.ts             # Game loop logic
 │  ├─ gameState.ts            # Game State logic
 │  ├─ input.ts                # Player input logic
 │  ├─ instance.ts             # Instance systems
-│  ├─ look.spec.ts            # Look timing: mouse once per frame, stick per tick (stub platform)
-│  ├─ menu.ts                 # Menu screen type
-│  ├─ menuSystem.ts           # Start-up menu: screens, navigation, New Game
-│  ├─ menuSystem.spec.ts      # Menu tests, direct and through GameLoop (stub platform)
-│  ├─ modeAudio.ts            # Game mode changes -> audio requests (ambience, mode sound)
-│  ├─ modeAudio.spec.ts       # Scenario tests for mode-driven audio (stub platform)
-│  ├─ modeChange.spec.ts      # Scenario tests for game mode changes (stub platform)
 │  ├─ party.ts                # Party logic
-│  ├─ pause.spec.ts           # Pause, resume and quit-to-menu scenarios (stub platform)
-│  ├─ renderSystem.ts         # Rendering system
 │  ├─ scene.ts                # Scene system
-│  ├─ settings.ts             # Player settings, defaults, and validated load/save as JSON
-│  ├─ settings.spec.ts        # Settings parsing, clamping and storage round-trip
 │  ├─ world.ts                # World and chunking logic
+│  ├─ audio/
+│  │  ├─ audioSystem.ts       # Owns sound handles, turns audio events into AudioService calls
+│  │  ├─ audioSystem.spec.ts  # Tests for audio event handling (stub audio)
+│  │  ├─ modeAudio.ts         # Game mode changes -> audio requests (ambience, mode sound)
+│  │  └─ modeAudio.spec.ts    # Scenario tests for mode-driven audio (stub platform)
+│  ├─ lighting/
+│  │  ├─ environment.ts       # Day/night cycle: sun, moon, ambient, and which body casts shadows
+│  │  ├─ environment.spec.ts  # Shadow caster choice and its dawn/dusk crossfade
+│  │  └─ renderSystem.ts      # Declares the frame to the renderer: camera, lighting, draws
+│  ├─ menu/
+│  │  ├─ menu.ts              # Menu screen type
+│  │  ├─ menuSystem.ts        # Start-up, pause and Debug menus: screens, navigation, values
+│  │  └─ menuSystem.spec.ts   # Menu tests, direct and through GameLoop (stub platform)
+│  ├─ settings/
+│  │  ├─ settings.ts          # Player settings, defaults, and validated load/save as JSON
+│  │  ├─ settings.spec.ts     # Settings parsing, clamping and storage round-trip
+│  │  ├─ displaySettings.ts   # Applies display settings, mirrors the platform's fullscreen state
+│  │  ├─ displaySettings.spec.ts # Fullscreen requests, refusals and outside changes (stub display)
+│  │  └─ debugSettings.ts     # Debug screen values (wireframe, shadows, bias, time), never saved
+│  ├─ scenarios/              # Scenario specs that cross systems (stub platform)
+│  │  ├─ debugMenu.spec.ts    # Debug screen: wireframe, shadows, bias and time reach the renderer
+│  │  ├─ look.spec.ts         # Look timing: mouse once per frame, stick per tick
+│  │  ├─ modeChange.spec.ts   # Game mode changes
+│  │  └─ pause.spec.ts        # Pause, resume and quit-to-menu
 │  └─ math/                   # Shared engine math logic
 │     ├─ aabb.ts              # Axis aligned bounding box
 │     ├─ mathHelpers.ts       # Matrix/vector/etc math helper methods
@@ -107,23 +115,31 @@ src/
 │  ├─ web/
 │  │  ├─ webBootstrap.ts      # Bootstraps the webGL game engine
 │  │  ├─ webClock.ts          # Web platform clock implementation
-│  │  ├─ webGLRenderer.ts     # Renderer specifically for webGL
-│  │  ├─ webInput.ts          # Web input state management
-│  │  ├─ webInput.spec.ts     # Gamepad mapping tests (faked navigator.getGamepads)
-│  │  ├─ webInputService.spec.ts # Keys, menu pointer priority, losing the cursor (fake DOM)
-│  │  ├─ webAudioService.spec.ts # Playback, loading, autoplay retry, and the AudioService contract
-│  │  ├─ webDisplay.spec.ts   # Canvas sizing, render scale, fullscreen and refusals (fake DOM)
-│  │  ├─ webMenuOverlay.spec.ts # Drawing, mouse hit areas against drawn text, scrolling (fake DOM)
-│  │  ├─ localStorageStore.spec.ts # Blocked storage, and the KeyValueStore contract
-│  │  ├─ webInputService.ts   # Web input service implementation
 │  │  ├─ webAssetLoader.ts    # Web asset loader (chunks)
-│  │  ├─ webAudioService.ts   # Web audio playback and mixing service
-│  │  ├─ webMenuOverlay.ts    # Menu drawn as text on a 2D canvas overlay, hit-tests the mouse
-│  │  ├─ menuHitTest.ts       # Mouse position to menu item, and menu scrolling (pure math)
-│  │  ├─ menuHitTest.spec.ts  # Hit-test, CSS-scaling and scrolling tests
-│  │  ├─ localStorageStore.ts # Key-value storage on localStorage, never throws
 │  │  ├─ webDisplay.ts        # Canvas fills its container, render scale, fullscreen on the container
-│  │  └─ debugHUD.ts          # Debug HUD overlay
+│  │  ├─ webDisplay.spec.ts   # Canvas sizing, render scale, fullscreen and refusals (fake DOM)
+│  │  ├─ localStorageStore.ts # Key-value storage on localStorage, never throws
+│  │  ├─ localStorageStore.spec.ts # Blocked storage, and the KeyValueStore contract
+│  │  ├─ debugHUD.ts          # Debug HUD overlay
+│  │  ├─ rendering/
+│  │  │  ├─ webGLRenderer.ts  # WebGL2 renderer: shaders, shadow map, depth and lit passes
+│  │  │  ├─ drawList.ts       # A frame's draws, copied in and replayed in endFrame
+│  │  │  ├─ drawList.spec.ts  # Copies scratch matrices, keeps call order, pool reuse
+│  │  │  ├─ shadowMath.ts     # Light view-projection for the shadow map, texel-snapped
+│  │  │  └─ shadowMath.spec.ts # Centring, overhead light, no shimmer as the focus moves
+│  │  ├─ input/
+│  │  │  ├─ webInput.ts       # Web input state management
+│  │  │  ├─ webInput.spec.ts  # Gamepad mapping tests (faked navigator.getGamepads)
+│  │  │  ├─ webInputService.ts # Web input service implementation
+│  │  │  └─ webInputService.spec.ts # Keys, menu pointer priority, losing the cursor (fake DOM)
+│  │  ├─ menu/
+│  │  │  ├─ webMenuOverlay.ts # Menu drawn as text on a 2D canvas overlay, hit-tests the mouse
+│  │  │  ├─ webMenuOverlay.spec.ts # Drawing, mouse hit areas against drawn text, scrolling (fake DOM)
+│  │  │  ├─ menuHitTest.ts    # Mouse position to menu item, and menu scrolling (pure math)
+│  │  │  └─ menuHitTest.spec.ts # Hit-test, CSS-scaling and scrolling tests
+│  │  └─ audio/
+│  │     ├─ webAudioService.ts # Web audio playback and mixing service
+│  │     └─ webAudioService.spec.ts # Playback, loading, autoplay retry, and the AudioService contract
 │  ├─ stub/
 │  │  ├─ nullRenderer.ts      # Stub renderer for testing/validation
 │  │  ├─ nullRenderer.spec.ts # Tests for stub renderer
