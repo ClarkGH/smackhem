@@ -13,6 +13,7 @@ import StubInput from './stubInput';
 import StubClock from './stubClock';
 import { identity } from '../../core/math/mathHelpers';
 import { createChunk } from './stubBootstrap';
+import { getCameraMatrix } from '../../core/camera';
 
 describe('NullRenderer - Portability Validation (RULE P-1)', () => {
     let renderer: NullRenderer;
@@ -196,6 +197,24 @@ describe('StubPlatform - Chunk streaming smoke test', () => {
                 gameLoop.render();
             }
         }).not.toThrow();
+    });
+
+    it('sends world meshes their own model matrix, with the camera view-projection set once', () => {
+        clock.update();
+        input.update();
+        gameLoop.update(clock.getDeltaTime());
+        gameLoop.render();
+
+        const expectedViewProj = getCameraMatrix(gameLoop.getRenderCamera(), 16 / 9);
+        expect(Array.from(renderer.getViewProjection())).toEqual(Array.from(expectedViewProj.elements));
+
+        // By reference: if core still pre-multiplied, these would be its scratch MVP instead
+        const models = renderer.getMeshModels();
+        const worldMeshes = world.getVisibleMeshes();
+        expect(worldMeshes.length).toBeGreaterThan(0);
+        worldMeshes.forEach((sm) => {
+            expect(models).toContain(sm.transform);
+        });
     });
 
     it('runs cleanly with wireframe mode active', () => {

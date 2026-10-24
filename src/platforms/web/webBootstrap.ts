@@ -122,17 +122,6 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
         opened: (open) => input.setMenuOpen(open),
     });
 
-    // Wireframe toggle on F4 (debug keys live on the F-keys, see docs/controls.md)
-    let wireframeEnabled = false;
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'F4') {
-            e.preventDefault();
-            wireframeEnabled = !wireframeEnabled;
-            renderer.setWireframe(wireframeEnabled);
-            console.log(`Wireframe: ${wireframeEnabled ? 'ON' : 'OFF'}`);
-        }
-    });
-
     // Browsers block audio until a user gesture, unlock on the first one
     const unlockAudio = () => {
         audio.resumeContext();

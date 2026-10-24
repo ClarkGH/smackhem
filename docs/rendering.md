@@ -18,10 +18,18 @@
   - [Lighting Parameters](#lighting-parameters)
   - [Renderer Interface Extension](#renderer-interface-extension)
   - [Implementation](#implementation)
+- [Shadows](#shadows)
+  - [What Casts and Receives](#what-casts-and-receives)
+  - [Choosing the Shadow Caster](#choosing-the-shadow-caster)
+  - [Frame Flow](#frame-flow)
+  - [Sampling: Acne, Peter-Panning and Soft Edges](#sampling-acne-peter-panning-and-soft-edges)
+  - [Billboards](#billboards)
+  - [Known Limits](#known-limits)
 - [2D Sprite Rendering (Instance Characters)](#2d-sprite-rendering-instance-characters)
   - [Renderer Interface Extension](#renderer-interface-extension-1)
   - [Implementation Details](#implementation-details)
   - [Sprite Lighting](#sprite-lighting)
+  - [Sprite Art](#sprite-art)
   - [Architecture](#architecture-1)
 - [Key Rule: gl.* never leaks upward](#key-rule-gl-never-leaks-upward)
 - [Navigation](#navigation)
@@ -33,23 +41,29 @@ The renderer explicitly owns rendering.
 ```typescript
 interface Renderer {
   beginFrame(): void;
+  // Once per frame, shared by every world draw
+  setViewProjection(viewProj: Mat4): void;
   drawMesh(
     mesh: MeshHandle,
-    transform: Mat4,
+    model: Mat4, // the mesh's own transform, not viewProj * model
     color: Vec3
   ): void;
   endFrame(): void;
 }
 ```
 
+Draws are recorded, not drawn on the spot: `endFrame` replays them in call order. That lets the renderer run more than one pass over the same frame (see [Shadows](#shadows)). Matrices and colors are copied when recorded, because core reuses scratch objects (one wall transform for every wall).
+
 ## WebGL Implementation
 
 - Uses WebGL2
 - One shader pair for world geometry
 - One shader pair for 2D sprites/textures (for instance characters)
-- World geometry: No textures, grayscale directional lighting (ambient + diffuse)
-- 2D sprites: Textures supported (RGBA with alpha blending), **lighting in progress**
+- One depth-only shader pair for the shadow map
+- World geometry: No textures, directional lighting (ambient + diffuse) with shadows
+- 2D sprites: Textures supported (RGBA with alpha blending), lit and shadowed
 - Depth test only (world geometry and sprites)
+- Draw calls are recorded in a `DrawList` (`platforms/web/drawList.ts`) and replayed in `endFrame`
 
 ## Display Size and Resolution
 
@@ -78,11 +92,11 @@ The rendering system uses grayscale directional lighting with ambient and diffus
 
 ### Directional Light Direction
 
-Light direction is a normalized 3D vector pointing from the light source toward the scene.
-For a sun in the east casting light westward:
+Light direction is a normalized 3D vector pointing from the surface toward the light source (the sun or moon).
+For a sun low in the east (+X):
 
 ```typescript
-lightDirection = normalize({x: -1, y: 0.2, z: 0})
+lightDirection = normalize({x: 1, y: 0.2, z: 0})
 ```
 
 ### Lambertian Diffuse Lighting
@@ -90,11 +104,11 @@ lightDirection = normalize({x: -1, y: 0.2, z: 0})
 Diffuse lighting calculation (performed in fragment shader):
 
 ```typescript
-dotProduct = dot(surfaceNormal, -lightDirection)
+dotProduct = dot(surfaceNormal, lightDirection)
 diffuse = max(dotProduct, 0.0)
 ```
 
-The dot product between the surface normal and the negated light direction determines how much light hits the surface. Surfaces facing away from the light receive no diffuse lighting.
+The dot product between the surface normal and the light direction determines how much light hits the surface. Surfaces facing away from the light receive no diffuse lighting.
 
 ### Lighting Calculation
 
@@ -158,7 +172,7 @@ The lighting system supports a deterministic sun/moon cycle that rotates light d
   - Visible during night (timeOfDay 0.0-0.25, 0.75-1.0)
   - Follows opposite path across sky
 - **Coordinate System**: Y-up world space, normalized vectors
-  - Light direction points FROM light source TOWARD scene
+  - Light direction points FROM the surface TOWARD the light source
   - Rotation around Y-axis in XZ plane
 
 ### Lighting Parameters
@@ -220,10 +234,12 @@ const angle = (timeOfDay - 0.25) * Math.PI * 2; // Full rotation with phase offs
 const elevation = Math.sin(angle) + DECLINATION_OFFSET; // -1 (midnight) to 1 (noon)
 const azimuth = Math.PI / 2 + angle; // Starts at east (π/2), rotates clockwise
 
-// Convert spherical to Cartesian direction vector
-const cosElev = Math.cos(elevation);
+// Convert spherical to Cartesian direction vector.
+// elevation is already a sine (-1..1), so it's y directly. Taking Math.sin of it again
+// treated it as radians and capped the noon sun at sin(1) ~ 57 degrees.
+const cosElev = Math.sqrt(1 - elevation * elevation);
 out.x = cosElev * Math.sin(azimuth);  // East-west component
-out.y = Math.sin(elevation);          // Up-down component
+out.y = elevation;                    // Up-down component
 out.z = cosElev * Math.cos(azimuth);  // North-south component
 // Normalize for unit vector
 // Note: No horizon clamping - sun can go below horizon for debugging
@@ -336,6 +352,73 @@ Both the sun and moon are rendered as visible spheres in the sky:
 - Celestial meshes (sun sphere) are created once and reused
 - No horizon clamping - sun can go below horizon for debugging
 
+## Shadows
+
+Shadow mapping, the standard technique in most 3D engines. Each frame the renderer draws the scene's depth as seen from the shadow-casting light into a texture (the shadow map). Then, for every lit pixel, it asks: is something nearer the light than me, at my spot in that texture? If so, that pixel is in shadow.
+
+### What Casts and Receives
+
+- **Every lit mesh casts and receives, per pixel**: floor, cube/prism/pyramid sides and tops, walls. Mesh on floor, mesh on mesh and a mesh on itself are all the same lookup.
+- **Billboards cast and receive, per pixel**: shaded by meshes and other billboards, and casting their sprite's shape.
+- **Never**: light sources (`isLightSource`: sun, moon, debug wireframe walls). The sun sphere sits right between the light and the camera, so it would put a disc of shadow around the player.
+- **Not**: the `scene_2d` screen quad (a flat overlay), or anything beyond the map's ±40 units around the camera. Shadows fade out over the map's outer 10% instead of ending on a hard line.
+- **Ambient is never shadowed**, only direct light. Shadows are naturally faint when ambient is high or direct light is dim.
+
+### Choosing the Shadow Caster
+
+Core (`EnvironmentSystem`) picks it every frame, as a pure function of the time of day:
+
+- The **more visible body** casts: the sun by day, the moon by night.
+- **Strength** = that body's visibility × an elevation fade, from 0 at `y = 0.05` to full at `y = 0.25` (direction's height). Near the horizon shadows would stretch for dozens of units.
+- At dawn and dusk both bodies sit at the horizon, so the moon → sun handover happens at strength 0, a crossfade rather than a pop.
+
+```typescript
+interface Renderer {
+    // Optional, like the other lighting setters. Called every frame, strength 0 included:
+    // the renderer keeps the last values it got, so skipping a call leaves stale shadows on.
+    setShadowCaster?(direction: Vec3, strength: number, focus: Vec3): void;
+}
+```
+
+`focus` is the render camera's position: core says where it cares about, the renderer decides the map's size and resolution (R-3). The pause menu's Debug screen (dev server only) can turn shadows off (core sends strength 0) and override the time of day.
+
+### Frame Flow
+
+1. `RenderSystem` sets the view-projection, lighting and shadow caster, then records its draws.
+2. `endFrame`: if strength > 0, the **depth pass** draws every recorded non-light-source mesh, then every billboard, into a 2048² depth texture, from the light.
+3. The **lit pass** replays the recording as before, sampling that texture.
+
+The light's view-projection (`platforms/web/shadowMath.ts`) is orthographic: sunlight is parallel, so shadows don't grow or shrink with distance from the light. It covers ±40 units around the camera (80 units / 2048 texels ≈ 3.9 cm per texel) and ±100 units along the light. Its centre snaps to whole texels: otherwise every small camera move re-rasterises shadow edges at slightly different spots and they crawl ("shimmer").
+
+### Sampling: Acne, Peter-Panning and Soft Edges
+
+- **Shadow acne**: a surface compares against its own depth, and texel-sized rounding makes it shadow itself in speckles or stripes.
+- **Peter-panning**: overcorrecting for acne pushes shadows away from their casters, so objects look like they float.
+- The mesh shader balances the two with:
+  - `NORMAL_OFFSET` (0.05): look up a point lifted off the surface along its normal.
+  - **Receiver-plane depth bias** (in `sampleShadow`): from how the light-space position changes between neighbouring screen pixels (`dFdx`/`dFdy`), work out how the surface's depth tilts across the shadow map. Each of the 9 soft-edge taps then compares against the surface's own depth *at that tap*, not at the centre. Without it, a tilted floor's outer taps look "behind" the floor itself, and the only cure was a large flat bias, which left a gap at every shadow's root.
+  - What's left: one texel's worth of that tilt (LINEAR compare reads depths up to a texel away) plus `CONSTANT_BIAS` (~1 cm).
+- **Soft edges**: the shadow map is sampled in compare mode with LINEAR filtering (each lookup blends 4 compares), 9 times in a 3×3 grid.
+
+These constants are the first things to adjust if acne or floating shadows show up. The pause menu's Debug screen has a **Shadow Bias** stepper (×0.25 to ×4) that scales both live: ×0.25 shows acne on the floor, high values show shadows pulling away from their casters.
+
+Before blaming the bias for a shadow that floats, check that the caster really touches the floor: a sprite with transparent rows under its feet floats, and its shadow is honest about it (see [Sprite Art](#sprite-art)).
+
+### Billboards
+
+A billboard faces the camera, but casts from a card that faces the light (so its shadow never collapses to a line when the sun is behind the camera). If it looked up its shadow on the camera-facing card, half the sprite would sit behind its own caster and shade itself.
+
+**Casting**: in the depth pass a billboard is drawn on that light-facing card, and pixels with alpha below 0.5 are discarded, so the shadow has the sprite's shape rather than a rectangle's.
+
+**Receiving**: each billboard pixel looks up its shadow where it would be **on the light-facing card**, nudged `SELF_CLEARANCE` (0.1 units) toward the light. The card maths (`LIGHT_CARD_GLSL`) is shared by both, so they always agree. Walls and meshes still shade it per pixel, so a sprite half in a wall's shadow is half shaded. With the light straight overhead every facing casts the same, so it keeps the camera-facing card.
+
+### Known Limits
+
+- **Shadows dim both bodies' diffuse light**, not just the caster's: the renderer only gets a direction, not which body. The crossfade keeps the other body dim whenever shadows are strong. Local lights (sconces, lanterns) will need this per light.
+- **Billboard models are assumed upright**: anchor in the translation, size from the first column. True of every current `drawTexturedQuad`.
+- **Sprites have almost no shadow at noon**: a flat card seen from straight above casts a line. If characters need grounding then, a small blob shadow under them is the usual addition.
+- **One map**: if shadows far from the camera look blocky, cascaded shadow maps (several maps at increasing distance) are the usual upgrade.
+
 ## 2D Sprite Rendering (Instance Characters)
 
 The renderer supports 2D sprite rendering for instance characters (party members, NPCs, enemies). Sprites are rendered as textured quads with billboard orientation in the 3D scene.
@@ -346,7 +429,8 @@ The renderer supports 2D sprite rendering for instance characters (party members
 interface Renderer {
     // ... existing methods ...
     loadTexture(_assetId: string): Promise<TextureHandle>;
-    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number, _normal?: Vec3): void;
+    // model: the billboard's own transform; the renderer applies the view-projection
+    drawTexturedQuad(_texture: TextureHandle, _model: Mat4, _size: number, _normal?: Vec3): void;
 }
 ```
 
@@ -361,41 +445,23 @@ interface Renderer {
 
 ### Sprite Lighting
 
-- Sprites are quads/billboards that are facing the camera directly. To light them correctly, the location they face from the camera needs to be drawn and normalized with the lighting.-
+Sprites are lit **as if they faced the light**: the same light-facing card they cast their shadow from (see [Billboards](#billboards)). Each body adds its full color, already faded by its own visibility, and only shadow dims it:
 
-```typescript
-const toCamera = {
-    x: this.camera.position.x - pos.x,
-    y: 0,
-    z: this.camera.position.z - pos.z,
-};
-// ...normalized...
-const right = { x: -toCamera.z, y: 0, z: toCamera.x };
-const up = { x: 0, y: 1, z: 0 };
-```
-We draw them directly inside the shader to allow for redraws on the normalization.
-```typescript
-uniform vec3 u_normal;
-...
-void main() {
-    ...
-    vec3 normal = normalize(u_normal);
-    ...
-}
+```glsl
+vec3 diffuse = (u_sunColor + u_moonColor) * sampleShadow(v_lightClip, BILLBOARD_BIAS);
+vec3 finalColor = textureColor * (u_ambientIntensity + diffuse);
 ```
 
-The renderer will default to up or accept a normal param.
-```typescript
-drawTexturedQuad(texture: TextureHandle, transform: Mat4, size: number, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
-    ...
-    const normalLoc = gl.getUniformLocation(this.textureProgram, 'u_normal');
-    if (normalLoc) {
-        gl.uniform3f(normalLoc, normal.x, normal.y, normal.z);
-    }
-}
-```
+Earlier, sprites used the direction to the camera as their normal. Standing on a sprite's sunny side then turned it ambient-only, and its brightness changed as you walked around it. A flat sprite has no real facing, so its brightness shouldn't depend on the camera. The `normal` passed to `drawTexturedQuad` is now only the fallback card when the light is straight overhead.
 
-There are some coloring issues. These will be fine tuned for pre-alpha.
+### Sprite Art
+
+A sprite's image is stretched over a square card `size` world units across, anchored so the card's bottom edge sits on the floor. So:
+
+- **The feet go on the bottom row of the image.** Transparent rows below them lift the drawn sprite, and its shadow, off the floor. With a low sun the gap shows clearly (shadow offset = height / tan(sun elevation)).
+- **The image is square**, or it gets squashed onto the square card.
+- **The opaque part spans the card's width**, because `INSTANCE_CHARACTER_SIZE` is both the card's size and the collision size. A smaller drawn circle collides bigger than it looks.
+- Pixel dimensions don't matter otherwise: a 22×22 and a 64×64 sprite both fill the same card. They just differ in how many pixels per world unit they show.
 
 ### Architecture
 

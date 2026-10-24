@@ -1,5 +1,6 @@
 import { createGame, type GameSetup } from './game';
 import { createDebugHUD } from './platforms/web/debugHUD';
+import { createDebugSettings } from './core/debugSettings';
 
 // Platform setup - the other platform is tree-shaken based on build config
 const setUpPlatform = async (): Promise<GameSetup> => {
@@ -17,6 +18,8 @@ const setUpPlatform = async (): Promise<GameSetup> => {
         updateChunks: createChunkUpdater(),
         assetLoader: platform.assetLoader,
         debugHUD: createDebugHUD(platform.canvas),
+        // Dev server only, so released builds have no Debug screen
+        debugSettings: import.meta.env.DEV ? createDebugSettings() : undefined,
     };
 };
 

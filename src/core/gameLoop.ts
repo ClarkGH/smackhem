@@ -29,6 +29,7 @@ import { createGameState, GameState } from './gameState';
 import Instance3DSystem from './instance';
 import MenuSystem from './menuSystem';
 import { createDefaultSettings, type Settings } from './settings';
+import type { DebugSettings } from './debugSettings';
 import EnvironmentSystem from './environment';
 import RenderSystem from './renderSystem';
 
@@ -71,6 +72,8 @@ export interface GameLoopOptions {
     settings?: Settings;
     // What the platform's display can do, nothing when left out
     displayCapabilities?: DisplayCapabilities;
+    // Adds the pause menu's Debug screen, left out in release builds
+    debugSettings?: DebugSettings;
 }
 
 export class GameLoop {
@@ -114,6 +117,9 @@ export class GameLoop {
     // Shared, changed in place by the menu
     private settings: Settings;
 
+    // Shared, changed in place by the Debug screen
+    private debugSettings?: DebugSettings;
+
     // Constants
     private readonly SUN_SIZE = 0.5; // Radius of sun orb (sphere)
 
@@ -142,8 +148,6 @@ export class GameLoop {
     // Pre-allocated scratch fields
     private readonly wallDebugTransform: Mat4 = identity();
 
-    private readonly wallDebugMVP: Mat4 = identity();
-
     constructor({
         renderer,
         input,
@@ -155,6 +159,7 @@ export class GameLoop {
         menuOverlay,
         settings,
         displayCapabilities,
+        debugSettings,
     }: GameLoopOptions) {
         this.renderer = renderer;
         this.input = input;
@@ -164,7 +169,8 @@ export class GameLoop {
         this.gameState = gameState;
         this.settings = settings ?? createDefaultSettings();
         this.scene2DSystem = new Scene2DSystem(this.eventBus, this.settings);
-        this.menuSystem = new MenuSystem(this.eventBus, this.settings, displayCapabilities);
+        this.debugSettings = debugSettings;
+        this.menuSystem = new MenuSystem(this.eventBus, this.settings, displayCapabilities, debugSettings);
         this.debugHUD = debugHUD;
         this.menuOverlay = menuOverlay;
 
@@ -394,7 +400,13 @@ export class GameLoop {
 
     public render(): void {
         const renderCamera = this.getRenderCamera();
-        this.environmentSystem.update(this.gameState, renderCamera.position, 1.0, 1.0);
+        const debug = this.debugSettings;
+        const hour = debug ? debug.timeOfDayHour : null;
+        this.environmentSystem.update(this.gameState, renderCamera.position, 1.0, 1.0, hour === null ? null : hour / 24);
+        if (debug) {
+            this.renderer.setWireframe(debug.wireframe);
+            this.renderer.setShadowBias?.(debug.shadowBiasScale);
+        }
 
         if (this.menuOverlay && this.menuSystem.consumeViewChanged()) {
             const { gameMode, isPaused } = this.gameState.discrete;
@@ -408,7 +420,7 @@ export class GameLoop {
             this.debugHUD,
             this.WALL_DEBUG_COLOR,
             this.wallDebugTransform,
-            this.wallDebugMVP,
+            debug ? debug.shadows : true,
         );
     }
 

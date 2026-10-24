@@ -13,6 +13,7 @@ import {
     WINDOW_RESOLUTION_PRESETS,
     type Settings,
 } from './settings';
+import { SHADOW_BIAS_SCALES, type DebugSettings } from './debugSettings';
 import type { AudioCategory } from '../services/audio';
 import type { DisplayCapabilities } from '../services/display';
 import type { PlayerIntent } from '../services/input';
@@ -27,6 +28,7 @@ type MenuAction =
     | 'resume'
     | 'open_settings'
     | 'open_accessibility'
+    | 'open_debug'
     | 'open_quit_confirm'
     | 'quit'
     | 'back';
@@ -38,7 +40,11 @@ type MenuSetting =
     | { kind: 'toggle'; key: 'invertMouseY' | 'invertControllerY' | 'fullscreen' | 'reducedMotion' }
     | { kind: 'renderScale' }
     | { kind: 'textScale' }
-    | { kind: 'windowResolution' };
+    | { kind: 'windowResolution' }
+    // Debug rows change DebugSettings, which is never saved
+    | { kind: 'debugToggle'; key: 'wireframe' | 'shadows' }
+    | { kind: 'timeOfDay' }
+    | { kind: 'shadowBias' };
 
 interface MenuItem {
     label: string;
@@ -72,8 +78,21 @@ const displayItems = (capabilities: DisplayCapabilities): MenuItem[] => {
     return items;
 };
 
+// Only offered when the platform hands GameLoop debug settings
+const pauseItems = (hasDebug: boolean): MenuItem[] => {
+    const items = [
+        actionItem('Resume', 'resume'),
+        actionItem('Settings', 'open_settings'),
+    ];
+    if (hasDebug) {
+        items.push(actionItem('Debug', 'open_debug'));
+    }
+    items.push(actionItem('Quit to Main Menu', 'open_quit_confirm'));
+    return items;
+};
+
 // Continue and Load stay disabled until the save system exists
-const buildScreens = (capabilities: DisplayCapabilities): Record<MenuScreen, MenuScreenData> => ({
+const buildScreens = (capabilities: DisplayCapabilities, hasDebug: boolean): Record<MenuScreen, MenuScreenData> => ({
     main: {
         title: 'Smackhem',
         items: [
@@ -85,11 +104,7 @@ const buildScreens = (capabilities: DisplayCapabilities): Record<MenuScreen, Men
     },
     pause: {
         title: 'Paused',
-        items: [
-            actionItem('Resume', 'resume'),
-            actionItem('Settings', 'open_settings'),
-            actionItem('Quit to Main Menu', 'open_quit_confirm'),
-        ],
+        items: pauseItems(hasDebug),
     },
     // No comes first, so a stray confirm never throws the run away
     quit_confirm: {
@@ -124,7 +139,19 @@ const buildScreens = (capabilities: DisplayCapabilities): Record<MenuScreen, Men
             actionItem('Back', 'back'),
         ],
     },
+    debug: {
+        title: 'Debug',
+        items: [
+            settingItem('Wireframe', { kind: 'debugToggle', key: 'wireframe' }),
+            settingItem('Shadows', { kind: 'debugToggle', key: 'shadows' }),
+            settingItem('Shadow Bias', { kind: 'shadowBias' }),
+            settingItem('Time of Day', { kind: 'timeOfDay' }),
+            actionItem('Back', 'back'),
+        ],
+    },
 });
+
+const TIME_OF_DAY_HOURS = 24;
 
 const firstEnabled = (items: MenuItem[]): number => {
     for (let i = 0; i < items.length; i += 1) {
@@ -138,6 +165,9 @@ export class MenuSystem {
 
     // Shared with the rest of the game, changed in place
     private readonly settings: Settings;
+
+    // Shared with GameLoop, changed in place. Absent means no Debug screen.
+    private readonly debug: DebugSettings | undefined;
 
     private readonly screens: Record<MenuScreen, MenuScreenData>;
 
@@ -156,11 +186,13 @@ export class MenuSystem {
     constructor(
         eventBus: TypeSafeEventBus,
         settings: Settings,
-        capabilities: DisplayCapabilities = NO_DISPLAY_CAPABILITIES,
+        capabilities?: DisplayCapabilities,
+        debug?: DebugSettings,
     ) {
         this.eventBus = eventBus;
         this.settings = settings;
-        this.screens = buildScreens(capabilities);
+        this.debug = debug;
+        this.screens = buildScreens(capabilities ?? NO_DISPLAY_CAPABILITIES, debug !== undefined);
         this.selected = firstEnabled(this.screens.main.items);
 
         // Settings can change from outside the menu, e.g. Escape leaving fullscreen
@@ -243,6 +275,7 @@ export class MenuSystem {
                 })),
                 selected: this.selected,
                 textScale: this.settings.menuTextScale,
+                showWorld: this.screen === 'debug',
             };
         }
         return this.view;
@@ -272,7 +305,7 @@ export class MenuSystem {
 
         if (item.setting) {
             // Confirm flips a toggle, it does nothing on a slider
-            if (item.setting.kind === 'toggle') {
+            if (item.setting.kind === 'toggle' || item.setting.kind === 'debugToggle') {
                 this.playSelectSound();
                 this.changeSetting(item.setting, 1);
             }
@@ -290,6 +323,9 @@ export class MenuSystem {
                 break;
             case 'open_accessibility':
                 this.openScreen('accessibility');
+                break;
+            case 'open_debug':
+                this.openScreen('debug');
                 break;
             case 'resume':
                 this.resume(gameState);
@@ -319,6 +355,11 @@ export class MenuSystem {
 
     private changeSetting(setting: MenuSetting, step: -1 | 1): void {
         const { settings } = this;
+
+        if (setting.kind === 'debugToggle' || setting.kind === 'timeOfDay' || setting.kind === 'shadowBias') {
+            this.changeDebugSetting(setting, step);
+            return;
+        }
 
         switch (setting.kind) {
             case 'volume': {
@@ -373,6 +414,29 @@ export class MenuSystem {
         this.markChanged();
     }
 
+    // Not settings_changed: that saves Settings, and debug values are never saved
+    private changeDebugSetting(setting: MenuSetting, step: -1 | 1): void {
+        const { debug } = this;
+        if (!debug) return;
+
+        if (setting.kind === 'debugToggle') {
+            debug[setting.key] = !debug[setting.key];
+        } else if (setting.kind === 'shadowBias') {
+            const index = SHADOW_BIAS_SCALES.indexOf(debug.shadowBiasScale);
+            const next = SHADOW_BIAS_SCALES[clamp(index + step, 0, SHADOW_BIAS_SCALES.length - 1)];
+            if (next === debug.shadowBiasScale) return;
+            debug.shadowBiasScale = next;
+        } else {
+            // null (live) first, then 00:00..23:00
+            const current = debug.timeOfDayHour;
+            const index = current === null ? 0 : current + 1;
+            const nextIndex = clamp(index + step, 0, TIME_OF_DAY_HOURS);
+            if (nextIndex === index) return;
+            debug.timeOfDayHour = nextIndex === 0 ? null : nextIndex - 1;
+        }
+        this.markChanged();
+    }
+
     private valueText(setting: MenuSetting): string {
         switch (setting.kind) {
             case 'volume':
@@ -388,6 +452,14 @@ export class MenuSystem {
             case 'windowResolution': {
                 const resolution = this.settings.windowResolution;
                 return resolution ? `${resolution.width}x${resolution.height}` : 'Display';
+            }
+            case 'debugToggle':
+                return this.debug?.[setting.key] ? 'On' : 'Off';
+            case 'shadowBias':
+                return `x${this.debug?.shadowBiasScale ?? 1}`;
+            case 'timeOfDay': {
+                const hour = this.debug?.timeOfDayHour ?? null;
+                return hour === null ? 'Live' : `${hour.toString().padStart(2, '0')}:00`;
             }
             default:
                 return '';

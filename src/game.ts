@@ -13,6 +13,7 @@ import {
 } from './core/settings';
 import { bindDisplay } from './core/displaySettings';
 import { createCamera } from './core/camera';
+import type { DebugSettings } from './core/debugSettings';
 import type { AudioCategory } from './services/audio';
 import type { PlatformServices } from './services/platform';
 import type { Renderer } from './services/renderer';
@@ -33,6 +34,8 @@ export interface GameSetup {
     // Web only, where chunks come from JSON files
     assetLoader?: unknown;
     debugHUD?: DebugHUD;
+    // Adds the pause menu's Debug screen
+    debugSettings?: DebugSettings;
 }
 
 export interface Game {
@@ -54,6 +57,7 @@ export const createGame = async ({
     updateChunks,
     assetLoader,
     debugHUD,
+    debugSettings,
 }: GameSetup): Promise<Game> => {
     const world = new World();
     const eventBus = new TypeSafeEventBus();
@@ -105,6 +109,7 @@ export const createGame = async ({
         menuOverlay: platform.menu,
         settings,
         displayCapabilities: platform.display.capabilities(),
+        debugSettings,
     });
 
     const frame = (): void => {

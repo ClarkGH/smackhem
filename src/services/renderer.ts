@@ -12,7 +12,11 @@ export interface TextureHandle {
 
 export interface Renderer {
     beginFrame(): void;
-    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3, u_isLightSource?: boolean): void;
+    setViewProjection(_viewProj: Mat4): void;
+    setShadowCaster?(_direction: Vec3, _strength: number, _focus: Vec3): void;
+    setShadowDebug?(_showMap: boolean, _bias: number): void;
+    setShadowBias?(_scale: number): void;
+    drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean): void;
     endFrame(): void;
     createPlaneMesh(_size: number): MeshHandle;
     createCubeMesh(_size: number): MeshHandle;
@@ -28,7 +32,7 @@ export interface Renderer {
         _moon: { direction: Vec3; color: Vec3 },
     ): void;
     loadTexture(_assetId: string): Promise<TextureHandle>;
-    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number, _normal?: Vec3): void;
+    drawTexturedQuad(_texture: TextureHandle, _model: Mat4, _size: number, _normal?: Vec3): void;
     clear?(_r: number, _g: number, _b: number, _a: number): void;
     getViewportWidth?(): number;
     getViewportHeight?(): number;

@@ -12,12 +12,8 @@ import {
 } from './math/mathHelpers';
 
 export default class RenderSystem {
-    // PERFORMANCE: Pre-allocated MVP matrices isolated to the drawing context
-    private readonly sunMVP: Mat4;
-
-    private readonly moonMVP: Mat4;
-
-    private readonly meshMVP: Mat4;
+    // PERFORMANCE: Pre-allocated matrices isolated to the drawing context
+    private readonly sceneSpriteMVP: Mat4;
 
     private readonly circleTransform: Mat4;
 
@@ -41,9 +37,7 @@ export default class RenderSystem {
         private wallDebugMesh: any,
     ) {
         // Pre-allocate tracking transforms to strictly prevent garbage collection spikes
-        this.sunMVP = { elements: new Float32Array(16) };
-        this.moonMVP = { elements: new Float32Array(16) };
-        this.meshMVP = { elements: new Float32Array(16) };
+        this.sceneSpriteMVP = { elements: new Float32Array(16) };
         this.circleTransform = { elements: new Float32Array(16) };
         this.sceneSpriteTransform = { elements: new Float32Array(16) };
         this.sceneOrthoProj = { elements: new Float32Array(16) };
@@ -57,7 +51,7 @@ export default class RenderSystem {
         o[12] = center.x; o[13] = center.y; o[14] = center.z; o[15] = 1;
     }
 
-    private renderBoundaryWireframe(viewProj: Mat4, wallDebugTransform: Mat4, wallDebugMVP: Mat4, WALL_DEBUG_COLOR: Vec3): void {
+    private renderBoundaryWireframe(wallDebugTransform: Mat4, WALL_DEBUG_COLOR: Vec3): void {
         if (!this.renderer.getWireframeEnabled?.()) return;
 
         this.world.getBoundaryWallAABBs().forEach((wall) => {
@@ -72,12 +66,18 @@ export default class RenderSystem {
                 z: wall.max.z - wall.min.z,
             };
             this.computeScaledTransform(center, scale, wallDebugTransform);
-            matrixMultiplyInto(viewProj, wallDebugTransform, wallDebugMVP);
-            this.renderer.drawMesh(this.wallDebugMesh, wallDebugMVP, WALL_DEBUG_COLOR, true);
+            this.renderer.drawMesh(this.wallDebugMesh, wallDebugTransform, WALL_DEBUG_COLOR, true);
         });
     }
 
-    private renderCelestialBodies(viewProj: Mat4): void {
+    private renderCelestialBodies(focus: Vec3, shadowsEnabled: boolean): void {
+        if (this.renderer.setShadowCaster) {
+            this.renderer.setShadowCaster(
+                this.environmentSystem.shadowLightDirection,
+                shadowsEnabled ? this.environmentSystem.shadowStrength : 0,
+                focus,
+            );
+        }
         if (this.renderer.setCelestialLighting) {
             this.renderer.setCelestialLighting(
                 { direction: this.environmentSystem.lightDirection, color: this.environmentSystem.sunColorWithVisibility },
@@ -88,12 +88,10 @@ export default class RenderSystem {
             this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
         }
         if (this.environmentSystem.sunVisibility > 0) {
-            matrixMultiplyInto(viewProj, this.environmentSystem.sunTransform, this.sunMVP);
-            this.renderer.drawMesh(this.sunMesh, this.sunMVP, this.environmentSystem.sunColorWithVisibility, true);
+            this.renderer.drawMesh(this.sunMesh, this.environmentSystem.sunTransform, this.environmentSystem.sunColorWithVisibility, true);
         }
         if (this.environmentSystem.moonVisibility > 0) {
-            matrixMultiplyInto(viewProj, this.environmentSystem.moonTransform, this.moonMVP);
-            this.renderer.drawMesh(this.moonMesh, this.moonMVP, this.environmentSystem.moonColorWithVisibility, true);
+            this.renderer.drawMesh(this.moonMesh, this.environmentSystem.moonTransform, this.environmentSystem.moonColorWithVisibility, true);
         }
     }
 
@@ -104,7 +102,8 @@ export default class RenderSystem {
         debugHUD: DebugHUD | undefined,
         WALL_DEBUG_COLOR: Vec3,
         wallDebugTransform: Mat4,
-        wallDebugMVP: Mat4,
+        // Debug menu switch, true without one
+        shadowsEnabled: boolean,
     ): void {
         this.renderer.beginFrame();
         const discreteState = gameState.discrete;
@@ -113,15 +112,14 @@ export default class RenderSystem {
         // 1. Process 2D UI Overlay Pass
         if (discreteState.gameMode === 'scene_2d') {
             const aspect = this.getAspectRatio();
-            const viewProj = getCameraMatrix(camera, aspect);
+            this.renderer.setViewProjection(getCameraMatrix(camera, aspect));
 
-            this.renderBoundaryWireframe(viewProj, wallDebugTransform, wallDebugMVP, WALL_DEBUG_COLOR);
+            this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
 
-            this.renderCelestialBodies(viewProj);
+            this.renderCelestialBodies(camera.position, shadowsEnabled);
 
             this.world.getVisibleMeshes().forEach((sm) => {
-                matrixMultiplyInto(viewProj, sm.transform, this.meshMVP);
-                this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
+                this.renderer.drawMesh(sm.mesh, sm.transform, sm.color);
             });
 
             const width = this.renderer.getViewportWidth?.() ?? 800;
@@ -154,20 +152,19 @@ export default class RenderSystem {
                 m[13] = interpolatedState.sceneCharacterPositionPx.y;
                 m[14] = -0.5; m[15] = 1;
 
-                matrixMultiplyInto(this.sceneOrthoProj, this.sceneSpriteTransform, this.meshMVP);
-                this.renderer.drawScreenQuad(partyMemberTexture1, this.meshMVP);
+                matrixMultiplyInto(this.sceneOrthoProj, this.sceneSpriteTransform, this.sceneSpriteMVP);
+                this.renderer.drawScreenQuad(partyMemberTexture1, this.sceneSpriteMVP);
             }
         } else {
             const aspect = this.getAspectRatio();
-            const viewProj = getCameraMatrix(camera, aspect);
+            this.renderer.setViewProjection(getCameraMatrix(camera, aspect));
 
-            this.renderBoundaryWireframe(viewProj, wallDebugTransform, wallDebugMVP, WALL_DEBUG_COLOR);
+            this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
 
-            this.renderCelestialBodies(viewProj);
+            this.renderCelestialBodies(camera.position, shadowsEnabled);
 
             this.world.getVisibleMeshes().forEach((sm) => {
-                matrixMultiplyInto(viewProj, sm.transform, this.meshMVP);
-                this.renderer.drawMesh(sm.mesh, this.meshMVP, sm.color);
+                this.renderer.drawMesh(sm.mesh, sm.transform, sm.color);
             });
 
             if (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive) && partyMemberTexture1) {
@@ -191,8 +188,7 @@ export default class RenderSystem {
                 m[8] = up.x * circleSize; m[9] = up.y * circleSize; m[10] = up.z * circleSize; m[11] = 0;
                 m[12] = pos.x; m[13] = pos.y; m[14] = pos.z; m[15] = 1;
 
-                matrixMultiplyInto(viewProj, this.circleTransform, this.meshMVP);
-                this.renderer.drawTexturedQuad(partyMemberTexture1, this.meshMVP, 1.0, toCamera);
+                this.renderer.drawTexturedQuad(partyMemberTexture1, this.circleTransform, 1.0, toCamera);
             }
         }
 

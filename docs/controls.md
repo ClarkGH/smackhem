@@ -14,7 +14,7 @@
 - **Standard first.** Every player-facing control follows a common PC or console convention, so nothing needs explaining.
 - **Controller-first (Rule I-2).** Everything is playable with two sticks and face buttons, and keyboard and mouse cover the same actions.
 - **Intent, not hardware (Rule I-1).** The platform turns keys, buttons and the mouse into `PlayerIntent`. Core never sees a key name.
-- **Debug keys live on the F-keys**, out of the way of play.
+- **Debug keys live on the F-keys**, out of the way of play. Everything else debug lives on the pause menu's Debug screen, so it works on a controller.
 
 Controller buttons use the browser's standard gamepad layout, named by Xbox labels: **A** bottom, **B** right, **X** left, **Y** top. PlayStation is Cross / Circle / Square / Triangle in the same positions. Nintendo controllers swap A/B, and on PC that's left for rebinding (planned).
 
@@ -63,7 +63,8 @@ Toggleable, never needed to play (Rule D-1).
 | Action | Key | Status |
 |---|---|---|
 | Debug HUD | F3 | ✅ |
-| Wireframe | F4 | ✅ |
+| Wireframe | Pause menu → Debug (dev server only) | ✅ |
+| Time of Day | Pause menu → Debug (dev server only) | ✅ |
 
 ## Open Questions
 

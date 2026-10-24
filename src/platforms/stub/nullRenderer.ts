@@ -29,14 +29,41 @@ export default class NullRenderer implements Renderer {
 
     private frameCount = 0;
 
+    private readonly viewProj = new Float32Array(16);
+
+    // Models drawn since beginFrame, by reference, so tests can tell a model from an MVP
+    private readonly meshModels: Mat4[] = [];
+
     beginFrame(): void {
         this.frameCount += 1;
-        // Stub implementation - could track frame stats here
+        this.meshModels.length = 0;
     }
 
-    drawMesh(_mesh: MeshHandle, _transform: Mat4, _color: Vec3, _isLightSource?: boolean): void {
-        // Stub implementation - could validate mesh handle here
-        // Could track draw calls for testing
+    private readonly shadowCaster = { direction: { x: 0, y: 1, z: 0 }, strength: 0, focus: { x: 0, y: 0, z: 0 } };
+
+    setShadowCaster(_direction: Vec3, _strength: number, _focus: Vec3): void {
+        const caster = this.shadowCaster;
+        caster.direction.x = _direction.x; caster.direction.y = _direction.y; caster.direction.z = _direction.z;
+        caster.strength = _strength;
+        caster.focus.x = _focus.x; caster.focus.y = _focus.y; caster.focus.z = _focus.z;
+    }
+
+    private shadowBiasScale = 1;
+
+    setShadowBias(_scale: number): void {
+        this.shadowBiasScale = _scale;
+    }
+
+    getShadowBias(): number {
+        return this.shadowBiasScale;
+    }
+
+    setViewProjection(_viewProj: Mat4): void {
+        this.viewProj.set(_viewProj.elements);
+    }
+
+    drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean): void {
+        this.meshModels.push(_model);
     }
 
     endFrame(): void {
@@ -79,7 +106,7 @@ export default class NullRenderer implements Renderer {
         return { id: `stub_texture_${_assetId}_${this.textureCounter}` };
     }
 
-    drawTexturedQuad(_texture: TextureHandle, _transform: Mat4, _size: number, _normal?: Vec3): void {
+    drawTexturedQuad(_texture: TextureHandle, _model: Mat4, _size: number, _normal?: Vec3): void {
         // Stub implementation - validates texture handle exists
         if (!_texture.id.startsWith('stub_texture_')) {
             throw new Error(`Invalid texture handle: ${_texture.id}`);
@@ -124,6 +151,19 @@ export default class NullRenderer implements Renderer {
 
     getTextureCount(): number {
         return this.textureCounter;
+    }
+
+    getViewProjection(): Float32Array {
+        return this.viewProj.slice();
+    }
+
+    getShadowCaster(): { direction: Vec3; strength: number; focus: Vec3 } {
+        const { direction, strength, focus } = this.shadowCaster;
+        return { direction: { ...direction }, strength, focus: { ...focus } };
+    }
+
+    getMeshModels(): readonly Mat4[] {
+        return this.meshModels;
     }
 
     getLightingState(): { direction: Vec3; color: Vec3; ambient: number } {

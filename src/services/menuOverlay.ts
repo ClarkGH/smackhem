@@ -17,6 +17,8 @@ export interface MenuView {
     items: MenuItemView[];
     selected: number;
     textScale: number;
+    // Dim the world behind less, for screens where it's what you're looking at (Debug)
+    showWorld?: boolean;
 }
 
 /**

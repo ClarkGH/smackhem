@@ -131,9 +131,9 @@ export default class WebMenuOverlay implements MenuOverlay {
         overlay.style.display = 'block';
         this.fitToCanvas();
 
-        // Dim the frozen world behind the menu
+        // Dim the frozen world behind the menu, less where the world is the point
         ctx.clearRect(0, 0, overlay.width, overlay.height);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillStyle = view.showWorld ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.6)';
         ctx.fillRect(0, 0, overlay.width, overlay.height);
 
         const fontSize = Math.round(BASE_FONT_SIZE * view.textScale);

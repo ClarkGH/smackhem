@@ -1,6 +1,89 @@
 import type { Renderer, MeshHandle, TextureHandle } from '../../services/renderer';
 import type { Mat4, Vec3 } from '../../types/common';
 import { identity } from '../../core/math/mathHelpers';
+import DrawList from './drawList';
+import { computeLightViewProj } from './shadowMath';
+
+// Shadow map: SHADOW_MAP_SIZE texels across SHADOW_HALF_EXTENT * 2 world units around the camera
+// (~4 cm per texel), and SHADOW_DEPTH_RADIUS units either side along the light
+const SHADOW_MAP_SIZE = 2048;
+const SHADOW_HALF_EXTENT = 40;
+const SHADOW_DEPTH_RADIUS = 100;
+
+// The shadow map lives on its own texture unit, sprites use unit 0
+const SHADOW_TEXTURE_UNIT = 1;
+
+// Where a billboard point sits on the card it casts from: upright, facing the shadow light.
+// Shared by the billboard's shadow lookup (receiving) and the billboard caster (depth pass), so the
+// two always agree. Assumes an upright billboard model: column 0 = right * size, column 3 = anchor.
+const LIGHT_CARD_GLSL = `
+            // local: the quad vertex's x and z (-0.5..0.5). clearance: distance toward the light
+            vec3 lightCardPosition(mat4 model, vec2 local, vec3 shadowDirection, vec3 cameraFacing, float clearance) {
+                vec3 toLight = vec3(shadowDirection.x, 0.0, shadowDirection.z);
+                float toLightLength = length(toLight);
+                // Light straight overhead: every facing casts the same, keep the camera-facing one
+                vec3 facing = toLightLength > 0.01 ? toLight / toLightLength : normalize(cameraFacing);
+                vec3 right = vec3(-facing.z, 0.0, facing.x);
+                float size = length(model[0].xyz);
+                return model[3].xyz
+                    + right * (local.x * size)
+                    + vec3(0.0, local.y * size, 0.0)
+                    + facing * clearance;
+            }
+`;
+
+// Shared by the mesh and billboard fragment shaders, which declare u_shadowMap and u_shadowStrength
+const SHADOW_SAMPLING_GLSL = `
+            const float SHADOW_TEXEL = 1.0 / ${SHADOW_MAP_SIZE}.0;
+
+            // Caps the receiver-plane slope (depth per map width) so grazing surfaces don't blow it up.
+            // 4.0 is a surface about 84 degrees from facing the light (tan 10), with the map 80 wide and 200 deep.
+            const float MAX_DEPTH_SLOPE = 4.0;
+
+            // lightClip: a position in the shadow caster's clip space.
+            // constantBias: depth allowance on top of the slope term. slopeBiasScale: debug multiplier.
+            // 1.0 fully lit by the caster, down to 0.0 in full shadow
+            float sampleShadow(vec3 lightClip, float constantBias, float slopeBiasScale) {
+                if (u_shadowStrength <= 0.0) return 1.0;
+
+                vec3 p = lightClip * 0.5 + 0.5;
+
+                // Receiver-plane depth bias: how this surface's depth changes across the map, from
+                // how p changes between neighbouring screen pixels. Each tap below then compares
+                // against the surface's own depth at the tap, not at the centre, so the outer taps of
+                // a sloped floor don't land "behind" the floor itself. Must run before any branch
+                // that differs between neighbouring pixels, or the derivatives are undefined.
+                vec3 dx = dFdx(p);
+                vec3 dy = dFdy(p);
+                float det = dx.x * dy.y - dx.y * dy.x;
+                vec2 slope = abs(det) > 1e-12
+                    ? vec2(dy.y * dx.z - dx.y * dy.z, dx.x * dy.z - dy.x * dx.z) / det
+                    : vec2(0.0);
+                slope = clamp(slope, -MAX_DEPTH_SLOPE, MAX_DEPTH_SLOPE);
+
+                // Outside the map is lit
+                float edge = min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y));
+                if (edge <= 0.0 || p.z >= 1.0) return 1.0;
+
+                // LINEAR compare reads stored depths up to a texel away from the tap: allow one
+                // texel's worth of slope for that, which the plane can't account for
+                float bias = constantBias + dot(abs(slope), vec2(SHADOW_TEXEL)) * slopeBiasScale;
+
+                // 3x3 taps, each already a 2x2 compare with LINEAR filtering: soft edges
+                float lit = 0.0;
+                for (int x = -1; x <= 1; x++) {
+                    for (int y = -1; y <= 1; y++) {
+                        vec2 offset = vec2(float(x), float(y)) * SHADOW_TEXEL;
+                        float tapDepth = p.z + dot(slope, offset) - bias;
+                        lit += texture(u_shadowMap, vec3(p.xy + offset, tapDepth));
+                    }
+                }
+                lit /= 9.0;
+
+                // Fade out over the outer 10% of the map, rather than a hard line
+                return mix(1.0, lit, u_shadowStrength * smoothstep(0.0, 0.1, edge));
+            }
+`;
 
 interface WebGLMesh {
     vao: WebGLVertexArrayObject;
@@ -48,9 +131,52 @@ export default class WebGLRenderer implements Renderer {
 
     private ambientIntensity: number = 0.3;
 
+    // Copied in by setViewProjection once per frame, shared by every world draw
+    private viewProj: Mat4 = identity();
+
+    // Draws are recorded during the frame and replayed in endFrame, so later
+    // passes (shadow depth) can walk the same list. Sized above a full load radius of chunks
+    private readonly drawList = new DrawList(1024);
+
+    // Copied in by setShadowCaster once per frame. Strength 0 skips the depth pass.
+    private readonly shadowDirection: Vec3 = { x: 0, y: 1, z: 0 };
+
+    private shadowStrength = 0;
+
+    // Debug multiplier on the mesh shader's normal offset and depth bias
+    private shadowBiasScale = 1;
+
+    private readonly shadowFocus: Vec3 = { x: 0, y: 0, z: 0 };
+
+    private readonly lightViewProj: Mat4 = identity();
+
+    private shadowProgram: WebGLProgram | null = null;
+
+    private shadowModelLoc: WebGLUniformLocation | null = null;
+
+    private shadowLightViewProjLoc: WebGLUniformLocation | null = null;
+
+    // Billboards cast from a light-facing card, with their transparent pixels cut out
+    private shadowBillboardProgram: WebGLProgram | null = null;
+
+    private shadowBillboardLocs: {
+        lightViewProj: WebGLUniformLocation | null;
+        model: WebGLUniformLocation | null;
+        shadowDirection: WebGLUniformLocation | null;
+        normal: WebGLUniformLocation | null;
+        texture: WebGLUniformLocation | null;
+    } = {
+            lightViewProj: null, model: null, shadowDirection: null, normal: null, texture: null,
+        };
+
+    private shadowTexture: WebGLTexture | null = null;
+
+    private shadowFramebuffer: WebGLFramebuffer | null = null;
+
     private uniformLocations: {
         color: WebGLUniformLocation | null;
-        transform: WebGLUniformLocation | null;
+        viewProj: WebGLUniformLocation | null;
+        model: WebGLUniformLocation | null;
         normalMatrix: WebGLUniformLocation | null;
         sunDirection: WebGLUniformLocation | null;
         sunColor: WebGLUniformLocation | null;
@@ -58,9 +184,13 @@ export default class WebGLRenderer implements Renderer {
         moonColor: WebGLUniformLocation | null;
         ambientIntensity: WebGLUniformLocation | null;
         isLightSource: WebGLUniformLocation | null;
+        lightViewProj: WebGLUniformLocation | null;
+        shadowStrength: WebGLUniformLocation | null;
+        shadowBiasScale: WebGLUniformLocation | null;
     } = {
             color: null,
-            transform: null,
+            viewProj: null,
+            model: null,
             normalMatrix: null,
             sunDirection: null,
             sunColor: null,
@@ -68,6 +198,9 @@ export default class WebGLRenderer implements Renderer {
             moonColor: null,
             ambientIntensity: null,
             isLightSource: null,
+            lightViewProj: null,
+            shadowStrength: null,
+            shadowBiasScale: null,
         };
 
     private identityMatrix: Mat4;
@@ -93,32 +226,36 @@ export default class WebGLRenderer implements Renderer {
         this.identityMatrix = identity();
 
         this.initShaders();
+        this.initShadowMap();
         this.initTextureShaders();
         this.createQuadMesh();
         this.initScreenQuadShaders();
     }
 
     private initShaders(): void {
+        // Fixed attribute locations, so the shadow program can draw the same VAOs
         const vertexShaderSource = `#version 300 es
-            in vec3 a_position;
-            in vec3 a_normal;
+            layout(location = 0) in vec3 a_position;
+            layout(location = 1) in vec3 a_normal;
             
-            uniform mat4 u_transform;
+            uniform mat4 u_viewProj;
+            uniform mat4 u_model;
             uniform mat4 u_normalMatrix;
             
             out vec3 v_normal;
-            out vec3 v_position;
+            out vec3 v_worldPos;
             
             void main() {
-                vec4 worldPos = u_transform * vec4(a_position, 1.0);
-                v_position = worldPos.xyz;
+                vec4 worldPos = u_model * vec4(a_position, 1.0);
+                v_worldPos = worldPos.xyz;
                 v_normal = normalize((u_normalMatrix * vec4(a_normal, 0.0)).xyz);
-                gl_Position = worldPos;
+                gl_Position = u_viewProj * worldPos;
             }
         `;
 
+        // highp: world positions reach ~100 units, which mediump can't hold to shadow-texel precision
         const fragmentShaderSource = `#version 300 es
-            precision mediump float;
+            precision highp float;
             
             uniform vec3 u_color;
             uniform vec3 u_sunDirection;
@@ -127,11 +264,26 @@ export default class WebGLRenderer implements Renderer {
             uniform vec3 u_moonColor;
             uniform float u_ambientIntensity;
             uniform float u_isLightSource; // 1.0 if object is self-illuminated, 0.0 otherwise
+            uniform mat4 u_lightViewProj;
+            uniform highp sampler2DShadow u_shadowMap;
+            uniform float u_shadowStrength;
+            uniform float u_shadowBiasScale;
             
             in vec3 v_normal;
-            in vec3 v_position;
+            in vec3 v_worldPos;
             
             out vec4 fragColor;
+${SHADOW_SAMPLING_GLSL}
+            // Lifts the lookup off the surface along its normal, about a texel, so a surface
+            // doesn't shadow itself in speckles ("acne"). Too much and shadows detach from their base.
+            const float NORMAL_OFFSET = 0.05;
+            // Depth allowance on top of sampleShadow's slope term (depth 0.005 = 1 world unit, so ~1 cm)
+            const float CONSTANT_BIAS = 0.00005;
+
+            float shadowFactor(vec3 normal) {
+                vec4 lightPos = u_lightViewProj * vec4(v_worldPos + normal * NORMAL_OFFSET * u_shadowBiasScale, 1.0);
+                return sampleShadow(lightPos.xyz, CONSTANT_BIAS * u_shadowBiasScale, u_shadowBiasScale);
+            }
             
             void main() {
                 if (u_isLightSource > 0.5) {
@@ -149,7 +301,10 @@ export default class WebGLRenderer implements Renderer {
                 float sunDiff = max(dot(v_normal, sunDir), 0.0);
                 float moonDiff = max(dot(v_normal, moonDir), 0.0);
                 
-                vec3 diffuse = sunDiff * u_sunColor + moonDiff * u_moonColor;
+                // Shadow dims both bodies' diffuse. Only one casts, and whenever the other is
+                // bright enough to matter the shadow strength is near zero (the dawn/dusk crossfade).
+                // Ambient is never shadowed.
+                vec3 diffuse = (sunDiff * u_sunColor + moonDiff * u_moonColor) * shadowFactor(v_normal);
                 vec3 finalColor = u_color * (u_ambientIntensity + diffuse);
                 
                 fragColor = vec4(finalColor, 1.0);
@@ -171,7 +326,8 @@ export default class WebGLRenderer implements Renderer {
         // Cache uniform locations (lookup once, reuse every frame)
         this.uniformLocations = {
             color: this.gl.getUniformLocation(this.program, 'u_color'),
-            transform: this.gl.getUniformLocation(this.program, 'u_transform'),
+            viewProj: this.gl.getUniformLocation(this.program, 'u_viewProj'),
+            model: this.gl.getUniformLocation(this.program, 'u_model'),
             normalMatrix: this.gl.getUniformLocation(this.program, 'u_normalMatrix'),
             sunDirection: this.gl.getUniformLocation(this.program, 'u_sunDirection'),
             sunColor: this.gl.getUniformLocation(this.program, 'u_sunColor'),
@@ -179,7 +335,194 @@ export default class WebGLRenderer implements Renderer {
             moonColor: this.gl.getUniformLocation(this.program, 'u_moonColor'),
             ambientIntensity: this.gl.getUniformLocation(this.program, 'u_ambientIntensity'),
             isLightSource: this.gl.getUniformLocation(this.program, 'u_isLightSource'),
+            lightViewProj: this.gl.getUniformLocation(this.program, 'u_lightViewProj'),
+            shadowStrength: this.gl.getUniformLocation(this.program, 'u_shadowStrength'),
+            shadowBiasScale: this.gl.getUniformLocation(this.program, 'u_shadowBiasScale'),
         };
+
+        // The sampler's unit never changes, set once
+        this.gl.useProgram(this.program);
+        this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_shadowMap'), SHADOW_TEXTURE_UNIT);
+    }
+
+    // Depth-only program and the depth texture it renders into, seen from the shadow caster
+    private initShadowMap(): void {
+        const { gl } = this;
+
+        const vertexShaderSource = `#version 300 es
+            layout(location = 0) in vec3 a_position;
+
+            uniform mat4 u_lightViewProj;
+            uniform mat4 u_model;
+
+            void main() {
+                gl_Position = u_lightViewProj * u_model * vec4(a_position, 1.0);
+            }
+        `;
+
+        // No colour output, only depth is written
+        const fragmentShaderSource = `#version 300 es
+            precision mediump float;
+            void main() {}
+        `;
+
+        const vertexShader = this.compileShader(gl.VERTEX_SHADER, vertexShaderSource);
+        const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+        if (!vertexShader || !fragmentShader) {
+            throw new Error('Failed to compile shadow shaders');
+        }
+        this.shadowProgram = this.createProgram(vertexShader, fragmentShader);
+        if (!this.shadowProgram) {
+            throw new Error('Failed to create shadow shader program');
+        }
+        this.shadowModelLoc = gl.getUniformLocation(this.shadowProgram, 'u_model');
+        this.shadowLightViewProjLoc = gl.getUniformLocation(this.shadowProgram, 'u_lightViewProj');
+
+        // Compare mode: sampling returns "how lit" (0..1) instead of a depth, and LINEAR
+        // filtering blends the 4 nearest compares for free
+        const texture = gl.createTexture();
+        if (!texture) throw new Error('Failed to create shadow map texture');
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.DEPTH_COMPONENT24, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+
+        const framebuffer = gl.createFramebuffer();
+        if (!framebuffer) throw new Error('Failed to create shadow framebuffer');
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, texture, 0);
+        gl.drawBuffers([gl.NONE]);
+        gl.readBuffer(gl.NONE);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+            throw new Error('Shadow framebuffer incomplete');
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        this.shadowTexture = texture;
+        this.shadowFramebuffer = framebuffer;
+
+        this.initShadowBillboardProgram();
+    }
+
+    private initShadowBillboardProgram(): void {
+        const { gl } = this;
+
+        // Same attribute locations as the billboard program, so it can draw the same quad VAO
+        const vertexShaderSource = `#version 300 es
+            layout(location = 0) in vec3 a_position;
+            layout(location = 1) in vec2 a_texCoord;
+
+            uniform mat4 u_lightViewProj;
+            uniform mat4 u_model;
+            uniform vec3 u_shadowDirection;
+            uniform vec3 u_normal;
+
+            out vec2 v_texCoord;
+${LIGHT_CARD_GLSL}
+            void main() {
+                vec3 onLightCard = lightCardPosition(u_model, a_position.xz, u_shadowDirection, u_normal, 0.0);
+                v_texCoord = a_texCoord;
+                gl_Position = u_lightViewProj * vec4(onLightCard, 1.0);
+            }
+        `;
+
+        // Only the sprite's shape casts: see-through pixels write no depth
+        const fragmentShaderSource = `#version 300 es
+            precision mediump float;
+
+            uniform sampler2D u_texture;
+
+            in vec2 v_texCoord;
+
+            void main() {
+                if (texture(u_texture, v_texCoord).a < 0.5) discard;
+            }
+        `;
+
+        const vertexShader = this.compileShader(gl.VERTEX_SHADER, vertexShaderSource);
+        const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+        if (!vertexShader || !fragmentShader) {
+            throw new Error('Failed to compile billboard shadow shaders');
+        }
+        const program = this.createProgram(vertexShader, fragmentShader);
+        if (!program) {
+            throw new Error('Failed to create billboard shadow shader program');
+        }
+        this.shadowBillboardProgram = program;
+        this.shadowBillboardLocs = {
+            lightViewProj: gl.getUniformLocation(program, 'u_lightViewProj'),
+            model: gl.getUniformLocation(program, 'u_model'),
+            shadowDirection: gl.getUniformLocation(program, 'u_shadowDirection'),
+            normal: gl.getUniformLocation(program, 'u_normal'),
+            texture: gl.getUniformLocation(program, 'u_texture'),
+        };
+    }
+
+    // Every recorded lit mesh, depth only, from the shadow caster. Light sources don't cast.
+    private renderShadowMap(): void {
+        const { gl } = this;
+        if (!this.shadowProgram || !this.shadowFramebuffer) return;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFramebuffer);
+        gl.viewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        gl.useProgram(this.shadowProgram);
+        gl.uniformMatrix4fv(this.shadowLightViewProjLoc, false, this.lightViewProj.elements);
+
+        const list = this.drawList;
+        for (let i = 0; i < list.size(); i += 1) {
+            const cmd = list.get(i);
+            if (cmd.kind === 'mesh' && !cmd.isLightSource) {
+                const webglMesh = this.meshes.get(cmd.id);
+                if (webglMesh) {
+                    gl.bindVertexArray(webglMesh.vao);
+                    gl.uniformMatrix4fv(this.shadowModelLoc, false, cmd.matrix.elements);
+                    gl.drawArrays(gl.TRIANGLES, 0, webglMesh.vertexCount);
+                }
+            }
+        }
+
+        this.renderBillboardShadows();
+
+        gl.bindVertexArray(null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    // Second half of the depth pass, own program so it isn't switched per draw
+    private renderBillboardShadows(): void {
+        const { gl } = this;
+        const program = this.shadowBillboardProgram;
+        if (!program || !this.quadVAO) return;
+        const locs = this.shadowBillboardLocs;
+
+        gl.useProgram(program);
+        gl.bindVertexArray(this.quadVAO);
+        gl.uniformMatrix4fv(locs.lightViewProj, false, this.lightViewProj.elements);
+        gl.uniform3f(locs.shadowDirection, this.shadowDirection.x, this.shadowDirection.y, this.shadowDirection.z);
+        gl.uniform1i(locs.texture, 0);
+        gl.activeTexture(gl.TEXTURE0);
+
+        const list = this.drawList;
+        for (let i = 0; i < list.size(); i += 1) {
+            const cmd = list.get(i);
+            if (cmd.kind === 'texturedQuad') {
+                const webglTexture = this.textures.get(cmd.id);
+                if (webglTexture) {
+                    gl.bindTexture(gl.TEXTURE_2D, webglTexture.texture);
+                    gl.uniformMatrix4fv(locs.model, false, cmd.matrix.elements);
+                    gl.uniform3f(locs.normal, cmd.normal.x, cmd.normal.y, cmd.normal.z);
+                    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                }
+            }
+        }
+
+        gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
     private compileShader(type: number, source: string): WebGLShader | null {
@@ -534,10 +877,15 @@ export default class WebGLRenderer implements Renderer {
         // Always reset clear color to default gray (scene mode can override with clear())
         this.gl.clearColor(160 / 255, 160 / 255, 160 / 255, 1);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+        this.drawList.reset();
     }
 
-    drawMesh(mesh: MeshHandle, transform: Mat4, color: Vec3, isLightSource: boolean = false): void {
-        const webglMesh = this.meshes.get(mesh.id);
+    drawMesh(mesh: MeshHandle, model: Mat4, color: Vec3, isLightSource: boolean = false): void {
+        this.drawList.pushMesh(mesh.id, model, color, isLightSource);
+    }
+
+    private drawMeshNow(meshId: string, model: Mat4, color: Vec3, isLightSource: boolean): void {
+        const webglMesh = this.meshes.get(meshId);
         if (!webglMesh || !this.program) {
             return;
         }
@@ -555,9 +903,13 @@ export default class WebGLRenderer implements Renderer {
             this.gl.uniform3f(this.uniformLocations.color, color.x, color.y, color.z);
         }
 
-        // Set transform uniform (using cached location)
-        if (this.uniformLocations.transform) {
-            this.gl.uniformMatrix4fv(this.uniformLocations.transform, false, transform.elements);
+        // Set view-projection and model uniforms (using cached locations)
+        if (this.uniformLocations.viewProj) {
+            this.gl.uniformMatrix4fv(this.uniformLocations.viewProj, false, this.viewProj.elements);
+        }
+
+        if (this.uniformLocations.model) {
+            this.gl.uniformMatrix4fv(this.uniformLocations.model, false, model.elements);
         }
 
         // Use identity normal matrix (keep normals in world space since model transforms are translation-only)
@@ -608,6 +960,18 @@ export default class WebGLRenderer implements Renderer {
             this.gl.uniform1f(this.uniformLocations.ambientIntensity, this.ambientIntensity);
         }
 
+        if (this.uniformLocations.lightViewProj) {
+            this.gl.uniformMatrix4fv(this.uniformLocations.lightViewProj, false, this.lightViewProj.elements);
+        }
+
+        if (this.uniformLocations.shadowStrength) {
+            this.gl.uniform1f(this.uniformLocations.shadowStrength, this.shadowStrength);
+        }
+
+        if (this.uniformLocations.shadowBiasScale) {
+            this.gl.uniform1f(this.uniformLocations.shadowBiasScale, this.shadowBiasScale);
+        }
+
         // Set wireframe mode
         if (this.wireframe) {
             this.gl.polygonOffset(0, 0);
@@ -620,7 +984,66 @@ export default class WebGLRenderer implements Renderer {
     }
 
     endFrame(): void {
+        const { gl } = this;
+        if (this.shadowStrength > 0) {
+            this.renderShadowMap();
+        }
+
+        // Bound only for the lit pass: a texture can't be sampled while it's being rendered into
+        gl.activeTexture(gl.TEXTURE0 + SHADOW_TEXTURE_UNIT);
+        gl.bindTexture(gl.TEXTURE_2D, this.shadowTexture);
+        gl.activeTexture(gl.TEXTURE0);
+
+        // Replay in call order: scene_2d clears over its meshes before the screen quad
+        const list = this.drawList;
+        for (let i = 0; i < list.size(); i += 1) {
+            const cmd = list.get(i);
+            switch (cmd.kind) {
+                case 'mesh':
+                    this.drawMeshNow(cmd.id, cmd.matrix, cmd.color, cmd.isLightSource);
+                    break;
+                case 'texturedQuad':
+                    this.drawTexturedQuadNow(cmd.id, cmd.matrix, cmd.normal);
+                    break;
+                case 'screenQuad':
+                    this.drawScreenQuadNow(cmd.id, cmd.matrix);
+                    break;
+                case 'clear':
+                    this.clearNow(cmd.color.x, cmd.color.y, cmd.color.z, cmd.alpha);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        gl.activeTexture(gl.TEXTURE0 + SHADOW_TEXTURE_UNIT);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.activeTexture(gl.TEXTURE0);
         // Present frame (WebGL handles this automatically)
+    }
+
+    setShadowBias(scale: number): void {
+        this.shadowBiasScale = scale;
+    }
+
+    setShadowCaster(direction: Vec3, strength: number, focus: Vec3): void {
+        this.shadowDirection.x = direction.x;
+        this.shadowDirection.y = direction.y;
+        this.shadowDirection.z = direction.z;
+        this.shadowStrength = strength;
+        this.shadowFocus.x = focus.x;
+        this.shadowFocus.y = focus.y;
+        this.shadowFocus.z = focus.z;
+        if (strength > 0) {
+            computeLightViewProj(
+                this.shadowDirection,
+                this.shadowFocus,
+                SHADOW_HALF_EXTENT,
+                SHADOW_DEPTH_RADIUS,
+                SHADOW_MAP_SIZE,
+                this.lightViewProj,
+            );
+        }
     }
 
     getWireframeEnabled(): boolean {
@@ -629,6 +1052,15 @@ export default class WebGLRenderer implements Renderer {
 
     setWireframe(enabled: boolean): void {
         this.wireframe = enabled;
+    }
+
+    setViewProjection(viewProj: Mat4): void {
+        // Copy, not keep a reference: core reuses its matrix and could change it mid-frame
+        const src = viewProj.elements;
+        const dst = this.viewProj.elements;
+        for (let i = 0; i < 16; i += 1) {
+            dst[i] = src[i];
+        }
     }
 
     setAmbientIntensity(intensity: number): void {
@@ -646,52 +1078,68 @@ export default class WebGLRenderer implements Renderer {
     }
 
     private initTextureShaders(): void {
+        // Fixed attribute locations, so the billboard shadow program can draw the same quad VAO
         const vertexShaderSource = `#version 300 es
-            in vec3 a_position;
-            in vec2 a_texCoord;
+            layout(location = 0) in vec3 a_position;
+            layout(location = 1) in vec2 a_texCoord;
             
-            uniform mat4 u_transform;
+            uniform mat4 u_viewProj;
+            uniform mat4 u_model;
+            uniform mat4 u_lightViewProj;
+            uniform vec3 u_shadowDirection;
+            uniform vec3 u_normal;
             
             out vec2 v_texCoord;
-            
+            out vec3 v_lightClip;
+
+            // How far in front of its own light-facing card a pixel looks up its shadow
+            const float SELF_CLEARANCE = 0.1;
+${LIGHT_CARD_GLSL}
             void main() {
                 // Quad vertices are on XZ plane (horizontal, Y=0)
-                // Transform already includes billboard rotation and position
+                // Model already includes billboard rotation and position
                 // Position components: x = horizontal, z = depth (both map to quad XZ plane)
-                vec4 worldPos = u_transform * vec4(a_position.x, 0.0, a_position.z, 1.0);
+                vec4 worldPos = u_model * vec4(a_position.x, 0.0, a_position.z, 1.0);
                 
                 v_texCoord = a_texCoord;
-                gl_Position = worldPos;
+                gl_Position = u_viewProj * worldPos;
+
+                // Shadows are looked up where this pixel would be on the card it casts from,
+                // nudged toward the light. Looked up on the camera-facing card, half the sprite
+                // would sit behind its own shadow caster.
+                vec3 onLightCard = lightCardPosition(u_model, a_position.xz, u_shadowDirection, u_normal, SELF_CLEARANCE);
+                v_lightClip = (u_lightViewProj * vec4(onLightCard, 1.0)).xyz;
             }
         `;
 
+        // highp for the shadow lookup, as in the mesh shader
         const fragmentShaderSource = `#version 300 es
-            precision mediump float;
+            precision highp float;
             
             uniform sampler2D u_texture;
+            uniform highp sampler2DShadow u_shadowMap;
+            uniform float u_shadowStrength;
             uniform float u_ambientIntensity;
-            uniform vec3 u_normal;
             uniform vec3 u_moonColor;
-            uniform vec3 u_moonDirection;
             uniform vec3 u_sunColor;
-            uniform vec3 u_sunDirection;
             
             in vec2 v_texCoord;
+            in vec3 v_lightClip;
             
             out vec4 fragColor;
+${SHADOW_SAMPLING_GLSL}
+            // The lookup already sits in front of the sprite's own caster, so only a small fixed bias
+            const float BILLBOARD_BIAS = 0.0002;
             
             void main() {
             vec4 textureSample = texture(u_texture, v_texCoord);
             vec3 textureColor = textureSample.rgb;
             float textureAlpha = textureSample.a;
 
-            vec3 normal = normalize(u_normal); // Fixed vertical normal for billboard
-            vec3 sunDir = normalize(u_sunDirection);
-            vec3 moonDir = normalize(u_moonDirection);
-
-            float sunDiff = max(dot(normal, sunDir), 0.0);
-            float moonDiff = max(dot(normal, moonDir), 0.0);
-            vec3 diffuse = sunDiff * u_sunColor + moonDiff * u_moonColor;
+            // Lit as if facing the light, the card it casts from, so brightness never depends
+            // on where the camera stands. Each body's color already carries its own fade,
+            // so only shadow dims it. As in the mesh shader, ambient is never shadowed.
+            vec3 diffuse = (u_sunColor + u_moonColor) * sampleShadow(v_lightClip, BILLBOARD_BIAS, 1.0);
 
             vec3 finalColor = textureColor * (u_ambientIntensity + diffuse);
             fragColor = vec4(finalColor, textureAlpha);
@@ -813,8 +1261,12 @@ export default class WebGLRenderer implements Renderer {
         return handle;
     }
 
-    drawTexturedQuad(texture: TextureHandle, transform: Mat4, size: number, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
-        const webglTexture = this.textures.get(texture.id);
+    drawTexturedQuad(texture: TextureHandle, model: Mat4, size: number, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
+        this.drawList.pushTexturedQuad(texture.id, model, normal);
+    }
+
+    private drawTexturedQuadNow(textureId: string, model: Mat4, normal: Vec3): void {
+        const webglTexture = this.textures.get(textureId);
         if (!webglTexture || !this.textureProgram || !this.quadVAO) {
             return;
         }
@@ -835,27 +1287,21 @@ export default class WebGLRenderer implements Renderer {
             gl.uniform1i(textureLoc, 0);
         }
 
-        // Transform already includes billboard rotation and size scaling from CPU
-        // Set transform uniform
-        const transformLoc = gl.getUniformLocation(this.textureProgram, 'u_transform');
-        if (transformLoc) {
-            gl.uniformMatrix4fv(transformLoc, false, transform.elements);
+        // Model already includes billboard rotation and size scaling from CPU
+        const viewProjLoc = gl.getUniformLocation(this.textureProgram, 'u_viewProj');
+        if (viewProjLoc) {
+            gl.uniformMatrix4fv(viewProjLoc, false, this.viewProj.elements);
+        }
+
+        const modelLoc = gl.getUniformLocation(this.textureProgram, 'u_model');
+        if (modelLoc) {
+            gl.uniformMatrix4fv(modelLoc, false, model.elements);
         }
 
         // Set lighting uniforms
-        const sunDirectionLoc = gl.getUniformLocation(this.textureProgram, 'u_sunDirection');
-        if (sunDirectionLoc) {
-            gl.uniform3f(sunDirectionLoc, this.sunDirection.x, this.sunDirection.y, this.sunDirection.z);
-        }
-
         const sunColorLoc = gl.getUniformLocation(this.textureProgram, 'u_sunColor');
         if (sunColorLoc) {
             gl.uniform3f(sunColorLoc, this.sunColor.x, this.sunColor.y, this.sunColor.z);
-        }
-
-        const moonDirectionLoc = gl.getUniformLocation(this.textureProgram, 'u_moonDirection');
-        if (moonDirectionLoc) {
-            gl.uniform3f(moonDirectionLoc, this.moonDirection.x, this.moonDirection.y, this.moonDirection.z);
         }
 
         const moonColorLoc = gl.getUniformLocation(this.textureProgram, 'u_moonColor');
@@ -871,6 +1317,26 @@ export default class WebGLRenderer implements Renderer {
         const normalLoc = gl.getUniformLocation(this.textureProgram, 'u_normal');
         if (normalLoc) {
             gl.uniform3f(normalLoc, normal.x, normal.y, normal.z);
+        }
+
+        const shadowMapLoc = gl.getUniformLocation(this.textureProgram, 'u_shadowMap');
+        if (shadowMapLoc) {
+            gl.uniform1i(shadowMapLoc, SHADOW_TEXTURE_UNIT);
+        }
+
+        const lightViewProjLoc = gl.getUniformLocation(this.textureProgram, 'u_lightViewProj');
+        if (lightViewProjLoc) {
+            gl.uniformMatrix4fv(lightViewProjLoc, false, this.lightViewProj.elements);
+        }
+
+        const shadowStrengthLoc = gl.getUniformLocation(this.textureProgram, 'u_shadowStrength');
+        if (shadowStrengthLoc) {
+            gl.uniform1f(shadowStrengthLoc, this.shadowStrength);
+        }
+
+        const shadowDirectionLoc = gl.getUniformLocation(this.textureProgram, 'u_shadowDirection');
+        if (shadowDirectionLoc) {
+            gl.uniform3f(shadowDirectionLoc, this.shadowDirection.x, this.shadowDirection.y, this.shadowDirection.z);
         }
 
         // Enable alpha blending for transparency
@@ -986,7 +1452,11 @@ export default class WebGLRenderer implements Renderer {
     }
 
     drawScreenQuad(texture: TextureHandle, transform: Mat4): void {
-        const webglTexture = this.textures.get(texture.id);
+        this.drawList.pushScreenQuad(texture.id, transform);
+    }
+
+    private drawScreenQuadNow(textureId: string, transform: Mat4): void {
+        const webglTexture = this.textures.get(textureId);
         if (!webglTexture || !this.screenQuadProgram || !this.screenQuadVAO) {
             return;
         }
@@ -1016,6 +1486,10 @@ export default class WebGLRenderer implements Renderer {
     }
 
     clear(r: number, g: number, b: number, a: number): void {
+        this.drawList.pushClear(r, g, b, a);
+    }
+
+    private clearNow(r: number, g: number, b: number, a: number): void {
         this.gl.clearColor(r, g, b, a);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     }

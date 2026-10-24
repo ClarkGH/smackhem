@@ -3,6 +3,7 @@ import { TypeSafeEventBus } from '../core/events';
 import { createGameState, type GameMode, type GameState } from '../core/gameState';
 import { FIXED_DT, GameLoop } from '../core/gameLoop';
 import { createDefaultSettings, type Settings } from '../core/settings';
+import type { DebugSettings } from '../core/debugSettings';
 import { World } from '../core/world';
 import NullRenderer from '../platforms/stub/nullRenderer';
 import NullMenuOverlay from '../platforms/stub/nullMenuOverlay';
@@ -28,6 +29,7 @@ export interface Scenario {
     gameLoop: GameLoop;
     eventBus: TypeSafeEventBus;
     overlay: NullMenuOverlay;
+    renderer: NullRenderer;
     settings: Settings;
     // One frame with these inputs. Edge actions are pressed once, held ones (move, lookRate) stay set.
     press: (intent: Partial<PlayerIntent>) => void;
@@ -43,6 +45,7 @@ export interface ScenarioOptions {
     mode?: GameMode;
     settings?: Settings;
     displayCapabilities?: DisplayCapabilities;
+    debugSettings?: DebugSettings;
 }
 
 export const createScenario = (options: ScenarioOptions = {}): Scenario => {
@@ -54,8 +57,9 @@ export const createScenario = (options: ScenarioOptions = {}): Scenario => {
     const eventBus = new TypeSafeEventBus();
     const overlay = new NullMenuOverlay();
     const settings = options.settings ?? createDefaultSettings();
+    const renderer = new NullRenderer();
     const gameLoop = new GameLoop({
-        renderer: new NullRenderer(),
+        renderer,
         input,
         world: new World(),
         getAspectRatio: () => 16 / 9,
@@ -64,6 +68,7 @@ export const createScenario = (options: ScenarioOptions = {}): Scenario => {
         menuOverlay: overlay,
         settings,
         displayCapabilities: options.displayCapabilities,
+        debugSettings: options.debugSettings,
     });
     // Like the first frame in main.ts, so the overlay starts with the menu (if any)
     gameLoop.render();
@@ -89,6 +94,6 @@ export const createScenario = (options: ScenarioOptions = {}): Scenario => {
     };
 
     return {
-        input, gameState, gameLoop, eventBus, overlay, settings, press, tick, frame, click,
+        input, gameState, gameLoop, eventBus, overlay, renderer, settings, press, tick, frame, click,
     };
 };
