@@ -1456,8 +1456,8 @@ ${SKY_COLOR_GLSL}
                 return 0.5 * mid + 0.5 * light;
             }
 
-            // Coverage (0..1) in .y, and the tone in .x: light on the sun-facing edge, darker in
-            // thick middles and on the far side.
+            // .x the tone (light on the sun-facing edge, darker in thick middles and on the far side),
+            // .y coverage (0..1)
             vec2 cloudAt(vec3 viewDir) {
                 // Every value that fwidth needs is computed on every pixel, before any early return:
                 // derivatives are undefined once neighbouring pixels take different paths. A near-flat
@@ -1518,6 +1518,22 @@ ${SKY_COLOR_GLSL}
                 return coverage * CLOUD_HIGH_OPACITY * smoothstep(0.0, CLOUD_HORIZON_FADE, viewDir.y);
             }
 
+            // Low clouds catch the sun's glow: warmest near the horizon and on the sun's side.
+            // Screen-blended so it can't clip, and the palette's glow is black by day and at night,
+            // so only sunrise and sunset change.
+            const float CLOUD_WARM_HEIGHT = 0.35;
+            const float CLOUD_WARMTH = 0.55;
+
+            vec3 warmCloud(vec3 color, vec3 viewDir) {
+                float low = 1.0 - smoothstep(0.0, CLOUD_WARM_HEIGHT, viewDir.y);
+                float sunSide = 0.4;
+                vec2 sunFlat = u_sunDirection.xz;
+                if (length(viewDir.xz) > 0.001 && length(sunFlat) > 0.001) {
+                    sunSide = 0.4 + 0.6 * max(dot(normalize(viewDir.xz), normalize(sunFlat)), 0.0);
+                }
+                return color + u_skyGlow * (low * sunSide * CLOUD_WARMTH) * (1.0 - color);
+            }
+
             void main() {
                 vec3 viewDir = normalize(v_far.xyz / v_far.w - v_near.xyz / v_near.w);
                 // Before any branch: derivatives need neighbouring pixels on the same path. From the
@@ -1533,11 +1549,12 @@ ${SKY_COLOR_GLSL}
                 // Clouds, high layer first so the low puffy layer passes in front of it. Colors come
                 // from the palette: the three tones (0, 0.5, 1) map to shadow, mid and light, and
                 // the high streaks take the light tone.
-                color = mix(color, u_cloudLight, highCloudAt(viewDir));
+                color = mix(color, warmCloud(u_cloudLight, viewDir), highCloudAt(viewDir));
                 vec2 cloud = cloudAt(viewDir);
                 vec3 tone = cloud.x < 0.5
                     ? mix(u_cloudShadow, u_cloudMid, cloud.x * 2.0)
                     : mix(u_cloudMid, u_cloudLight, cloud.x * 2.0 - 1.0);
+                tone = warmCloud(tone, viewDir);
                 color = mix(color, tone, cloud.y);
 
                 fragColor = vec4(color, 1.0);
