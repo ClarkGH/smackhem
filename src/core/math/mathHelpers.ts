@@ -9,6 +9,23 @@ export const identity = (): Mat4 => {
     return { elements: e };
 };
 
+// Writes every element, so a reused matrix keeps nothing from before (M-1)
+export const perspectiveInto = (fov: number, aspect: number, near: number, far: number, out: Mat4): Mat4 => {
+    const f = 1.0 / Math.tan(fov / 2);
+    const normalizationFactor = 1 / (near - far);
+
+    const e = out.elements;
+    e.fill(0);
+
+    e[0] = f / aspect; // x-scale
+    e[5] = f; // y-scale
+    e[10] = (far + near) * normalizationFactor; // depth buffer
+    e[11] = -1; // Projection 'trick'
+    e[14] = (2 * far * near) * normalizationFactor; // depth buffer
+
+    return out;
+};
+
 export const perspective = (
     fov: number,
     aspect: number,
@@ -17,20 +34,7 @@ export const perspective = (
     // TODO: Implement left/right-handed coordinate systems for fun
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     whereEverYouAre: number,
-): Mat4 => {
-    const f = 1.0 / Math.tan(fov / 2);
-    const normalizationFactor = 1 / (near - far);
-
-    const e = new Float32Array(16);
-
-    e[0] = f / aspect; // x-scale
-    e[5] = f; // y-scale
-    e[10] = (far + near) * normalizationFactor; // depth buffer
-    e[11] = -1; // Projection 'trick'
-    e[14] = (2 * far * near) * normalizationFactor; // depth buffer
-
-    return { elements: e };
-};
+): Mat4 => perspectiveInto(fov, aspect, near, far, { elements: new Float32Array(16) });
 
 export interface OrthoBounds {
     left: number;
@@ -205,48 +209,58 @@ export const quaternionFromYawPitch = (yaw: number, pitch: number): Quaternion =
     return quaternionNormalize(quaternionMultiply(yawQuat, pitchQuat));
 };
 
+/**
+ * The view matrix for a camera at position looking along yaw and pitch, written into out (M-1).
+ * The camera's axes are worked out directly, the same rotation as quaternionFromYawPitch
+ * (yaw about Y, then pitch about X) without building quaternions. mathHelpers.spec checks they agree.
+ */
+export const lookDirectionInto = (position: Vec3, yaw: number, pitch: number, out: Mat4): Mat4 => {
+    const sy = Math.sin(yaw);
+    const cy = Math.cos(yaw);
+    const sp = Math.sin(pitch);
+    const cp = Math.cos(pitch);
+
+    // right = (cos yaw, 0, sin yaw), up = (-sin pitch sin yaw, cos pitch, sin pitch cos yaw),
+    // forward = (cos pitch sin yaw, sin pitch, -cos pitch cos yaw)
+    const rx = cy; const ry = 0; const rz = sy;
+    const ux = -sp * sy; const uy = cp; const uz = sp * cy;
+    const fx = cp * sy; const fy = sp; const fz = -cp * cy;
+    const e = out.elements;
+
+    // 2. Rotation part (Transpose the camera's orientation)
+    // Column 0
+    e[0] = rx;
+    e[1] = ux;
+    // We use -forward because WebGL looks down -Z
+    e[2] = -fx;
+    e[3] = 0;
+
+    // Column 1
+    e[4] = ry;
+    e[5] = uy;
+    e[6] = -fy;
+    e[7] = 0;
+
+    // Column 2
+    e[8] = rz;
+    e[9] = uz;
+    e[10] = -fz;
+    e[11] = 0;
+
+    // Translation
+    e[12] = -(rx * position.x + ry * position.y + rz * position.z);
+    e[13] = -(ux * position.x + uy * position.y + uz * position.z);
+    e[14] = (fx * position.x + fy * position.y + fz * position.z);
+    e[15] = 1;
+
+    return out;
+};
+
 export const lookDirection = (
     position: Vec3,
     yaw: number,
     pitch: number,
-): Mat4 => {
-    const rotation = quaternionFromYawPitch(yaw, pitch);
-
-    const right = quaternionApplyToVector(rotation, { x: 1, y: 0, z: 0 });
-    const up = quaternionApplyToVector(rotation, { x: 0, y: 1, z: 0 });
-    const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
-    const e = new Float32Array(16);
-
-    // 2. Rotation part (Transpose the camera's orientation)
-    // Column 0
-    e[0] = right.x;
-    e[1] = up.x;
-    // We use -forward because WebGL looks down -Z
-    e[2] = -forward.x;
-    e[3] = 0;
-
-    // Column 1
-    e[4] = right.y;
-    e[5] = up.y;
-    e[6] = -forward.y;
-    e[7] = 0;
-
-    // Column 2
-    e[8] = right.z;
-    e[9] = up.z;
-    e[10] = -forward.z;
-    e[11] = 0;
-
-    // Translation
-    e[12] = -(right.x * position.x + right.y * position.y
-        + right.z * position.z);
-    e[13] = -(up.x * position.x + up.y * position.y + up.z * position.z);
-    e[14] = (forward.x * position.x + forward.y * position.y
-        + forward.z * position.z);
-    e[15] = 1;
-
-    return { elements: e };
-};
+): Mat4 => lookDirectionInto(position, yaw, pitch, { elements: new Float32Array(16) });
 
 // Matrix extraction
 export const extractPosition = (matrix: Mat4): Vec3 => ({

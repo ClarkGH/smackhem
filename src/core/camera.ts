@@ -1,7 +1,10 @@
 import {
     perspective,
+    perspectiveInto,
     lookDirection,
+    lookDirectionInto,
     matrixMultiply,
+    matrixMultiplyInto,
     quaternionFromYawPitch,
     quaternionApplyToVector,
 } from './math/mathHelpers';
@@ -44,6 +47,20 @@ export const getCameraMatrix = (
     const view = lookDirection(camera.position, camera.yaw, camera.pitch);
 
     return matrixMultiply(proj, view);
+};
+
+// The same matrix as getCameraMatrix, written into out, for the per-frame draw (M-1).
+// scratch holds the projection and view on the way, so nothing is allocated.
+export const getCameraMatrixInto = (
+    camera: Camera,
+    aspect: number,
+    out: Mat4,
+    scratch: { proj: Mat4; view: Mat4 },
+): Mat4 => {
+    perspectiveInto(camera.fov, aspect, camera.near, camera.far, scratch.proj);
+    lookDirectionInto(camera.position, camera.yaw, camera.pitch, scratch.view);
+    matrixMultiplyInto(scratch.proj, scratch.view, out);
+    return out;
 };
 
 // View matrix for normal matrix computation

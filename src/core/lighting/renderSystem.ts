@@ -5,11 +5,14 @@ import type { DebugHUD } from '../gameLoop';
 import { World } from '../world';
 import EnvironmentSystem from './environment';
 import { Vec3, Mat4 } from '../../types/common';
-import { getCameraMatrix, INSTANCE_CHARACTER_SIZE } from '../camera';
+import { getCameraMatrixInto, INSTANCE_CHARACTER_SIZE } from '../camera';
 import { SCENE_HEIGHT_PX, SCENE_TILE_SIZE, SCENE_WIDTH_PX } from '../scene';
 import {
     matrixMultiplyInto, smoothstep, orthographic, fitLogicalOrtho, quaternionFromYawPitch, quaternionApplyToVector,
 } from '../math/mathHelpers';
+
+// The sky colours copied from the palette each frame, listed once rather than every frame (M-1)
+const SKY_COLOR_FIELDS = ['horizon', 'upper', 'zenith', 'glow', 'cloudLight', 'cloudMid', 'cloudShadow'] as const;
 
 export default class RenderSystem {
     // PERFORMANCE: Pre-allocated matrices isolated to the drawing context
@@ -26,8 +29,13 @@ export default class RenderSystem {
 
     private readonly billboardCenter: Vec3 = { x: 0, y: 0, z: 0 };
 
-    // The 3D view-projection drawn with this frame, for placing overlays over the world
-    private viewProj: Mat4 | null = null;
+    // The 3D camera's view-projection, rebuilt in place every frame (M-1)
+    private readonly viewProj: Mat4 = { elements: new Float32Array(16) };
+
+    private readonly viewProjScratch = { proj: { elements: new Float32Array(16) }, view: { elements: new Float32Array(16) } };
+
+    // Whether a world frame has been drawn, so overlays have a camera to be placed with
+    private hasWorldViewProj = false;
 
     // NPC textures by asset ID. null while loading, or if the load failed.
     private readonly npcTextures: Map<string, TextureHandle | null> = new Map();
@@ -155,7 +163,7 @@ export default class RenderSystem {
      * False when it's behind the camera, or no 3D frame has been drawn yet.
      */
     public projectToViewport(point: Vec3, out: { x: number; y: number }): boolean {
-        if (!this.viewProj) return false;
+        if (!this.hasWorldViewProj) return false;
         const m = this.viewProj.elements;
         // Column-major, like every Mat4 here
         const clipX = m[0] * point.x + m[4] * point.y + m[8] * point.z + m[12];
@@ -199,9 +207,10 @@ export default class RenderSystem {
         // Before beginFrame, which clears to this frame's sky. Every mode, so the renderer
         // never holds a stale sky (scene_2d's own clear covers it).
         const { palette } = this.environmentSystem;
-        (['horizon', 'upper', 'zenith', 'glow', 'cloudLight', 'cloudMid', 'cloudShadow'] as const).forEach((field) => {
+        for (let i = 0; i < SKY_COLOR_FIELDS.length; i += 1) {
+            const field = SKY_COLOR_FIELDS[i];
             this.sky[field].x = palette[field].x; this.sky[field].y = palette[field].y; this.sky[field].z = palette[field].z;
-        });
+        }
         this.sky.stars = palette.stars;
         this.sky.cloudTime = this.environmentSystem.cloudTime;
         this.sky.starTime = this.environmentSystem.starTime;
@@ -226,7 +235,7 @@ export default class RenderSystem {
         // 1. Process 2D UI Overlay Pass
         if (discreteState.gameMode === 'scene_2d') {
             const aspect = this.getAspectRatio();
-            this.renderer.setViewProjection(getCameraMatrix(camera, aspect));
+            this.renderer.setViewProjection(getCameraMatrixInto(camera, aspect, this.viewProj, this.viewProjScratch));
             this.renderer.setViewPosition?.(camera.position);
 
             this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
@@ -272,8 +281,8 @@ export default class RenderSystem {
             }
         } else {
             const aspect = this.getAspectRatio();
-            this.viewProj = getCameraMatrix(camera, aspect);
-            this.renderer.setViewProjection(this.viewProj);
+            this.renderer.setViewProjection(getCameraMatrixInto(camera, aspect, this.viewProj, this.viewProjScratch));
+            this.hasWorldViewProj = true;
             this.renderer.setViewPosition?.(camera.position);
 
             this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
