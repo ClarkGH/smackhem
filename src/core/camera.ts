@@ -83,3 +83,20 @@ export const getCameraRight = (yaw: number): Vec3 => {
     const right = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
     return { x: right.x, y: 0, z: right.z };
 };
+
+// The flat direction a yaw looks in, written into out so it can run every tick (M-1).
+// Matches getCameraForward(yaw, 0), which camera.spec checks.
+export const flatForwardInto = (yaw: number, out: Vec3): Vec3 => {
+    out.x = Math.sin(yaw);
+    out.y = 0;
+    out.z = -Math.cos(yaw);
+    return out;
+};
+
+// Forward turned a quarter to the right, written into out (M-1). Matches getCameraRight, which camera.spec checks.
+export const flatRightInto = (yaw: number, out: Vec3): Vec3 => {
+    out.x = Math.cos(yaw);
+    out.y = 0;
+    out.z = Math.sin(yaw);
+    return out;
+};

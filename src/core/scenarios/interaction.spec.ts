@@ -7,8 +7,6 @@ import {
 import { ChunkLoader, type NpcJSON } from '../../services/chunkLoader';
 import { createDebugSettings } from '../settings/debugSettings';
 import { createScenario, type Scenario } from '../../testing/scenario';
-import { flatForwardInto } from '../interaction';
-import { getCameraForward } from '../camera';
 
 const LINE = "Me NPC, me no do nuthin' yet.. but me look great!";
 
@@ -235,18 +233,6 @@ describe('NPC speech in the instance - scenario (stub platform)', () => {
 
         expect(scenario.gameState.discrete.activeSpeech?.npcId).toBe('behind');
         expect(scenario.speech.lastView).toBeNull();
-    });
-});
-
-describe('flatForwardInto', () => {
-    it('matches getCameraForward without allocating a new vector', () => {
-        const out = { x: 0, y: 0, z: 0 };
-        [0, 0.7, Math.PI / 2, 2.5, Math.PI, -1.2].forEach((yaw) => {
-            const expected = getCameraForward(yaw, 0);
-            expect(flatForwardInto(yaw, out)).toBe(out);
-            expect(out.x).toBeCloseTo(expected.x, 6);
-            expect(out.z).toBeCloseTo(expected.z, 6);
-        });
     });
 });
 

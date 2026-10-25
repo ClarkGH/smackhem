@@ -4,8 +4,9 @@ import { TypeSafeEventBus } from './events';
 import type { GameMode, GameState } from './gameState';
 import { lerpVec3, smoothstep } from './math/mathHelpers';
 import {
+    flatForwardInto,
+    flatRightInto,
     getCameraForward,
-    getCameraRight,
     INSTANCE_CHARACTER_SIZE,
     PLAYER_SPEED,
     type Camera,
@@ -26,6 +27,13 @@ export default class Instance3DSystem {
     private readonly transitionStartPos: Vec3 = { x: 0, y: 0, z: 0 };
 
     private readonly transitionEndPos: Vec3 = { x: 0, y: 0, z: 0 };
+
+    // Filled in place on every tick the circle moves (M-1)
+    private readonly moveForward: Vec3 = { x: 0, y: 0, z: -1 };
+
+    private readonly moveRight: Vec3 = { x: 1, y: 0, z: 0 };
+
+    private readonly proposedMovement: Vec3 = { x: 0, y: 0, z: 0 };
 
     constructor(
         // I assure you, these variables are in use.
@@ -193,15 +201,14 @@ export default class Instance3DSystem {
             const { x: moveX, y: moveY } = intent.move;
 
             if (moveX !== 0 || moveY !== 0) {
-                const forward = getCameraForward(this.camera.yaw, 0);
-                const right = getCameraRight(this.camera.yaw);
+                const forward = flatForwardInto(this.camera.yaw, this.moveForward);
+                const right = flatRightInto(this.camera.yaw, this.moveRight);
 
                 const moveDistance = PLAYER_SPEED * dt;
-                const proposedMovement = {
-                    x: (forward.x * moveY + right.x * moveX) * moveDistance,
-                    y: 0,
-                    z: (forward.z * moveY + right.z * moveX) * moveDistance,
-                };
+                const { proposedMovement } = this;
+                proposedMovement.x = (forward.x * moveY + right.x * moveX) * moveDistance;
+                proposedMovement.y = 0;
+                proposedMovement.z = (forward.z * moveY + right.z * moveX) * moveDistance;
 
                 const worldAABBs = this.world.getCollidableAABBs();
                 const resolvedMovement = resolveCollision(

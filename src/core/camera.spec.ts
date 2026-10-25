@@ -1,8 +1,52 @@
 import { describe, it, expect } from 'vitest';
-import { createCamera, getCameraMatrix, getCameraMatrixInto } from './camera';
+import {
+    createCamera,
+    flatForwardInto,
+    flatRightInto,
+    getCameraForward,
+    getCameraMatrix,
+    getCameraMatrixInto,
+    getCameraRight,
+} from './camera';
 import type { Mat4 } from '../types/common';
 
 const newMat4 = (): Mat4 => ({ elements: new Float32Array(16) });
+
+// Every quadrant, both quarter turns, and the start
+const YAWS = [0, 0.7, Math.PI / 2, 2.5, Math.PI, -1.2];
+
+describe('flat move directions', () => {
+    it('flatForwardInto matches getCameraForward, without allocating a new vector', () => {
+        const out = { x: 0, y: 0, z: 0 };
+        YAWS.forEach((yaw) => {
+            const expected = getCameraForward(yaw, 0);
+            expect(flatForwardInto(yaw, out)).toBe(out);
+            expect(out.x).toBeCloseTo(expected.x, 6);
+            expect(out.z).toBeCloseTo(expected.z, 6);
+        });
+    });
+
+    it('flatRightInto matches getCameraRight, without allocating a new vector', () => {
+        const out = { x: 0, y: 0, z: 0 };
+        YAWS.forEach((yaw) => {
+            const expected = getCameraRight(yaw);
+            expect(flatRightInto(yaw, out)).toBe(out);
+            expect(out.x).toBeCloseTo(expected.x, 6);
+            expect(out.z).toBeCloseTo(expected.z, 6);
+        });
+    });
+
+    it('flattens a tilted forward the same way movement always has', () => {
+        // Movement used getCameraForward(yaw, pitch), which drops the tilt and rescales to length 1
+        const out = { x: 0, y: 0, z: 0 };
+        YAWS.forEach((yaw) => {
+            const expected = getCameraForward(yaw, 1.2);
+            flatForwardInto(yaw, out);
+            expect(out.x).toBeCloseTo(expected.x, 5);
+            expect(out.z).toBeCloseTo(expected.z, 5);
+        });
+    });
+});
 
 describe('getCameraMatrixInto', () => {
     it('matches getCameraMatrix, reusing the same matrices from one camera to the next', () => {

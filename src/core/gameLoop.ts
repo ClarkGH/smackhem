@@ -10,8 +10,8 @@ import {
     PLAYER_SPEED,
     PLAYER_HEIGHT,
     PLAYER_RADIUS,
-    getCameraForward,
-    getCameraRight,
+    flatForwardInto,
+    flatRightInto,
     type Camera,
 } from './camera';
 import {
@@ -156,6 +156,13 @@ export class GameLoop {
 
     // Pre-allocated scratch fields
     private readonly wallDebugTransform: Mat4 = identity();
+
+    // Filled in place on every moving tick (M-1)
+    private readonly moveForward: Vec3 = { x: 0, y: 0, z: -1 };
+
+    private readonly moveRight: Vec3 = { x: 1, y: 0, z: 0 };
+
+    private readonly proposedMovement: Vec3 = { x: 0, y: 0, z: 0 };
 
     // The camera in the world, the circle in the instance, see interaction.ts
     private readonly interactor: Interactor = { position: { x: 0, y: 0, z: 0 }, facing: 0 };
@@ -331,14 +338,14 @@ export class GameLoop {
         const { x: moveX, y: moveY } = intent.move;
 
         if (moveX !== 0 || moveY !== 0) {
-            const forward = getCameraForward(this.camera.yaw, this.camera.pitch);
-            const right = getCameraRight(this.camera.yaw);
+            // Along the floor whatever the pitch, as getCameraForward(yaw, pitch) gave before
+            const forward = flatForwardInto(this.camera.yaw, this.moveForward);
+            const right = flatRightInto(this.camera.yaw, this.moveRight);
 
-            const proposedMovement = {
-                x: (forward.x * moveY + right.x * moveX) * PLAYER_SPEED * dt,
-                y: 0,
-                z: (forward.z * moveY + right.z * moveX) * PLAYER_SPEED * dt,
-            };
+            const { proposedMovement } = this;
+            proposedMovement.x = (forward.x * moveY + right.x * moveX) * PLAYER_SPEED * dt;
+            proposedMovement.y = 0;
+            proposedMovement.z = (forward.z * moveY + right.z * moveX) * PLAYER_SPEED * dt;
 
             const worldAABBs = this.world.getCollidableAABBs();
 

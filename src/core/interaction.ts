@@ -2,6 +2,7 @@ import type { GameState } from './gameState';
 import type { PlayerIntent } from '../services/input';
 import type { Vec3 } from '../types/common';
 import type { World } from './world';
+import { flatForwardInto } from './camera';
 
 // How close, across the floor, the interactor has to be to an interactable's edge (not its centre)
 export const INTERACT_RANGE = 2.0;
@@ -22,15 +23,6 @@ export interface Interactable {
     position: Vec3;
     size: number;
 }
-
-// The flat direction a yaw looks in, written into out so it can run every tick (M-1).
-// Matches getCameraForward(yaw, 0), which interaction.spec checks.
-export const flatForwardInto = (yaw: number, out: Vec3): Vec3 => {
-    out.x = Math.sin(yaw);
-    out.y = 0;
-    out.z = -Math.cos(yaw);
-    return out;
-};
 
 export default class InteractionSystem {
     private readonly forward: Vec3 = { x: 0, y: 0, z: -1 };
