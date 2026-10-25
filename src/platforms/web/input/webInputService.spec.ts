@@ -77,6 +77,50 @@ describe('WebInputService', () => {
 
             expect(input.getLastDevice()).toBe('keyboard');
         });
+
+        describe('the mouse, while on the pad', () => {
+            const mouse = (x: number, y = 0): void => canvas.dispatch('mousemove', { movementX: x, movementY: y });
+            let pad: { axes: number[]; buttons: { pressed: boolean }[] };
+
+            beforeEach(() => {
+                pad = {
+                    axes: [0, 0, 0, 0],
+                    buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: i === 0 })),
+                };
+                vi.stubGlobal('navigator', { getGamepads: () => [pad] });
+                frame();
+                expect(input.getLastDevice()).toBe('gamepad');
+            });
+
+            it('stays on the pad after a bump of the desk', () => {
+                mouse(1);
+                mouse(0, -2);
+
+                expect(input.getLastDevice()).toBe('gamepad');
+            });
+
+            it('switches on a deliberate move, even a slow one made of small steps', () => {
+                for (let i = 0; i < 6; i += 1) mouse(2);
+
+                expect(input.getLastDevice()).toBe('keyboard');
+            });
+
+            it('switches at once on one big move', () => {
+                mouse(20);
+
+                expect(input.getLastDevice()).toBe('keyboard');
+            });
+
+            it('starts counting again each time the pad is used', () => {
+                mouse(6);
+                // Using the pad (a stick push; a held button only counts on its press) sets travel back to 0
+                pad.axes[0] = 0.8;
+                frame();
+                mouse(6);
+
+                expect(input.getLastDevice()).toBe('gamepad');
+            });
+        });
     });
 
     it('Escape is both back and the menu button', () => {

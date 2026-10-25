@@ -29,6 +29,10 @@ const PAD_BUTTON = {
 // Which device the player last touched, so on-screen prompts can show its button
 export type InputDevice = 'keyboard' | 'gamepad';
 
+// Mouse travel, in pixels added up since the pad was last used, before prompts switch back to the keyboard.
+// Added up rather than per event, so a slow deliberate move (many 1-2 px events) still switches, but a bump doesn't.
+const MOUSE_SWITCH_TRAVEL = 8;
+
 const STICK_DEADZONE = 0.15;
 // A left stick push past this counts as one menu step
 const STICK_NAVIGATE_THRESHOLD = 0.5;
@@ -56,6 +60,8 @@ export interface WebInputState {
     padButtons: boolean[];
     padStickStep: { x: number; y: number };
     lastDevice: InputDevice;
+    // Mouse pixels moved since the pad was last used, see MOUSE_SWITCH_TRAVEL
+    mouseTravel: number;
 }
 
 export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => ({
@@ -77,6 +83,7 @@ export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => (
     padButtons: [],
     padStickStep: { x: 0, y: 0 },
     lastDevice: 'keyboard',
+    mouseTravel: 0,
 });
 
 export const setupWebInput = (
@@ -88,7 +95,8 @@ export const setupWebInput = (
         // Several events can arrive per frame, keep all of them
         webState.axes.mouseLookX += e.movementX;
         webState.axes.mouseLookY += e.movementY;
-        webState.lastDevice = 'keyboard';
+        webState.mouseTravel += Math.abs(e.movementX) + Math.abs(e.movementY);
+        if (webState.mouseTravel > MOUSE_SWITCH_TRAVEL) webState.lastDevice = 'keyboard';
     });
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -246,7 +254,10 @@ export const syncWebInput = (
         // Any press or stick push makes the pad the device prompts show
         const padTouched = padA || padB || padY || padStart || padUp || padDown || padLeft || padRight
             || padMoveX !== 0 || padMoveY !== 0 || finalLookRateX !== 0 || finalLookRateY !== 0;
-        if (padTouched) webState.lastDevice = 'gamepad';
+        if (padTouched) {
+            webState.lastDevice = 'gamepad';
+            webState.mouseTravel = 0;
+        }
 
         if (padA) interact = true;
         if (padB) back = true;
