@@ -355,10 +355,10 @@ Both the sun and moon are rendered as visible spheres in the sky:
 
 ## Sky
 
-The sky's color is **sky state**, not lighting (R-3): core works out what it should be, the renderer draws it. Today it's one color per frame, used as the clear color.
+The sky is **sky state**, not lighting (R-3): core works out what it should be, the renderer draws it. Each frame core sends four colors (horizon, upper, zenith, and a glow for the sun's side) and the sun's direction. Today the renderer only uses `horizon`, as the clear color; the gradient pass comes next.
 
-- **Palette** (`core/lighting/skyPalette.ts`): `SKY_KEYS` is a circular table of art-directed colors by time of day. Night holds from 20:00 to 05:00, dawn is at 06:00, day holds from 07:30 to 16:30, then sunset at 18:00 and dusk at 19:00. `skyColorAt` smoothsteps from the last key at or before the time to the next, measuring forward across midnight. A hold is two neighbouring keys with the same color. Dawn and sunset sit where the sun crosses the horizon, which the spec checks against `EnvironmentSystem`.
-- **To the renderer**: `RenderSystem` fills a `SkyState` and calls `setSky` **before** `beginFrame`, every frame and in every mode. `beginFrame` then clears to it, so the color always belongs to the current frame. In `scene_2d` the scene's own `clear()` draws over it.
+- **Palette** (`core/lighting/skyPalette.ts`): `SKY_KEYS` is a circular table of art-directed colors by time of day, four per key. `skyColorsAt` blends all four with the same segment and blend, so they move together. Night holds from 20:00 to 05:00, dawn is at 06:00, day holds from 07:30 to 16:30, then sunset at 18:00 and dusk at 19:00. `skyColorAt` smoothsteps from the last key at or before the time to the next, measuring forward across midnight. A hold is two neighbouring keys with the same color. Dawn and sunset sit where the sun crosses the horizon, which the spec checks against `EnvironmentSystem`.
+- **To the renderer**: `RenderSystem` fills a `SkyState` (palette colors, plus the sun's direction: always the sun, even below the horizon, never the shadow caster, which switches to the moon at night) and calls `setSky` **before** `beginFrame`, every frame and in every mode. `beginFrame` then clears to it, so the color always belongs to the current frame. In `scene_2d` the scene's own `clear()` draws over it.
 - **Tuning**: edit the hex values in `SKY_KEYS`, then check them with the Debug screen's Time of Day. The spec reads expected colors from the table, so color changes never touch a test.
 
 ## Shadows

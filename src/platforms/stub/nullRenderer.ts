@@ -36,7 +36,13 @@ export default class NullRenderer implements Renderer {
     // Models drawn since beginFrame, by reference, so tests can tell a model from an MVP
     private readonly meshModels: Mat4[] = [];
 
-    private readonly sky = { x: 0, y: 0, z: 0 };
+    private readonly sky: SkyState = {
+        horizon: { x: 0, y: 0, z: 0 },
+        upper: { x: 0, y: 0, z: 0 },
+        zenith: { x: 0, y: 0, z: 0 },
+        glow: { x: 0, y: 0, z: 0 },
+        sunDirection: { x: 0, y: 0, z: 0 },
+    };
 
     // Whether setSky came between the last endFrame and this beginFrame, for the ordering contract.
     // Reset at endFrame, not beginFrame: otherwise a late setSky in one frame counts for the next.
@@ -51,12 +57,20 @@ export default class NullRenderer implements Renderer {
     }
 
     setSky(_sky: SkyState): void {
-        this.sky.x = _sky.horizon.x; this.sky.y = _sky.horizon.y; this.sky.z = _sky.horizon.z;
+        (['horizon', 'upper', 'zenith', 'glow', 'sunDirection'] as const).forEach((field) => {
+            this.sky[field].x = _sky[field].x; this.sky[field].y = _sky[field].y; this.sky[field].z = _sky[field].z;
+        });
         this.skySetBetweenFrames = true;
     }
 
-    getSky(): Vec3 {
-        return { ...this.sky };
+    getSky(): SkyState {
+        return {
+            horizon: { ...this.sky.horizon },
+            upper: { ...this.sky.upper },
+            zenith: { ...this.sky.zenith },
+            glow: { ...this.sky.glow },
+            sunDirection: { ...this.sky.sunDirection },
+        };
     }
 
     wasSkySetBeforeBeginFrame(): boolean {

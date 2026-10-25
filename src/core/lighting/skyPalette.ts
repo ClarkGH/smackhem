@@ -3,13 +3,22 @@ import { smoothstep } from '../math/mathHelpers';
 
 export type SkyKeyName = 'nightEnd' | 'dawn' | 'morning' | 'afternoon' | 'sunset' | 'dusk' | 'nightStart';
 
-export interface SkyKey {
+// The sky's colors at one moment, bottom to top, plus the warm glow on the sun's side
+export interface SkyColors {
+    horizon: Vec3;
+    upper: Vec3;
+    zenith: Vec3;
+    // Added low in the sky toward the sun. Black for none.
+    glow: Vec3;
+}
+
+export interface SkyKey extends SkyColors {
     name: SkyKeyName;
     // Fraction of the day, 0..1, like EnvironmentSystem.timeOfDay
     time: number;
-    // Sky color at this key. Today the whole sky (the clear color); later the horizon stop.
-    horizon: Vec3;
 }
+
+export const SKY_CHANNELS = ['horizon', 'upper', 'zenith', 'glow'] as const;
 
 const hours = (h: number): number => h / 24;
 
@@ -20,6 +29,15 @@ const hex = (value: number): Vec3 => ({
     z: (value & 0xff) / 255,
 });
 
+// Held colors, shared by both ends of their hold
+const NIGHT = {
+    horizon: hex(0x3a3f75), upper: hex(0x1e2250), zenith: hex(0x0b1033), glow: hex(0x000000),
+};
+
+const DAY = {
+    horizon: hex(0x8fb7d0), upper: hex(0x4f86b8), zenith: hex(0x0a4f8f), glow: hex(0x000000),
+};
+
 /**
  * The art-directed keys, sorted by time. The list is circular: the last key blends into the first,
  * across midnight. Two neighbours with the same color are a hold (night, day).
@@ -27,21 +45,28 @@ const hex = (value: number): Vec3 => ({
  * Colors are seeds eyedropped from the references, to tune in game.
  */
 export const SKY_KEYS: readonly SkyKey[] = [
-    { name: 'nightEnd', time: hours(5), horizon: hex(0x3a3f75) },
-    { name: 'dawn', time: hours(6), horizon: hex(0xf07476) },
-    { name: 'morning', time: hours(7.5), horizon: hex(0x8fb7d0) },
-    { name: 'afternoon', time: hours(16.5), horizon: hex(0x8fb7d0) },
-    { name: 'sunset', time: hours(18), horizon: hex(0xf8b07a) },
-    { name: 'dusk', time: hours(19), horizon: hex(0xb07ab0) },
-    { name: 'nightStart', time: hours(20), horizon: hex(0x3a3f75) },
+    { name: 'nightEnd', time: hours(5), ...NIGHT },
+    {
+        name: 'dawn', time: hours(6), horizon: hex(0xf07476), upper: hex(0xb07ab0), zenith: hex(0x5a4a9a), glow: hex(0xffb38a),
+    },
+    { name: 'morning', time: hours(7.5), ...DAY },
+    { name: 'afternoon', time: hours(16.5), ...DAY },
+    {
+        name: 'sunset', time: hours(18), horizon: hex(0xf8b07a), upper: hex(0xb07ab0), zenith: hex(0x3a2f7a), glow: hex(0xffb070),
+    },
+    {
+        name: 'dusk', time: hours(19), horizon: hex(0xb07ab0), upper: hex(0x6a3fc0), zenith: hex(0x2a1f7a), glow: hex(0x79536f),
+    },
+    { name: 'nightStart', time: hours(20), ...NIGHT },
 ];
 
 /**
- * Sky color at a time of day (0..1), written into out (no allocation).
+ * Sky colors at a time of day (0..1), written into out (no allocation).
+ * Any object with the four color fields works as out, e.g. the renderer's SkyState.
  * Finds the segment from the last key at or before timeOfDay to the next key, wrapping
  * past midnight, and smoothsteps between them.
  */
-export const skyColorAt = (timeOfDay: number, out: Vec3): void => {
+export const skyColorsAt = (timeOfDay: number, out: SkyColors): void => {
     const t = timeOfDay - Math.floor(timeOfDay);
     const count = SKY_KEYS.length;
 
@@ -58,7 +83,14 @@ export const skyColorAt = (timeOfDay: number, out: Vec3): void => {
     const into = (t - from.time + 1) % 1;
     const blend = smoothstep(into / span);
 
-    out.x = from.horizon.x + (to.horizon.x - from.horizon.x) * blend;
-    out.y = from.horizon.y + (to.horizon.y - from.horizon.y) * blend;
-    out.z = from.horizon.z + (to.horizon.z - from.horizon.z) * blend;
+    // Every color shares the same segment and blend, so they move together
+    for (let c = 0; c < SKY_CHANNELS.length; c += 1) {
+        const channel = SKY_CHANNELS[c];
+        const a = from[channel];
+        const b = to[channel];
+        const o = out[channel];
+        o.x = a.x + (b.x - a.x) * blend;
+        o.y = a.y + (b.y - a.y) * blend;
+        o.z = a.z + (b.z - a.z) * blend;
+    }
 };

@@ -7,7 +7,9 @@ import {
 import type { GameEvent } from '../events';
 import { createDebugSettings, type DebugSettings } from '../settings/debugSettings';
 import { createScenario, type Scenario } from '../../testing/scenario';
-import { skyColorAt } from '../lighting/skyPalette';
+import { skyColorsAt } from '../lighting/skyPalette';
+import EnvironmentSystem from '../lighting/environment';
+import { createGameState } from '../gameState';
 
 const labels = (scenario: Scenario): string[] => scenario.overlay.lastView?.items.map((item) => item.label) ?? [];
 
@@ -120,15 +122,33 @@ describe('debug menu - scenario (stub platform)', () => {
         expect(settingsChanges).toHaveLength(0);
     });
 
-    it('sends the palette\'s sky color for the overridden hour, before beginFrame', () => {
+    it('sends the palette\'s sky colors and the sun\'s direction for the overridden hour, before beginFrame', () => {
         scenario.click('Debug');
         // Live -> 00:00 is one step, then one step per hour
         let stepsTaken = 0;
         [0, 6, 12, 18].forEach((hour) => {
             for (; stepsTaken < hour + 1; stepsTaken += 1) step('Time of Day', 1);
-            const expected = { x: 0, y: 0, z: 0 };
-            skyColorAt(hour / 24, expected);
-            expect(scenario.renderer.getSky()).toEqual(expected);
+            const sky = scenario.renderer.getSky();
+            const expected = {
+                horizon: { x: 0, y: 0, z: 0 },
+                upper: { x: 0, y: 0, z: 0 },
+                zenith: { x: 0, y: 0, z: 0 },
+                glow: { x: 0, y: 0, z: 0 },
+            };
+            skyColorsAt(hour / 24, expected);
+            expect({
+                horizon: sky.horizon, upper: sky.upper, zenith: sky.zenith, glow: sky.glow,
+            }).toEqual(expected);
+
+            // The sun's own direction, whatever the hour
+            const environment = new EnvironmentSystem(100);
+            environment.update(createGameState(), { x: 0, y: 0, z: 0 }, 1, 1, hour / 24);
+            expect(sky.sunDirection).toEqual(environment.lightDirection);
+            if (hour === 0) {
+                // Midnight: below the horizon, and not the moon the shadows switch to
+                expect(sky.sunDirection.y).toBeLessThan(0);
+                expect(sky.sunDirection).not.toEqual(environment.shadowLightDirection);
+            }
             expect(scenario.renderer.wasSkySetBeforeBeginFrame()).toBe(true);
         });
     });

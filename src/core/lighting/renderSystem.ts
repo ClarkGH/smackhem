@@ -4,7 +4,7 @@ import type { GameState } from '../gameState';
 import type { DebugHUD } from '../gameLoop';
 import { World } from '../world';
 import EnvironmentSystem from './environment';
-import { skyColorAt } from './skyPalette';
+import { skyColorsAt } from './skyPalette';
 import { Vec3, Mat4 } from '../../types/common';
 import { getCameraMatrix, INSTANCE_CHARACTER_SIZE } from '../camera';
 import { SCENE_HEIGHT_PX, SCENE_TILE_SIZE, SCENE_WIDTH_PX } from '../scene';
@@ -28,7 +28,13 @@ export default class RenderSystem {
     private sceneOrthoHeight = 0;
 
     // Filled from the palette every frame and handed to the renderer (M-1)
-    private readonly sky: SkyState = { horizon: { x: 0, y: 0, z: 0 } };
+    private readonly sky: SkyState = {
+        horizon: { x: 0, y: 0, z: 0 },
+        upper: { x: 0, y: 0, z: 0 },
+        zenith: { x: 0, y: 0, z: 0 },
+        glow: { x: 0, y: 0, z: 0 },
+        sunDirection: { x: 0, y: 1, z: 0 },
+    };
 
     constructor(
         private renderer: Renderer,
@@ -111,7 +117,11 @@ export default class RenderSystem {
     ): void {
         // Before beginFrame, which clears to this frame's sky. Every mode, so the renderer
         // never holds a stale sky (scene_2d's own clear covers it).
-        skyColorAt(this.environmentSystem.timeOfDay, this.sky.horizon);
+        skyColorsAt(this.environmentSystem.timeOfDay, this.sky);
+        // Always the sun, even below the horizon (afterglow), never shadowLightDirection,
+        // which switches to the moon at night and would swing the glow across the sky at dawn
+        const sun = this.environmentSystem.lightDirection;
+        this.sky.sunDirection.x = sun.x; this.sky.sunDirection.y = sun.y; this.sky.sunDirection.z = sun.z;
         this.renderer.setSky?.(this.sky);
         this.renderer.beginFrame();
         const discreteState = gameState.discrete;

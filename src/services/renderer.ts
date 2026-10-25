@@ -13,6 +13,10 @@ export interface TextureHandle {
 // What's drawn behind the world, as plain data (R-3)
 export interface SkyState {
     horizon: Vec3;
+    upper: Vec3;
+    glow: Vec3;
+    sunDirection: Vec3;
+    zenith: Vec3;
 }
 
 export interface Renderer {
