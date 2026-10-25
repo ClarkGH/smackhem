@@ -419,7 +419,7 @@ A billboard faces the camera, but casts from a card that faces the light (so its
 
 **Casting**: in the depth pass a billboard is drawn on that light-facing card, and pixels with alpha below 0.5 are discarded, so the shadow has the sprite's shape rather than a rectangle's.
 
-**Receiving**: each billboard pixel looks up its shadow where it would be **on the light-facing card**, nudged `SELF_CLEARANCE` (0.1 units) toward the light. The card maths (`LIGHT_CARD_GLSL`) is shared by both, so they always agree. Walls and meshes still shade it per pixel, so a sprite half in a wall's shadow is half shaded. With the light straight overhead every facing casts the same, so it keeps the camera-facing card.
+**Receiving**: each billboard pixel looks up its shadow where it would be **on the light-facing card**, nudged `SELF_CLEARANCE` (0.1 units) toward the light. The card maths (`LIGHT_CARD_GLSL`) is shared by both, so they always agree. One difference: for receiving, the card's "right" is flipped to point the same way as the visible card's. Looking toward the light the two point opposite ways, and an unflipped lookup reads the card mirrored, so shadows slide across the sprite backwards. Sideways shifts can't cause self-shadowing (the lookup stays on the light's side of the card), and the caster isn't flipped, so a sprite's own shadow never mirrors as the camera moves. Walls and meshes still shade it per pixel, so a sprite half in a wall's shadow is half shaded. With the light straight overhead every facing casts the same, so it keeps the camera-facing card.
 
 ### Known Limits
 

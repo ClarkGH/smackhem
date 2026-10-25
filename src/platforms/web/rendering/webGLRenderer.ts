@@ -19,13 +19,18 @@ const SHADOW_TEXTURE_UNIT = 1;
 // Shared by the billboard's shadow lookup (receiving) and the billboard caster (depth pass), so the
 // two always agree. Assumes an upright billboard model: column 0 = right * size, column 3 = anchor.
 const LIGHT_CARD_GLSL = `
-            // local: the quad vertex's x and z (-0.5..0.5). clearance: distance toward the light
-            vec3 lightCardPosition(mat4 model, vec2 local, vec3 shadowDirection, vec3 cameraFacing, float clearance) {
+            // local: the quad vertex's x and z (-0.5..0.5). clearance: distance toward the light.
+            // matchCameraRight: point the card's right the same way as the visible card's (model column 0).
+            // The shadow lookup needs it: looking toward the light the two "rights" are opposite, and the
+            // lookup would read the card mirrored, so shadows would slide across the sprite backwards.
+            // The caster leaves it off, so a sprite's own shadow never flips as the camera moves.
+            vec3 lightCardPosition(mat4 model, vec2 local, vec3 shadowDirection, vec3 cameraFacing, float clearance, bool matchCameraRight) {
                 vec3 toLight = vec3(shadowDirection.x, 0.0, shadowDirection.z);
                 float toLightLength = length(toLight);
                 // Light straight overhead: every facing casts the same, keep the camera-facing one
                 vec3 facing = toLightLength > 0.01 ? toLight / toLightLength : normalize(cameraFacing);
                 vec3 right = vec3(-facing.z, 0.0, facing.x);
+                if (matchCameraRight && dot(right, model[0].xyz) < 0.0) right = -right;
                 float size = length(model[0].xyz);
                 return model[3].xyz
                     + right * (local.x * size)
@@ -430,7 +435,7 @@ ${SHADOW_SAMPLING_GLSL}
             out vec2 v_texCoord;
 ${LIGHT_CARD_GLSL}
             void main() {
-                vec3 onLightCard = lightCardPosition(u_model, a_position.xz, u_shadowDirection, u_normal, 0.0);
+                vec3 onLightCard = lightCardPosition(u_model, a_position.xz, u_shadowDirection, u_normal, 0.0, false);
                 v_texCoord = a_texCoord;
                 gl_Position = u_lightViewProj * vec4(onLightCard, 1.0);
             }
@@ -1118,7 +1123,7 @@ ${LIGHT_CARD_GLSL}
                 // Shadows are looked up where this pixel would be on the card it casts from,
                 // nudged toward the light. Looked up on the camera-facing card, half the sprite
                 // would sit behind its own shadow caster.
-                vec3 onLightCard = lightCardPosition(u_model, a_position.xz, u_shadowDirection, u_normal, SELF_CLEARANCE);
+                vec3 onLightCard = lightCardPosition(u_model, a_position.xz, u_shadowDirection, u_normal, SELF_CLEARANCE, true);
                 v_lightClip = (u_lightViewProj * vec4(onLightCard, 1.0)).xyz;
             }
         `;
