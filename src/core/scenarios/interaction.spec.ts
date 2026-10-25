@@ -1,10 +1,5 @@
-import {
-    describe,
-    it,
-    expect,
-    vi,
-} from 'vitest';
-import { ChunkLoader, type NpcJSON } from '../../services/chunkLoader';
+import { describe, it, expect } from 'vitest';
+import type { NpcJSON } from '../../services/chunkLoader';
 import { createDebugSettings } from '../settings/debugSettings';
 import { createScenario, type Scenario } from '../../testing/scenario';
 
@@ -19,11 +14,7 @@ const AHEAD = npcAt('ahead', 0, -1.5);
 
 const withNpcs = (npcs: NpcJSON[]): Scenario => {
     const scenario = createScenario({ debugSettings: createDebugSettings() });
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const json = JSON.stringify({
-        version: 2, id: '0,0', meshes: [], npcs,
-    });
-    scenario.world.addChunk(new ChunkLoader().loadChunkFromJSON(json, 0, 0, scenario.renderer));
+    scenario.addChunk({ npcs });
     return scenario;
 };
 
@@ -69,6 +60,18 @@ describe('NPC speech - scenario (stub platform)', () => {
 
         expect(gameState.discrete.activeSpeech).toBeNull();
         expect(speech.lastView).toBeNull();
+    });
+
+    it('tells the overlay to hide once, not every frame after', () => {
+        const { speech, press, tick } = withNpcs([AHEAD]);
+        press({ interact: true });
+        press({ interact: true });
+        expect(speech.lastView).toBeNull();
+        const calls = speech.renderCount;
+
+        tick(30);
+
+        expect(speech.renderCount).toBe(calls);
     });
 
     it('closes on Back', () => {

@@ -27,7 +27,6 @@ const bottomOffset = (shape: (typeof SHAPES)[number]): number => {
 const height = (shape: (typeof SHAPES)[number]): number => (shape.type === 'prism' ? shape.scale[1] : shape.scale[0]);
 
 const load = (meshes: object[]) => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     const json = JSON.stringify({ version: 2, id: '1,2', meshes });
     return new ChunkLoader().loadChunkFromJSON(json, 1, 2, new NullRenderer());
 };
@@ -69,7 +68,6 @@ describe('ChunkLoader mesh placement', () => {
 describe('ChunkLoader schema version', () => {
     const versionWarnings = (version: number): number => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        vi.spyOn(console, 'log').mockImplementation(() => {});
         const json = JSON.stringify({ version, id: '0,0', meshes: [] });
         new ChunkLoader().loadChunkFromJSON(json, 0, 0, new NullRenderer());
         return warn.mock.calls.filter(([message]) => String(message).startsWith('Chunk JSON version mismatch')).length;
@@ -90,7 +88,6 @@ describe('ChunkLoader NPCs', () => {
     };
 
     const loadNpcs = (npcs?: object[]) => {
-        vi.spyOn(console, 'log').mockImplementation(() => {});
         const json = JSON.stringify({
             version: 2, id: '1,2', meshes: [], npcs,
         });
@@ -121,7 +118,6 @@ describe('ChunkLoader NPCs', () => {
 
     it('skips an infinite size, which JSON gives for 1e999', () => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
-        vi.spyOn(console, 'log').mockImplementation(() => {});
         // Built by hand, JSON.stringify would write Infinity as null
         const json = `{ "version": 2, "id": "1,2", "meshes": [], "npcs": [
             { "id": "huge", "sprite": "npc-lmao", "pos": [0, 0, 0], "size": 1e999, "line": "Hi" }

@@ -18,7 +18,7 @@ export default class RenderSystem {
     // PERFORMANCE: Pre-allocated matrices isolated to the drawing context
     private readonly sceneSpriteMVP: Mat4;
 
-    private readonly circleTransform: Mat4;
+    private readonly billboardTransform: Mat4;
 
     private readonly sceneSpriteTransform: Mat4;
 
@@ -75,7 +75,7 @@ export default class RenderSystem {
     ) {
         // Pre-allocate tracking transforms to strictly prevent garbage collection spikes
         this.sceneSpriteMVP = { elements: new Float32Array(16) };
-        this.circleTransform = { elements: new Float32Array(16) };
+        this.billboardTransform = { elements: new Float32Array(16) };
         this.sceneSpriteTransform = { elements: new Float32Array(16) };
         this.sceneOrthoProj = { elements: new Float32Array(16) };
     }
@@ -121,13 +121,13 @@ export default class RenderSystem {
         }
 
         // The quad lies on XZ: its x runs along the camera's right, its z stands up
-        const m = this.circleTransform.elements;
+        const m = this.billboardTransform.elements;
         m[0] = -toCamera.z * size; m[1] = 0; m[2] = toCamera.x * size; m[3] = 0;
         m[4] = 0; m[5] = 0; m[6] = 0; m[7] = 0;
         m[8] = 0; m[9] = size; m[10] = 0; m[11] = 0;
         m[12] = center.x; m[13] = center.y; m[14] = center.z; m[15] = 1;
 
-        this.renderer.drawTexturedQuad(texture, this.circleTransform, 1.0, toCamera);
+        this.renderer.drawTexturedQuad(texture, this.billboardTransform, 1.0, toCamera);
     }
 
     // Loads each NPC's texture the first time it's seen, and draws it once loaded

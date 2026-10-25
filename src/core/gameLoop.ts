@@ -1,8 +1,8 @@
 import type { Renderer, TextureHandle } from '../services/renderer';
 import type { Input, PlayerIntent } from '../services/input';
 import type { MenuOverlay } from '../services/menuOverlay';
-import type { SpeechOverlay, SpeechView } from '../services/speechOverlay';
-import type { PromptOverlay, PromptView } from '../services/promptOverlay';
+import type { SpeechOverlay } from '../services/speechOverlay';
+import type { PromptOverlay } from '../services/promptOverlay';
 import type { DisplayCapabilities } from '../services/display';
 import type { TypeSafeEventBus } from './events';
 import {
@@ -35,6 +35,7 @@ import { QUARTERS_PER_DAY, type DebugSettings } from './settings/debugSettings';
 import EnvironmentSystem, { DAY_LENGTH_SECONDS } from './lighting/environment';
 import RenderSystem from './lighting/renderSystem';
 import InteractionSystem, { type Interactor } from './interaction';
+import OverheadOverlays from './overheadOverlays';
 
 // Simulation step, 60 ticks per second. Exported so tests step the loop exactly.
 export const FIXED_DT = 1 / 60;
@@ -127,10 +128,6 @@ export class GameLoop {
 
     private menuOverlay?: MenuOverlay;
 
-    private speechOverlay?: SpeechOverlay;
-
-    private promptOverlay?: PromptOverlay;
-
     // Shared, changed in place by the menu
     private settings: Settings;
 
@@ -167,17 +164,8 @@ export class GameLoop {
     // The camera in the world, the circle in the instance, see interaction.ts
     private readonly interactor: Interactor = { position: { x: 0, y: 0, z: 0 }, facing: 0 };
 
-    // Filled in place every frame the bubble shows (M-1)
-    private readonly speechView: SpeechView = { text: '', x: 0, y: 0 };
-
-    private readonly promptView: PromptView = { x: 0, y: 0 };
-
-    private readonly speechHead: Vec3 = { x: 0, y: 0, z: 0 };
-
-    // Whether each overlay was last told to show, so hiding is sent once
-    private speechShown = false;
-
-    private promptShown = false;
+    // The speech bubble and interact prompt over NPCs' heads
+    private overheadOverlays: OverheadOverlays;
 
     constructor({
         renderer,
@@ -206,8 +194,6 @@ export class GameLoop {
         this.menuSystem = new MenuSystem(this.eventBus, this.settings, displayCapabilities, debugSettings);
         this.debugHUD = debugHUD;
         this.menuOverlay = menuOverlay;
-        this.speechOverlay = speechOverlay;
-        this.promptOverlay = promptOverlay;
 
         // Core objects
         this.camera = createCamera();
@@ -232,6 +218,7 @@ export class GameLoop {
             this.getAspectRatio,
             this.wallDebugMesh,
         );
+        this.overheadOverlays = new OverheadOverlays(this.world, this.renderSystem, speechOverlay, promptOverlay);
 
         this.eventBus.subscribe('game_mode_changed', (event) => {
             console.log(`event - ${event.type}\n`, `curr mode: ${event.currentMode}\n`, `prev mode: ${event.previousMode}`);
@@ -494,56 +481,7 @@ export class GameLoop {
             debug ? debug.shadows : true,
         );
 
-        this.renderSpeech();
-        this.renderPrompt();
-    }
-
-    // Where over an NPC's head lands on screen, false when it can't be shown: menus, other modes, behind the camera
-    private projectOverHead(npcId: string, out: { x: number; y: number }): boolean {
-        const { gameMode, isPaused } = this.gameState.discrete;
-        if (isPaused || (gameMode !== 'world_3d' && gameMode !== 'instance_3d')) return false;
-        const npc = this.world.findNpc(npcId);
-        if (!npc) return false;
-        const head = this.speechHead;
-        head.x = npc.position.x;
-        head.y = npc.position.y + npc.size + 0.2;
-        head.z = npc.position.z;
-        return this.renderSystem.projectToViewport(head, out);
-    }
-
-    // The bubble sits over the speaker's head
-    private renderSpeech(): void {
-        if (!this.speechOverlay) return;
-        const { activeSpeech } = this.gameState.discrete;
-
-        let visible = false;
-        if (activeSpeech) {
-            visible = this.projectOverHead(activeSpeech.npcId, this.speechView);
-            this.speechView.text = activeSpeech.line;
-        }
-
-        if (visible) {
-            this.speechOverlay.render(this.speechView);
-            this.speechShown = true;
-        } else if (this.speechShown) {
-            this.speechOverlay.render(null);
-            this.speechShown = false;
-        }
-    }
-
-    // The prompt sits over whatever Interact would reach right now
-    private renderPrompt(): void {
-        if (!this.promptOverlay) return;
-        const { interactTarget } = this.gameState.discrete;
-        const visible = interactTarget !== null && this.projectOverHead(interactTarget, this.promptView);
-
-        if (visible) {
-            this.promptOverlay.render(this.promptView);
-            this.promptShown = true;
-        } else if (this.promptShown) {
-            this.promptOverlay.render(null);
-            this.promptShown = false;
-        }
+        this.overheadOverlays.render(this.gameState);
     }
 
     // TODO: Do we even need this if it lives in state? Should it live in state?

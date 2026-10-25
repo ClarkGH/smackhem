@@ -4,7 +4,7 @@ import {
     expect,
     vi,
 } from 'vitest';
-import { ChunkLoader, type NpcJSON } from '../../services/chunkLoader';
+import type { NpcJSON } from '../../services/chunkLoader';
 import { createScenario, type Scenario } from '../../testing/scenario';
 
 // One unit ahead of where the player can stand, straight down the starting view (-z)
@@ -14,11 +14,7 @@ const NPC: NpcJSON = {
 
 const withSpawnChunk = (npcs: NpcJSON[]): Scenario => {
     const scenario = createScenario();
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const json = JSON.stringify({
-        version: 2, id: '0,0', meshes: [], npcs,
-    });
-    scenario.world.addChunk(new ChunkLoader().loadChunkFromJSON(json, 0, 0, scenario.renderer));
+    scenario.addChunk({ npcs });
     return scenario;
 };
 

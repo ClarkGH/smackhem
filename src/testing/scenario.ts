@@ -12,6 +12,7 @@ import NullPromptOverlay from '../platforms/stub/nullPromptOverlay';
 import StubInput from '../platforms/stub/stubInput';
 import type { DisplayCapabilities } from '../services/display';
 import type { PlayerIntent } from '../services/input';
+import { ChunkLoader, type MeshJSON, type NpcJSON } from '../services/chunkLoader';
 
 export { FIXED_DT };
 
@@ -47,6 +48,8 @@ export interface Scenario {
     click: (label: string) => void;
     // Pause -> Debug -> Enter 2D Scene, then one tick so the transition starts. Needs debugSettings.
     enterScene: () => void;
+    // Loads a chunk at grid (x, z) through the real ChunkLoader, as if it came from a file, and adds it to the world
+    addChunk: (content: { meshes?: MeshJSON[]; npcs?: NpcJSON[] }, x?: number, z?: number) => void;
 }
 
 export interface ScenarioOptions {
@@ -113,7 +116,14 @@ export const createScenario = (options: ScenarioOptions = {}): Scenario => {
         tick();
     };
 
+    const addChunk = (content: { meshes?: MeshJSON[]; npcs?: NpcJSON[] }, x = 0, z = 0): void => {
+        const json = JSON.stringify({
+            version: 2, id: World.getChunkID(x, z), meshes: content.meshes ?? [], npcs: content.npcs,
+        });
+        world.addChunk(new ChunkLoader().loadChunkFromJSON(json, x, z, renderer));
+    };
+
     return {
-        input, gameState, gameLoop, eventBus, overlay, speech, prompt, renderer, settings, world, press, tick, frame, click, enterScene,
+        input, gameState, gameLoop, eventBus, overlay, speech, prompt, renderer, settings, world, press, tick, frame, click, enterScene, addChunk,
     };
 };
