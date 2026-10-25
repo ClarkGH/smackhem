@@ -68,7 +68,7 @@ export const checkCollision = (
 export const resolveCollision = (
     playerPos: Vec3,
     movement: Vec3,
-    worldAABBs: AABB[],
+    worldAABBs: readonly AABB[],
     playerHeight: number,
     playerRadius: number,
     context: CollisionContext,

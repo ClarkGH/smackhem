@@ -53,7 +53,7 @@ export default class InteractionSystem {
     // The nearest candidate in reach, and in front when the interactor has a facing.
     // Reach and nearness go by the candidate's edge, so a big one is reachable from where it looks reachable.
     // Generic, so each kind of interactable gets back its own type.
-    private findTarget<T extends Interactable>(candidates: T[], interactor: Interactor): T | null {
+    private findTarget<T extends Interactable>(candidates: readonly T[], interactor: Interactor): T | null {
         const forward = interactor.facing === null ? null : flatForwardInto(interactor.facing, this.forward);
         let nearest: T | null = null;
         let nearestEdge = INTERACT_RANGE;

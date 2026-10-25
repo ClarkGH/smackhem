@@ -35,58 +35,49 @@ export interface Chunk {
 }
 
 export class World {
-    public activeChunks: Map<ChunkID, Chunk> = new Map();
+    private readonly chunks: Map<ChunkID, Chunk> = new Map();
 
-    private _visibleMeshesBuffer: StaticMesh[] = [];
+    // Read-only, so only addChunk and removeChunk change the world and the lists below never go stale
+    public readonly activeChunks: ReadonlyMap<ChunkID, Chunk> = this.chunks;
 
-    private _collidableAABBsBuffer: AABB[] = [];
+    // Built from the chunks whenever one is added or removed, never per tick (M-1, M-2)
+    private readonly visibleMeshes: StaticMesh[] = [];
 
-    private _visibleNpcsBuffer: Npc[] = [];
+    private readonly visibleNpcs: Npc[] = [];
+
+    private readonly boundaryWalls: AABB[] = [];
+
+    private readonly collidableAABBs: AABB[] = [];
 
     public static getChunkID(x: number, z: number): ChunkID {
         return `${x},${z}`;
     }
 
     public addChunk(chunk: Chunk) {
-        this.activeChunks.set(chunk.id, chunk);
+        this.chunks.set(chunk.id, chunk);
+        this.rebuild();
     }
 
     public removeChunk(chunkId: ChunkID) {
-        const chunk = this.activeChunks.get(chunkId);
-        if (!chunk) return;
-
-        this.activeChunks.delete(chunkId);
+        if (!this.chunks.delete(chunkId)) return;
+        this.rebuild();
     }
 
-    public getVisibleMeshes(): StaticMesh[] {
-        this._visibleMeshesBuffer.length = 0;
-
-        this.activeChunks.forEach((chunk) => {
-            this._visibleMeshesBuffer.push(...chunk.meshes);
-        });
-
-        return this._visibleMeshesBuffer;
+    public getVisibleMeshes(): readonly StaticMesh[] {
+        return this.visibleMeshes;
     }
 
-    public getVisibleNpcs(): Npc[] {
-        this._visibleNpcsBuffer.length = 0;
-
-        this.activeChunks.forEach((chunk) => {
-            this._visibleNpcsBuffer.push(...chunk.npcs);
-        });
-
-        return this._visibleNpcsBuffer;
+    public getVisibleNpcs(): readonly Npc[] {
+        return this.visibleNpcs;
     }
 
     // Undefined once its chunk has unloaded
     public findNpc(npcId: string): Npc | undefined {
-        let found: Npc | undefined;
-        this.activeChunks.forEach((chunk) => {
-            for (let i = 0; i < chunk.npcs.length && !found; i += 1) {
-                if (chunk.npcs[i].id === npcId) found = chunk.npcs[i];
-            }
-        });
-        return found;
+        const npcs = this.visibleNpcs;
+        for (let i = 0; i < npcs.length; i += 1) {
+            if (npcs[i].id === npcId) return npcs[i];
+        }
+        return undefined;
     }
 
     // Chunk index along one axis, a plain number so per-frame checks don't allocate (M-1)
@@ -114,26 +105,41 @@ export class World {
         return chunks;
     }
 
+    // Chunk boxes (NPCs included) and the boundary walls
     // TODO: Add other mesh types to the collision system
-    public getCollidableAABBs(): AABB[] {
-        this._collidableAABBsBuffer.length = 0;
-
-        this.activeChunks.forEach((chunk) => {
-            this._collidableAABBsBuffer.push(...chunk.collisionAABBs);
-        });
-
-        const boundaryAABBs = this.getBoundaryWallAABBs();
-        this._collidableAABBsBuffer.push(...boundaryAABBs);
-
-        return this._collidableAABBsBuffer;
+    public getCollidableAABBs(): readonly AABB[] {
+        return this.collidableAABBs;
     }
 
     // Expose wall AABBs
     // TODO: Consider making private for non-debug version
-    public getBoundaryWallAABBs(): AABB[] {
-        const walls: AABB[] = [];
+    public getBoundaryWallAABBs(): readonly AABB[] {
+        return this.boundaryWalls;
+    }
 
-        this.activeChunks.forEach((chunk) => {
+    // Refills every list from the chunks. Runs on chunk add and remove, so its allocations
+    // happen at the allocation boundary (M-2), not per tick. Indexed loops, no spread (M-3).
+    private rebuild(): void {
+        this.visibleMeshes.length = 0;
+        this.visibleNpcs.length = 0;
+        this.collidableAABBs.length = 0;
+
+        this.chunks.forEach((chunk) => {
+            for (let i = 0; i < chunk.meshes.length; i += 1) this.visibleMeshes.push(chunk.meshes[i]);
+            for (let i = 0; i < chunk.npcs.length; i += 1) this.visibleNpcs.push(chunk.npcs[i]);
+            for (let i = 0; i < chunk.collisionAABBs.length; i += 1) this.collidableAABBs.push(chunk.collisionAABBs[i]);
+        });
+
+        // Every chunk's walls, since adding or removing one changes its neighbours' walls too
+        this.rebuildBoundaryWalls();
+        for (let i = 0; i < this.boundaryWalls.length; i += 1) this.collidableAABBs.push(this.boundaryWalls[i]);
+    }
+
+    private rebuildBoundaryWalls(): void {
+        const walls = this.boundaryWalls;
+        walls.length = 0;
+
+        this.chunks.forEach((chunk) => {
             if (!chunk.hasContent) return;
 
             const [chunkX, chunkZ] = chunk.id.split(',').map(Number);
@@ -146,14 +152,12 @@ export class World {
             ];
 
             neighbors.forEach(([nx, nz, side]) => {
-                const neighbor = this.activeChunks.get(World.getChunkID(nx, nz));
+                const neighbor = this.chunks.get(World.getChunkID(nx, nz));
                 if (!(neighbor?.hasContent ?? false)) {
                     walls.push(this.getEdgeWall(chunk, side));
                 }
             });
         });
-
-        return walls;
     }
 
     private getEdgeWall(chunk: Chunk, side: 'north' | 'south' | 'east' | 'west'): AABB {
