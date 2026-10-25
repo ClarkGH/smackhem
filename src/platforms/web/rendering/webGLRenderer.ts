@@ -39,6 +39,43 @@ const LIGHT_CARD_GLSL = `
             }
 `;
 
+// The sky's color in a view direction. Used by the sky pass, and later by fog so distant objects
+// match the sky behind them. Expects u_skyHorizon, u_skyUpper, u_skyZenith, u_skyGlow, u_sunDirection.
+const SKY_COLOR_GLSL = `
+            // Height (view direction y) by which the horizon color has become the upper color
+            const float HORIZON_BAND = 0.25;
+            // Halo: tight around the sun itself, so it rises and sets with the sun
+            const float HALO_POWER = 24.0;
+            // Band: wide warmth along the horizon on the sun's side of the sky (by compass direction)
+            const float BAND_POWER = 3.0;
+            const float BAND_HEIGHT = 0.35;
+            const float BAND_STRENGTH = 0.6;
+
+            vec3 skyColor(vec3 viewDir) {
+                float height = viewDir.y;
+                // Below the horizon stays horizon color (seen past the floor's edge)
+                vec3 low = mix(u_skyHorizon, u_skyUpper, smoothstep(0.0, HORIZON_BAND, height));
+                vec3 color = mix(low, u_skyZenith, smoothstep(HORIZON_BAND, 1.0, height));
+
+                // Glow, in two parts. The sun may be below the horizon (afterglow).
+                vec3 sunDir = normalize(u_sunDirection);
+                float halo = pow(max(dot(viewDir, sunDir), 0.0), HALO_POWER);
+                // The band compares compass directions only, so it hugs the horizon whatever the
+                // sun's height; it fades as the palette's glow color fades after dawn and sunset.
+                // Straight up or down there's no compass direction, so no band.
+                float band = 0.0;
+                if (length(viewDir.xz) > 0.001 && length(sunDir.xz) > 0.001) {
+                    float sameSide = max(dot(normalize(viewDir.xz), normalize(sunDir.xz)), 0.0);
+                    band = pow(sameSide, BAND_POWER) * (1.0 - smoothstep(0.0, BAND_HEIGHT, abs(height)));
+                }
+                float amount = clamp(halo + band * BAND_STRENGTH, 0.0, 1.0);
+
+                // Screen blend: tints toward the glow color but can't pass full brightness,
+                // so no flat white patch. Black glow (day, night) still adds nothing.
+                return color + u_skyGlow * amount * (1.0 - color);
+            }
+`;
+
 // Shared by the mesh and billboard fragment shaders, which declare u_shadowMap and u_shadowStrength
 const SHADOW_SAMPLING_GLSL = `
             const float SHADOW_TEXEL = 1.0 / ${SHADOW_MAP_SIZE}.0;
@@ -138,8 +175,31 @@ export default class WebGLRenderer implements Renderer {
 
     private ambientIntensity: number = 0.3;
 
-    // Copied in by setSky before beginFrame clears to it. Grey until core sets a sky.
-    private readonly skyColor: Vec3 = { x: 160 / 255, y: 160 / 255, z: 160 / 255 };
+    // Copied in by setSky before beginFrame. Starts as the old flat grey, so a core that
+    // never sets a sky looks the same as before.
+    private readonly sky: SkyState = {
+        horizon: { x: 160 / 255, y: 160 / 255, z: 160 / 255 },
+        upper: { x: 160 / 255, y: 160 / 255, z: 160 / 255 },
+        zenith: { x: 160 / 255, y: 160 / 255, z: 160 / 255 },
+        glow: { x: 0, y: 0, z: 0 },
+        sunDirection: { x: 0, y: 1, z: 0 },
+    };
+
+    private skyProgram: WebGLProgram | null = null;
+
+    // Holds no attributes: the sky triangle's corners come from gl_VertexID
+    private skyVAO: WebGLVertexArrayObject | null = null;
+
+    private skyLocs: {
+        viewProj: WebGLUniformLocation | null;
+        horizon: WebGLUniformLocation | null;
+        upper: WebGLUniformLocation | null;
+        zenith: WebGLUniformLocation | null;
+        glow: WebGLUniformLocation | null;
+        sunDirection: WebGLUniformLocation | null;
+    } = {
+            viewProj: null, horizon: null, upper: null, zenith: null, glow: null, sunDirection: null,
+        };
 
     // Copied in by setViewProjection once per frame, shared by every world draw
     private viewProj: Mat4 = identity();
@@ -240,6 +300,7 @@ export default class WebGLRenderer implements Renderer {
         this.initTextureShaders();
         this.createQuadMesh();
         this.initScreenQuadShaders();
+        this.initSkyShaders();
     }
 
     private initShaders(): void {
@@ -884,8 +945,9 @@ ${LIGHT_CARD_GLSL}
     public beginFrame(): void {
         // Update viewport in case canvas was resized
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        // This frame's sky, set by setSky just before (scene mode can override with clear())
-        this.gl.clearColor(this.skyColor.x, this.skyColor.y, this.skyColor.z, 1);
+        // This frame's horizon color, set by setSky just before. The sky pass draws over it;
+        // it shows only if that pass can't run (scene mode can override with clear())
+        this.gl.clearColor(this.sky.horizon.x, this.sky.horizon.y, this.sky.horizon.z, 1);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
         this.drawList.reset();
     }
@@ -1004,6 +1066,9 @@ ${LIGHT_CARD_GLSL}
         gl.bindTexture(gl.TEXTURE_2D, this.shadowTexture);
         gl.activeTexture(gl.TEXTURE0);
 
+        // Behind everything, before the replay draws the world over it
+        this.drawSky();
+
         // Replay in call order: scene_2d clears over its meshes before the screen quad
         const list = this.drawList;
         for (let i = 0; i < list.size(); i += 1) {
@@ -1065,9 +1130,99 @@ ${LIGHT_CARD_GLSL}
     }
 
     public setSky(sky: SkyState): void {
-        this.skyColor.x = sky.horizon.x;
-        this.skyColor.y = sky.horizon.y;
-        this.skyColor.z = sky.horizon.z;
+        (['horizon', 'upper', 'zenith', 'glow', 'sunDirection'] as const).forEach((field) => {
+            this.sky[field].x = sky[field].x;
+            this.sky[field].y = sky[field].y;
+            this.sky[field].z = sky[field].z;
+        });
+    }
+
+    private initSkyShaders(): void {
+        const { gl } = this;
+
+        // One triangle bigger than the screen, corners from gl_VertexID: (-1,-1), (3,-1), (-1,3).
+        // Each corner's ray is un-projected at the near and far planes; dividing in the fragment
+        // shader keeps every pixel's view direction exact for any field of view.
+        const vertexShaderSource = `#version 300 es
+            uniform mat4 u_viewProj;
+
+            out vec4 v_near;
+            out vec4 v_far;
+
+            void main() {
+                vec2 corner = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)) * 2.0 - 1.0;
+                mat4 toWorld = inverse(u_viewProj);
+                v_near = toWorld * vec4(corner, -1.0, 1.0);
+                v_far = toWorld * vec4(corner, 1.0, 1.0);
+                gl_Position = vec4(corner, 0.0, 1.0);
+            }
+        `;
+
+        const fragmentShaderSource = `#version 300 es
+            precision highp float;
+
+            uniform vec3 u_skyHorizon;
+            uniform vec3 u_skyUpper;
+            uniform vec3 u_skyZenith;
+            uniform vec3 u_skyGlow;
+            uniform vec3 u_sunDirection;
+
+            in vec4 v_near;
+            in vec4 v_far;
+
+            out vec4 fragColor;
+${SKY_COLOR_GLSL}
+            void main() {
+                vec3 viewDir = normalize(v_far.xyz / v_far.w - v_near.xyz / v_near.w);
+                fragColor = vec4(skyColor(viewDir), 1.0);
+            }
+        `;
+
+        const vertexShader = this.compileShader(gl.VERTEX_SHADER, vertexShaderSource);
+        const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+        if (!vertexShader || !fragmentShader) {
+            throw new Error('Failed to compile sky shaders');
+        }
+        const program = this.createProgram(vertexShader, fragmentShader);
+        if (!program) {
+            throw new Error('Failed to create sky shader program');
+        }
+        this.skyProgram = program;
+        this.skyLocs = {
+            viewProj: gl.getUniformLocation(program, 'u_viewProj'),
+            horizon: gl.getUniformLocation(program, 'u_skyHorizon'),
+            upper: gl.getUniformLocation(program, 'u_skyUpper'),
+            zenith: gl.getUniformLocation(program, 'u_skyZenith'),
+            glow: gl.getUniformLocation(program, 'u_skyGlow'),
+            sunDirection: gl.getUniformLocation(program, 'u_sunDirection'),
+        };
+        this.skyVAO = gl.createVertexArray();
+    }
+
+    // The gradient and glow behind the world. No depth test or write, so everything draws over it.
+    private drawSky(): void {
+        const { gl } = this;
+        const program = this.skyProgram;
+        if (!program || !this.skyVAO) return;
+        const locs = this.skyLocs;
+        const { sky } = this;
+
+        gl.useProgram(program);
+        gl.bindVertexArray(this.skyVAO);
+        gl.uniformMatrix4fv(locs.viewProj, false, this.viewProj.elements);
+        gl.uniform3f(locs.horizon, sky.horizon.x, sky.horizon.y, sky.horizon.z);
+        gl.uniform3f(locs.upper, sky.upper.x, sky.upper.y, sky.upper.z);
+        gl.uniform3f(locs.zenith, sky.zenith.x, sky.zenith.y, sky.zenith.z);
+        gl.uniform3f(locs.glow, sky.glow.x, sky.glow.y, sky.glow.z);
+        gl.uniform3f(locs.sunDirection, sky.sunDirection.x, sky.sunDirection.y, sky.sunDirection.z);
+
+        gl.disable(gl.DEPTH_TEST);
+        gl.depthMask(false);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.depthMask(true);
+        gl.enable(gl.DEPTH_TEST);
+
+        gl.bindVertexArray(null);
     }
 
     public setViewProjection(viewProj: Mat4): void {

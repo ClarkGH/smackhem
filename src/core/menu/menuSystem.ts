@@ -13,7 +13,7 @@ import {
     WINDOW_RESOLUTION_PRESETS,
     type Settings,
 } from '../settings/settings';
-import { SHADOW_BIAS_SCALES, type DebugSettings } from '../settings/debugSettings';
+import { QUARTERS_PER_DAY, SHADOW_BIAS_SCALES, type DebugSettings } from '../settings/debugSettings';
 import type { AudioCategory } from '../../services/audio';
 import type { DisplayCapabilities } from '../../services/display';
 import type { PlayerIntent } from '../../services/input';
@@ -150,8 +150,6 @@ const buildScreens = (capabilities: DisplayCapabilities, hasDebug: boolean): Rec
         ],
     },
 });
-
-const TIME_OF_DAY_HOURS = 24;
 
 const firstEnabled = (items: MenuItem[]): number => {
     for (let i = 0; i < items.length; i += 1) {
@@ -427,12 +425,12 @@ export class MenuSystem {
             if (next === debug.shadowBiasScale) return;
             debug.shadowBiasScale = next;
         } else {
-            // null (live) first, then 00:00..23:00
-            const current = debug.timeOfDayHour;
+            // null (live) first, then 00:00..23:45 in quarter hours
+            const current = debug.timeOfDayQuarter;
             const index = current === null ? 0 : current + 1;
-            const nextIndex = clamp(index + step, 0, TIME_OF_DAY_HOURS);
+            const nextIndex = clamp(index + step, 0, QUARTERS_PER_DAY);
             if (nextIndex === index) return;
-            debug.timeOfDayHour = nextIndex === 0 ? null : nextIndex - 1;
+            debug.timeOfDayQuarter = nextIndex === 0 ? null : nextIndex - 1;
         }
         this.markChanged();
     }
@@ -458,8 +456,11 @@ export class MenuSystem {
             case 'shadowBias':
                 return `x${this.debug?.shadowBiasScale ?? 1}`;
             case 'timeOfDay': {
-                const hour = this.debug?.timeOfDayHour ?? null;
-                return hour === null ? 'Live' : `${hour.toString().padStart(2, '0')}:00`;
+                const quarter = this.debug?.timeOfDayQuarter ?? null;
+                if (quarter === null) return 'Live';
+                const hours = Math.floor(quarter / 4).toString().padStart(2, '0');
+                const minutes = ((quarter % 4) * 15).toString().padStart(2, '0');
+                return `${hours}:${minutes}`;
             }
             default:
                 return '';

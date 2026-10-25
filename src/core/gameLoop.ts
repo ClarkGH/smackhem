@@ -29,7 +29,7 @@ import { createGameState, GameState } from './gameState';
 import Instance3DSystem from './instance';
 import MenuSystem from './menu/menuSystem';
 import { createDefaultSettings, type Settings } from './settings/settings';
-import type { DebugSettings } from './settings/debugSettings';
+import { QUARTERS_PER_DAY, type DebugSettings } from './settings/debugSettings';
 import EnvironmentSystem from './lighting/environment';
 import RenderSystem from './lighting/renderSystem';
 
@@ -401,8 +401,14 @@ export class GameLoop {
     public render(): void {
         const renderCamera = this.getRenderCamera();
         const debug = this.debugSettings;
-        const hour = debug ? debug.timeOfDayHour : null;
-        this.environmentSystem.update(this.gameState, renderCamera.position, 1.0, 1.0, hour === null ? null : hour / 24);
+        const quarter = debug ? debug.timeOfDayQuarter : null;
+        this.environmentSystem.update(
+            this.gameState,
+            renderCamera.position,
+            1.0,
+            1.0,
+            quarter === null ? null : quarter / QUARTERS_PER_DAY,
+        );
         if (debug) {
             this.renderer.setWireframe(debug.wireframe);
             this.renderer.setShadowBias?.(debug.shadowBiasScale);

@@ -24,6 +24,11 @@ describe('debug menu - scenario (stub platform)', () => {
         scenario.press({ menuPointer: { index, clicked: false, step: direction } });
     };
 
+    // Steps Time of Day from Live to an exact time. Live -> 00:00 is one step, then one per quarter hour.
+    const setTime = (hours: number): void => {
+        for (let i = 0; i < hours * 4 + 1; i += 1) step('Time of Day', 1);
+    };
+
     const valueOf = (label: string): string | undefined => {
         const index = labels(scenario).indexOf(label);
         return scenario.overlay.lastView?.items[index].value;
@@ -72,7 +77,7 @@ describe('debug menu - scenario (stub platform)', () => {
         expect(scenario.renderer.getWireframeEnabled()).toBe(false);
     });
 
-    it('overrides the time of day by the hour, without moving simulation time', () => {
+    it('overrides the time of day by the quarter hour, without moving simulation time', () => {
         const { gameState, gameLoop } = scenario;
         const simulationTime = gameState.interpolated.simulationTime;
         scenario.click('Debug');
@@ -82,7 +87,12 @@ describe('debug menu - scenario (stub platform)', () => {
         expect(valueOf('Time of Day')).toBe('00:00');
         expect(gameLoop.getTimeOfDay()).toBe(0);
 
-        for (let i = 0; i < 12; i += 1) step('Time of Day', 1);
+        step('Time of Day', 1);
+        expect(valueOf('Time of Day')).toBe('00:15');
+        expect(gameLoop.getTimeOfDay()).toBe(1 / 96);
+
+        // 00:15 -> 12:00 is 47 more quarter hours
+        for (let i = 0; i < 47; i += 1) step('Time of Day', 1);
         expect(valueOf('Time of Day')).toBe('12:00');
         expect(gameLoop.getTimeOfDay()).toBe(0.5);
         expect(gameState.interpolated.simulationTime).toBe(simulationTime);
@@ -91,7 +101,7 @@ describe('debug menu - scenario (stub platform)', () => {
 
     it('casts noon shadows from the camera, and Shadows Off sends zero strength', () => {
         scenario.click('Debug');
-        for (let i = 0; i < 13; i += 1) step('Time of Day', 1);
+        setTime(12);
         expect(valueOf('Time of Day')).toBe('12:00');
 
         const caster = scenario.renderer.getShadowCaster();
@@ -124,10 +134,10 @@ describe('debug menu - scenario (stub platform)', () => {
 
     it('sends the palette\'s sky colors and the sun\'s direction for the overridden hour, before beginFrame', () => {
         scenario.click('Debug');
-        // Live -> 00:00 is one step, then one step per hour
+        // Live -> 00:00 is one step, then four per hour
         let stepsTaken = 0;
         [0, 6, 12, 18].forEach((hour) => {
-            for (; stepsTaken < hour + 1; stepsTaken += 1) step('Time of Day', 1);
+            for (; stepsTaken < hour * 4 + 1; stepsTaken += 1) step('Time of Day', 1);
             const sky = scenario.renderer.getSky();
             const expected = {
                 horizon: { x: 0, y: 0, z: 0 },
@@ -153,13 +163,20 @@ describe('debug menu - scenario (stub platform)', () => {
         });
     });
 
-    it('stops at 23:00 and steps back to Live', () => {
+    it('stops at 23:45 and steps back to Live', () => {
         scenario.click('Debug');
-        for (let i = 0; i < 30; i += 1) step('Time of Day', 1);
-        expect(valueOf('Time of Day')).toBe('23:00');
+        for (let i = 0; i < 110; i += 1) step('Time of Day', 1);
+        expect(valueOf('Time of Day')).toBe('23:45');
 
-        for (let i = 0; i < 30; i += 1) step('Time of Day', -1);
+        for (let i = 0; i < 110; i += 1) step('Time of Day', -1);
         expect(valueOf('Time of Day')).toBe('Live');
-        expect(debug.timeOfDayHour).toBeNull();
+        expect(debug.timeOfDayQuarter).toBeNull();
+    });
+
+    it('shows quarter hours, e.g. 06:30 for sunrise tuning', () => {
+        scenario.click('Debug');
+        setTime(6.5);
+        expect(valueOf('Time of Day')).toBe('06:30');
+        expect(scenario.gameLoop.getTimeOfDay()).toBe(6.5 / 24);
     });
 });
