@@ -183,6 +183,7 @@ export default class WebGLRenderer implements Renderer {
         zenith: { x: 160 / 255, y: 160 / 255, z: 160 / 255 },
         glow: { x: 0, y: 0, z: 0 },
         sunDirection: { x: 0, y: 1, z: 0 },
+        stars: 0,
     };
 
     private skyProgram: WebGLProgram | null = null;
@@ -197,8 +198,9 @@ export default class WebGLRenderer implements Renderer {
         zenith: WebGLUniformLocation | null;
         glow: WebGLUniformLocation | null;
         sunDirection: WebGLUniformLocation | null;
+        stars: WebGLUniformLocation | null;
     } = {
-            viewProj: null, horizon: null, upper: null, zenith: null, glow: null, sunDirection: null,
+            viewProj: null, horizon: null, upper: null, zenith: null, glow: null, sunDirection: null, stars: null,
         };
 
     // Copied in by setViewProjection once per frame, shared by every world draw
@@ -1135,6 +1137,7 @@ ${LIGHT_CARD_GLSL}
             this.sky[field].y = sky[field].y;
             this.sky[field].z = sky[field].z;
         });
+        this.sky.stars = sky.stars;
     }
 
     private initSkyShaders(): void {
@@ -1166,15 +1169,101 @@ ${LIGHT_CARD_GLSL}
             uniform vec3 u_skyZenith;
             uniform vec3 u_skyGlow;
             uniform vec3 u_sunDirection;
+            uniform float u_skyStars;
 
             in vec4 v_near;
             in vec4 v_far;
 
             out vec4 fragColor;
 ${SKY_COLOR_GLSL}
+            // Stars, deterministic and stateless: docs/rendering.md "Stars" writes the hash out
+            // exactly, so a native shader produces the same sky.
+            // Cells per cube face, side to side. Big enough cells that a star never reaches its
+            // cell's edge, even where cells are squeezed near the cube's edges or at low resolution.
+            const float STAR_GRID = 32.0;
+            // Share of cells holding a star: 0.24 of 6 x 32 x 32 is about 1500 over the whole sky,
+            // about 700 above the horizon
+            const float STAR_DENSITY = 0.24;
+            // Height over which stars thin out toward the horizon
+            const float STAR_HORIZON_FADE = 0.15;
+            // How far past its threshold the palette's stars value must go for a star to be fully in
+            const float STAR_FADE_RANGE = 0.15;
+
+            uint starHash(uint face, uint x, uint y) {
+                uint h = (face * 0x9E3779B9u) ^ (x * 0x85EBCA6Bu) ^ (y * 0xC2B2AE35u);
+                h ^= h >> 16u;
+                h *= 0x7FEB352Du;
+                h ^= h >> 15u;
+                h *= 0x846CA68Bu;
+                h ^= h >> 16u;
+                return h;
+            }
+
+            // Top 24 bits as 0..1
+            float starUnit(uint h) {
+                return float(h >> 8u) / 16777216.0;
+            }
+
+            // pixelAngle: how much the view direction changes per screen pixel
+            float starLight(vec3 viewDir, float pixelAngle) {
+                if (u_skyStars <= 0.0 || viewDir.y <= 0.0) return 0.0;
+
+                // Cube face by the largest axis; the other two over it give face coordinates in -1..1.
+                // A cube grid keeps cells nearly even; latitude/longitude would bunch them overhead.
+                vec3 a = abs(viewDir);
+                uint face;
+                vec2 faceUV;
+                float major;
+                if (a.x >= a.y && a.x >= a.z) {
+                    face = viewDir.x > 0.0 ? 0u : 1u; faceUV = viewDir.yz; major = viewDir.x;
+                } else if (a.y >= a.z) {
+                    face = viewDir.y > 0.0 ? 2u : 3u; faceUV = viewDir.xz; major = viewDir.y;
+                } else {
+                    face = viewDir.z > 0.0 ? 4u : 5u; faceUV = viewDir.xy; major = viewDir.z;
+                }
+                vec2 grid = (faceUV / abs(major) * 0.5 + 0.5) * STAR_GRID;
+                vec2 cell = floor(grid);
+
+                uint h = starHash(face, uint(cell.x), uint(cell.y));
+                if (starUnit(h) >= STAR_DENSITY) return 0.0;
+
+                // Further values from the same hash: position (kept off the cell's edges) and brightness
+                uint h2 = h * 0x27D4EB2Du;
+                uint h3 = h2 * 0x165667B1u;
+                uint h4 = h3 * 0x9E3779B9u;
+                vec2 center = cell + 0.2 + 0.6 * vec2(starUnit(h2), starUnit(h3));
+                float b = starUnit(h4);
+                // Squared: many faint stars, few bright ones
+                float brightness = b * b;
+
+                // Speckle-in: brighter stars have lower thresholds, so they come out first at dusk
+                // and leave last at dawn; the faintest are fully in exactly at full night
+                float threshold = (1.0 - brightness) * (1.0 - STAR_FADE_RANGE);
+                float show = smoothstep(threshold, threshold + STAR_FADE_RANGE, u_skyStars);
+
+                // The star's own direction, rebuilt from its face position. Its round shape is
+                // measured against the view direction, not on the face: a face seen at an angle
+                // would squash a face-space circle into a dash on screen.
+                vec2 starUV = center / STAR_GRID * 2.0 - 1.0;
+                float side = sign(major);
+                vec3 starDir = face < 2u ? vec3(side, starUV.x, starUV.y)
+                    : (face < 4u ? vec3(starUV.x, side, starUV.y) : vec3(starUV.x, starUV.y, side));
+                starDir = normalize(starDir);
+
+                // Three sizes, by brightness, in screen pixels (radius)
+                float radiusPixels = brightness > 0.6 ? 1.5 : (brightness > 0.25 ? 1.0 : 0.75);
+                float radius = radiusPixels * pixelAngle;
+                float spot = 1.0 - smoothstep(radius * 0.5, radius, length(viewDir - starDir));
+
+                return spot * brightness * show * smoothstep(0.0, STAR_HORIZON_FADE, viewDir.y);
+            }
+
             void main() {
                 vec3 viewDir = normalize(v_far.xyz / v_far.w - v_near.xyz / v_near.w);
-                fragColor = vec4(skyColor(viewDir), 1.0);
+                // Before any branch: derivatives need neighbouring pixels on the same path. From the
+                // view direction, which is smooth everywhere; face coordinates jump where faces meet.
+                float pixelAngle = length(fwidth(viewDir));
+                fragColor = vec4(skyColor(viewDir) + vec3(starLight(viewDir, pixelAngle)), 1.0);
             }
         `;
 
@@ -1195,6 +1284,7 @@ ${SKY_COLOR_GLSL}
             zenith: gl.getUniformLocation(program, 'u_skyZenith'),
             glow: gl.getUniformLocation(program, 'u_skyGlow'),
             sunDirection: gl.getUniformLocation(program, 'u_sunDirection'),
+            stars: gl.getUniformLocation(program, 'u_skyStars'),
         };
         this.skyVAO = gl.createVertexArray();
     }
@@ -1215,6 +1305,7 @@ ${SKY_COLOR_GLSL}
         gl.uniform3f(locs.zenith, sky.zenith.x, sky.zenith.y, sky.zenith.z);
         gl.uniform3f(locs.glow, sky.glow.x, sky.glow.y, sky.glow.z);
         gl.uniform3f(locs.sunDirection, sky.sunDirection.x, sky.sunDirection.y, sky.sunDirection.z);
+        gl.uniform1f(locs.stars, sky.stars);
 
         gl.disable(gl.DEPTH_TEST);
         gl.depthMask(false);

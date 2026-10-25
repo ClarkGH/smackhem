@@ -13,14 +13,15 @@ const colorsAt = (timeOfDay: number): SkyColors => {
         upper: { x: 0, y: 0, z: 0 },
         zenith: { x: 0, y: 0, z: 0 },
         glow: { x: 0, y: 0, z: 0 },
+        stars: 0,
     };
     skyColorsAt(timeOfDay, out);
     return out;
 };
 
-// Just the four colors of a key, for comparing against skyColorsAt
+// Just the sky values of a key (no name or time), for comparing against skyColorsAt
 const colorsOf = (k: SkyColors): SkyColors => ({
-    horizon: k.horizon, upper: k.upper, zenith: k.zenith, glow: k.glow,
+    horizon: k.horizon, upper: k.upper, zenith: k.zenith, glow: k.glow, stars: k.stars,
 });
 
 // Expected colors always come from the key table, so tuning a color never touches this spec
@@ -95,6 +96,19 @@ describe('skyColorsAt', () => {
                 expect(between[channel][rgb]).toBeLessThan(high);
             });
         });
+        expect(between.stars).toBeGreaterThan(Math.min(night.stars, dawn.stars));
+        expect(between.stars).toBeLessThan(Math.max(night.stars, dawn.stars));
+    });
+
+    it('shows stars through the whole night and none through the day', () => {
+        [20, 23 + 59 / 60, 0, 3, 5].forEach((h) => {
+            expect(colorsAt(hours(h)).stars).toBe(key('nightStart').stars);
+        });
+        [7.5, 12, 16.5].forEach((h) => {
+            expect(colorsAt(hours(h)).stars).toBe(key('morning').stars);
+        });
+        expect(key('nightStart').stars).toBe(1);
+        expect(key('morning').stars).toBe(0);
     });
 
     it('holds the day colors from morning to afternoon', () => {
@@ -120,6 +134,7 @@ describe('skyColorsAt', () => {
                     Math.abs(colors[channel].z - previous[channel].z),
                 );
             }
+            biggestJump = Math.max(biggestJump, Math.abs(colors.stars - previous.stars));
             previous = colors;
         }
         expect(biggestJump).toBeLessThan(0.02);

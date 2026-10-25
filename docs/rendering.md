@@ -361,6 +361,26 @@ The sky is **sky state**, not lighting (R-3): core works out what it should be, 
 - **`skyColor(viewDir)`** (`SKY_COLOR_GLSL`, shared so fog can reuse it): horizon → upper by `HORIZON_BAND` (view height 0.25), upper → zenith above that, horizon color below the horizon. The glow has two parts: a **halo** centered on the sun (`HALO_POWER`), so it rises and sets with it, and a wide **band** along the horizon on the sun's compass side (`BAND_POWER`, `BAND_HEIGHT`, `BAND_STRENGTH`). It's **screen**-blended (`color + glow × amount × (1 − color)`), so it tints toward the glow color without clipping to white, and black glow still adds nothing. (A first version weighted the whole glow toward the horizon: since the sun rises straight up, the bright spot stayed pinned to the horizon as the sun climbed, and adding it clipped to a flat white patch.)
 - `beginFrame` still clears to `horizon` as a fallback.
 
+### Stars
+
+Drawn in the sky pass's `main`, **not** in `skyColor()`, so fog (which will reuse `skyColor()`) never gets stars. Deterministic and stateless: no textures, no time input, so the same view direction always shows the same star on every machine. To reproduce the field on another backend, match this exactly:
+
+1. **Face:** the view direction's largest absolute axis picks one of 6 faces: +x 0, −x 1, +y 2, −y 3, +z 4, −z 5. Face coordinates are the other two components divided by that axis's absolute value (x faces: `(y, z)`, y faces: `(x, z)`, z faces: `(x, y)`), giving −1..1.
+2. **Cell:** `grid = (faceUV * 0.5 + 0.5) * 32`, `cell = floor(grid)`.
+3. **Hash** (32-bit unsigned, wrapping multiplication):
+   ```
+   h = (face * 0x9E3779B9) ^ (cellX * 0x85EBCA6B) ^ (cellY * 0xC2B2AE35)
+   h ^= h >> 16; h *= 0x7FEB352D; h ^= h >> 15; h *= 0x846CA68B; h ^= h >> 16
+   unit(v) = (v >> 8) / 16777216        // top 24 bits as 0..1
+   h2 = h * 0x27D4EB2D; h3 = h2 * 0x165667B1; h4 = h3 * 0x9E3779B9
+   ```
+4. **A star** exists if `unit(h) < 0.24`. Its center in the cell is `cell + 0.2 + 0.6 * (unit(h2), unit(h3))`, and its brightness is `unit(h4)²`, so most are faint.
+5. **Shape:** the center is turned back into a 3D direction, and the star is a soft dot measured as `length(viewDir − starDir)` against its radius in pixels (`fwidth(viewDir)`), so it's round on screen whatever face it's on. Radius by brightness: 1.5 px above 0.6, 1 px above 0.25, else 0.75 px.
+6. **Speckle-in:** a star shows once the palette's `stars` value passes `(1 − brightness) × 0.85`, fading in over 0.15. Bright stars come out first at dusk and leave last at dawn; the faintest are fully in exactly at full night (`stars` = 1).
+7. **Horizon:** stars thin out over the lowest 0.15 of view height and never appear below the horizon.
+
+Tunable in the shader: `STAR_GRID` 32, `STAR_DENSITY` 0.24 (about 700 above the horizon), `STAR_HORIZON_FADE`, `STAR_FADE_RANGE`. (A first version measured the dots in face coordinates: faces seen at an angle squashed them into dashes, so they're measured in view-direction space.)
+
 - **Palette** (`core/lighting/skyPalette.ts`): `SKY_KEYS` is a circular table of art-directed colors by time of day, four per key. `skyColorsAt` blends all four with the same segment and blend, so they move together. Night holds from 20:00 to 05:00, dawn is at 06:00, day holds from 07:30 to 16:30, then sunset at 18:00 and dusk at 19:00. `skyColorAt` smoothsteps from the last key at or before the time to the next, measuring forward across midnight. A hold is two neighbouring keys with the same color. Dawn and sunset sit where the sun crosses the horizon, which the spec checks against `EnvironmentSystem`.
 - **To the renderer**: `RenderSystem` fills a `SkyState` (palette colors, plus the sun's direction: always the sun, even below the horizon, never the shadow caster, which switches to the moon at night) and calls `setSky` **before** `beginFrame`, every frame and in every mode. `beginFrame` then clears to it, so the color always belongs to the current frame. In `scene_2d` the scene's own `clear()` draws over it.
 - **Tuning**: edit the hex values in `SKY_KEYS`, then check them with the Debug screen's Time of Day. The spec reads expected colors from the table, so color changes never touch a test.

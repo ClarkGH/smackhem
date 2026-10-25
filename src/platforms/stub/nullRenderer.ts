@@ -42,6 +42,7 @@ export default class NullRenderer implements Renderer {
         zenith: { x: 0, y: 0, z: 0 },
         glow: { x: 0, y: 0, z: 0 },
         sunDirection: { x: 0, y: 0, z: 0 },
+        stars: 0,
     };
 
     // Whether setSky came between the last endFrame and this beginFrame, for the ordering contract.
@@ -60,6 +61,7 @@ export default class NullRenderer implements Renderer {
         (['horizon', 'upper', 'zenith', 'glow', 'sunDirection'] as const).forEach((field) => {
             this.sky[field].x = _sky[field].x; this.sky[field].y = _sky[field].y; this.sky[field].z = _sky[field].z;
         });
+        this.sky.stars = _sky.stars;
         this.skySetBetweenFrames = true;
     }
 
@@ -70,6 +72,7 @@ export default class NullRenderer implements Renderer {
             zenith: { ...this.sky.zenith },
             glow: { ...this.sky.glow },
             sunDirection: { ...this.sky.sunDirection },
+            stars: this.sky.stars,
         };
     }
 

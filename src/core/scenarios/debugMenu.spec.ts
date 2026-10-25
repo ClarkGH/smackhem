@@ -144,11 +144,14 @@ describe('debug menu - scenario (stub platform)', () => {
                 upper: { x: 0, y: 0, z: 0 },
                 zenith: { x: 0, y: 0, z: 0 },
                 glow: { x: 0, y: 0, z: 0 },
+                stars: 0,
             };
             skyColorsAt(hour / 24, expected);
             expect({
-                horizon: sky.horizon, upper: sky.upper, zenith: sky.zenith, glow: sky.glow,
+                horizon: sky.horizon, upper: sky.upper, zenith: sky.zenith, glow: sky.glow, stars: sky.stars,
             }).toEqual(expected);
+            if (hour === 0) expect(sky.stars).toBe(1);
+            if (hour === 12) expect(sky.stars).toBe(0);
 
             // The sun's own direction, whatever the hour
             const environment = new EnvironmentSystem(100);

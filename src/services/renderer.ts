@@ -17,6 +17,7 @@ export interface SkyState {
     glow: Vec3;
     sunDirection: Vec3;
     zenith: Vec3;
+    stars: number;
 }
 
 export interface Renderer {

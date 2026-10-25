@@ -34,6 +34,7 @@ export default class RenderSystem {
         zenith: { x: 0, y: 0, z: 0 },
         glow: { x: 0, y: 0, z: 0 },
         sunDirection: { x: 0, y: 1, z: 0 },
+        stars: 0,
     };
 
     constructor(
