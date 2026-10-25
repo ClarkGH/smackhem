@@ -289,7 +289,10 @@ export class GameLoop {
 
         // TODO: Revisit if this needs to be at the top still
         if (discreteState.gameMode === 'world_3d') {
-            this.camera.position = { ...interpolatedState.cameraPosition };
+            // Copied in place, this runs every world tick (M-1)
+            this.camera.position.x = interpolatedState.cameraPosition.x;
+            this.camera.position.y = interpolatedState.cameraPosition.y;
+            this.camera.position.z = interpolatedState.cameraPosition.z;
             this.camera.yaw = interpolatedState.cameraYaw;
             this.camera.pitch = interpolatedState.cameraPitch;
         }
@@ -349,7 +352,9 @@ export class GameLoop {
             this.camera.position.z += resolvedMovement.z;
             this.camera.position.y = PLAYER_HEIGHT;
 
-            interpolatedState.cameraPosition = { ...this.camera.position };
+            interpolatedState.cameraPosition.x = this.camera.position.x;
+            interpolatedState.cameraPosition.y = this.camera.position.y;
+            interpolatedState.cameraPosition.z = this.camera.position.z;
         }
 
         // Copied, camera.position is replaced rather than mutated by some systems
