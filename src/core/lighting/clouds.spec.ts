@@ -1,11 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
-    CLOUD_CYCLE_SECONDS, CLOUD_NOISE_PERIOD, CLOUD_OCTAVE_LAPS, cloudTimeAt,
+    CLOUD_CYCLE_SECONDS, CLOUD_HIGH_OCTAVE_LAPS, CLOUD_NOISE_PERIOD, CLOUD_OCTAVE_LAPS, cloudTimeAt,
 } from './clouds';
 
+// Both layers' tables: every rule below applies to each
+const LAYERS = [['low', CLOUD_OCTAVE_LAPS], ['high', CLOUD_HIGH_OCTAVE_LAPS]] as const;
+
 // What the sky shader does with it: each octave's offset, in noise cells
-const octaveOffset = (cloudTime: number, octave: number): [number, number] => {
-    const [lapsX, lapsZ] = CLOUD_OCTAVE_LAPS[octave];
+const octaveOffset = (
+    laps: readonly (readonly [number, number])[],
+    cloudTime: number,
+    octave: number,
+): [number, number] => {
+    const [lapsX, lapsZ] = laps[octave];
     const phase = cloudTime / CLOUD_CYCLE_SECONDS;
     return [lapsX * CLOUD_NOISE_PERIOD * phase, lapsZ * CLOUD_NOISE_PERIOD * phase];
 };
@@ -31,22 +38,26 @@ describe('cloudTimeAt', () => {
         expect(late).toBeLessThan(CLOUD_CYCLE_SECONDS);
     });
 
-    it('moves every octave a whole number of noise periods per cycle', () => {
-        CLOUD_OCTAVE_LAPS.forEach(([x, z]) => {
-            expect(Number.isInteger(x)).toBe(true);
-            expect(Number.isInteger(z)).toBe(true);
+    it('moves every octave of both layers a whole number of noise periods per cycle', () => {
+        LAYERS.forEach(([, laps]) => {
+            laps.forEach(([x, z]) => {
+                expect(Number.isInteger(x)).toBe(true);
+                expect(Number.isInteger(z)).toBe(true);
+            });
         });
     });
 
     it('has no jump at the wrap: just before it, every octave is where it is just after', () => {
         const justBefore = CLOUD_CYCLE_SECONDS - 0.001;
         const justAfter = cloudTimeAt(CLOUD_CYCLE_SECONDS + 0.001);
-        CLOUD_OCTAVE_LAPS.forEach((_, octave) => {
-            const [bx, bz] = octaveOffset(justBefore, octave);
-            const [ax, az] = octaveOffset(justAfter, octave);
-            // Within a hair: the two moments are only 0.002 s apart
-            expect(apartOnPeriod(bx, ax)).toBeLessThan(0.01);
-            expect(apartOnPeriod(bz, az)).toBeLessThan(0.01);
+        LAYERS.forEach(([, laps]) => {
+            laps.forEach((_, octave) => {
+                const [bx, bz] = octaveOffset(laps, justBefore, octave);
+                const [ax, az] = octaveOffset(laps, justAfter, octave);
+                // Within a hair: the two moments are only 0.002 s apart
+                expect(apartOnPeriod(bx, ax)).toBeLessThan(0.01);
+                expect(apartOnPeriod(bz, az)).toBeLessThan(0.01);
+            });
         });
     });
 });

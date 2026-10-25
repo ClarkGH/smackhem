@@ -22,6 +22,9 @@ const colorsOf = (k: TimeOfDayPalette): TimeOfDayPalette => ({
     sunLight: k.sunLight,
     moonLight: k.moonLight,
     sunDisc: k.sunDisc,
+    cloudLight: k.cloudLight,
+    cloudMid: k.cloudMid,
+    cloudShadow: k.cloudShadow,
     ambient: k.ambient,
     stars: k.stars,
 });

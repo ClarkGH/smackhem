@@ -34,6 +34,9 @@ export default class RenderSystem {
         glow: { x: 0, y: 0, z: 0 },
         sunDirection: { x: 0, y: 1, z: 0 },
         stars: 0,
+        cloudLight: { x: 0, y: 0, z: 0 },
+        cloudMid: { x: 0, y: 0, z: 0 },
+        cloudShadow: { x: 0, y: 0, z: 0 },
         cloudTime: 0,
         moonDirection: { x: 0, y: -1, z: 0 },
         sunDisc: { x: 0, y: 0, z: 0 },
@@ -116,7 +119,7 @@ export default class RenderSystem {
         // Before beginFrame, which clears to this frame's sky. Every mode, so the renderer
         // never holds a stale sky (scene_2d's own clear covers it).
         const { palette } = this.environmentSystem;
-        (['horizon', 'upper', 'zenith', 'glow'] as const).forEach((field) => {
+        (['horizon', 'upper', 'zenith', 'glow', 'cloudLight', 'cloudMid', 'cloudShadow'] as const).forEach((field) => {
             this.sky[field].x = palette[field].x; this.sky[field].y = palette[field].y; this.sky[field].z = palette[field].z;
         });
         this.sky.stars = palette.stars;

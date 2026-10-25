@@ -43,6 +43,9 @@ export default class NullRenderer implements Renderer {
         glow: { x: 0, y: 0, z: 0 },
         sunDirection: { x: 0, y: 0, z: 0 },
         stars: 0,
+        cloudLight: { x: 0, y: 0, z: 0 },
+        cloudMid: { x: 0, y: 0, z: 0 },
+        cloudShadow: { x: 0, y: 0, z: 0 },
         cloudTime: 0,
         moonDirection: { x: 0, y: 0, z: 0 },
         sunDisc: { x: 0, y: 0, z: 0 },
@@ -64,7 +67,7 @@ export default class NullRenderer implements Renderer {
     }
 
     public setSky(_sky: SkyState): void {
-        (['horizon', 'upper', 'zenith', 'glow', 'sunDirection', 'moonDirection', 'sunDisc', 'moonDisc'] as const).forEach((field) => {
+        (['horizon', 'upper', 'zenith', 'glow', 'sunDirection', 'moonDirection', 'sunDisc', 'moonDisc', 'cloudLight', 'cloudMid', 'cloudShadow'] as const).forEach((field) => {
             this.sky[field].x = _sky[field].x; this.sky[field].y = _sky[field].y; this.sky[field].z = _sky[field].z;
         });
         this.sky.stars = _sky.stars;
@@ -82,6 +85,9 @@ export default class NullRenderer implements Renderer {
             glow: { ...this.sky.glow },
             sunDirection: { ...this.sky.sunDirection },
             stars: this.sky.stars,
+            cloudLight: { ...this.sky.cloudLight },
+            cloudMid: { ...this.sky.cloudMid },
+            cloudShadow: { ...this.sky.cloudShadow },
             cloudTime: this.sky.cloudTime,
             moonDirection: { ...this.sky.moonDirection },
             sunDisc: { ...this.sky.sunDisc },

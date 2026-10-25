@@ -142,10 +142,8 @@ describe('debug menu - scenario (stub platform)', () => {
             const sky = scenario.renderer.getSky();
             const expected = createPalette();
             paletteAt(hour / 24, expected);
-            expect({
-                horizon: sky.horizon, upper: sky.upper, zenith: sky.zenith, glow: sky.glow, stars: sky.stars,
-            }).toEqual({
-                horizon: expected.horizon, upper: expected.upper, zenith: expected.zenith, glow: expected.glow, stars: expected.stars,
+            (['horizon', 'upper', 'zenith', 'glow', 'cloudLight', 'cloudMid', 'cloudShadow', 'stars'] as const).forEach((field) => {
+                expect(sky[field]).toEqual(expected[field]);
             });
             if (hour === 0) expect(sky.stars).toBe(1);
             if (hour === 12) expect(sky.stars).toBe(0);

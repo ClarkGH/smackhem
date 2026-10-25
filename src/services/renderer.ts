@@ -18,6 +18,9 @@ export interface SkyState {
     sunDirection: Vec3;
     zenith: Vec3;
     stars: number;
+    cloudLight: Vec3;
+    cloudMid: Vec3;
+    cloudShadow: Vec3;
     cloudTime: number;
     moonDirection: Vec3;
     sunDisc: Vec3;

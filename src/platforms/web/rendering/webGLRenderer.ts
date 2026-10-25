@@ -5,15 +5,19 @@ import type { Mat4, Vec3 } from '../../../types/common';
 import { identity } from '../../../core/math/mathHelpers';
 import DrawList from './drawList';
 import { computeLightViewProj } from './shadowMath';
-import { CLOUD_CYCLE_SECONDS, CLOUD_NOISE_PERIOD, CLOUD_OCTAVE_LAPS } from '../../../core/lighting/clouds';
+import {
+    CLOUD_CYCLE_SECONDS, CLOUD_HIGH_OCTAVE_LAPS, CLOUD_NOISE_PERIOD, CLOUD_OCTAVE_LAPS,
+} from '../../../core/lighting/clouds';
 
 // A number as a GLSL float literal (GLSL won't turn 256 into 256.0 for you)
 const glslFloat = (value: number): string => (Number.isInteger(value) ? `${value}.0` : `${value}`);
 
-// Each octave's laps per cloud cycle, as GLSL vec2 constants, from the same table core uses
-const CLOUD_LAPS_GLSL = CLOUD_OCTAVE_LAPS
-    .map(([x, z], i) => `const vec2 CLOUD_LAPS_${i} = vec2(${glslFloat(x)}, ${glslFloat(z)});`)
+// Each octave's laps per cloud cycle, as GLSL vec2 constants, from the same tables core uses
+const lapsGlsl = (name: string, laps: readonly (readonly [number, number])[]): string => laps
+    .map(([x, z], i) => `const vec2 ${name}_${i} = vec2(${glslFloat(x)}, ${glslFloat(z)});`)
     .join('\n            ');
+const CLOUD_LAPS_GLSL = `${lapsGlsl('CLOUD_LAPS', CLOUD_OCTAVE_LAPS)}
+            ${lapsGlsl('CLOUD_HIGH_LAPS', CLOUD_HIGH_OCTAVE_LAPS)}`;
 
 // Shadow map: SHADOW_MAP_SIZE texels across SHADOW_HALF_EXTENT * 2 world units around the camera
 // (~4 cm per texel), and SHADOW_DEPTH_RADIUS units either side along the light
@@ -210,6 +214,9 @@ export default class WebGLRenderer implements Renderer {
         glow: { x: 0, y: 0, z: 0 },
         sunDirection: { x: 0, y: 1, z: 0 },
         stars: 0,
+        cloudLight: { x: 1, y: 1, z: 1 },
+        cloudMid: { x: 0.8, y: 0.8, z: 0.8 },
+        cloudShadow: { x: 0.6, y: 0.6, z: 0.6 },
         cloudTime: 0,
         moonDirection: { x: 0, y: -1, z: 0 },
         sunDisc: { x: 0, y: 0, z: 0 },
@@ -238,6 +245,9 @@ export default class WebGLRenderer implements Renderer {
         moonDisc: WebGLUniformLocation | null;
         sunVisibility: WebGLUniformLocation | null;
         moonVisibility: WebGLUniformLocation | null;
+        cloudLight: WebGLUniformLocation | null;
+        cloudMid: WebGLUniformLocation | null;
+        cloudShadow: WebGLUniformLocation | null;
     } = {
             viewProj: null,
             horizon: null,
@@ -253,6 +263,9 @@ export default class WebGLRenderer implements Renderer {
             moonDisc: null,
             sunVisibility: null,
             moonVisibility: null,
+            cloudLight: null,
+            cloudMid: null,
+            cloudShadow: null,
         };
 
     // Copied in by setViewPosition once per frame, for fog distances
@@ -1230,6 +1243,9 @@ ${LIGHT_CARD_GLSL}
         });
         this.sky.stars = sky.stars;
         this.sky.cloudTime = sky.cloudTime;
+        (['cloudLight', 'cloudMid', 'cloudShadow'] as const).forEach((field) => {
+            this.sky[field].x = sky[field].x; this.sky[field].y = sky[field].y; this.sky[field].z = sky[field].z;
+        });
         this.sky.moonDirection.x = sky.moonDirection.x;
         this.sky.moonDirection.y = sky.moonDirection.y;
         this.sky.moonDirection.z = sky.moonDirection.z;
@@ -1276,6 +1292,9 @@ ${LIGHT_CARD_GLSL}
             uniform vec3 u_moonDisc;
             uniform float u_sunVisibility;
             uniform float u_moonVisibility;
+            uniform vec3 u_cloudLight;
+            uniform vec3 u_cloudMid;
+            uniform vec3 u_cloudShadow;
 
             in vec4 v_near;
             in vec4 v_far;
@@ -1371,9 +1390,10 @@ ${SKY_COLOR_GLSL}
             const float CLOUD_HEIGHT = 60.0;
             // Noise cells per world unit on the layer (one cell is ~70 units across)
             const float CLOUD_SCALE = 0.014;
-            // Density above which there's cloud, and how soft the edge is
-            const float CLOUD_COVERAGE = 0.5;
-            const float CLOUD_EDGE = 0.07;
+            // Density above which there's cloud. Higher means fewer, separate clouds with sky between.
+            const float CLOUD_COVERAGE = 0.63;
+            // Edges are about one pixel soft (from fwidth), never less than this: crisp, not jagged
+            const float CLOUD_EDGE_MIN = 0.002;
             // View height over which clouds fade out at the horizon
             const float CLOUD_HORIZON_FADE = 0.2;
             // Distance along the view ray over which the fine octaves fade out: far away they'd be
@@ -1427,16 +1447,27 @@ ${SKY_COLOR_GLSL}
                     + mix(0.075, fine, detail);
             }
 
-            // Coverage (0..1) in .a, and a shade value in .r: 1 on the sun-facing edge, lower in
-            // thick middles and on the far side. Plan 6 maps the shade to palette tones.
+            // Three flat tones for a graphic look that suits the 2D sprites: shadow (0), mid (0.5) and
+            // light (1), with steps about a pixel soft. Plan 6 maps the three to palette colors.
+            float toneBands(float shade, float width) {
+                // Thresholds favor the light tones: mostly lit tops, smaller shaded undersides
+                float mid = smoothstep(0.3 - width, 0.3 + width, shade);
+                float light = smoothstep(0.55 - width, 0.55 + width, shade);
+                return 0.5 * mid + 0.5 * light;
+            }
+
+            // Coverage (0..1) in .y, and the tone in .x: light on the sun-facing edge, darker in
+            // thick middles and on the far side.
             vec2 cloudAt(vec3 viewDir) {
-                if (viewDir.y <= 0.01) return vec2(0.0);
-                float rayLength = (CLOUD_HEIGHT - u_eye.y) / viewDir.y;
+                // Every value that fwidth needs is computed on every pixel, before any early return:
+                // derivatives are undefined once neighbouring pixels take different paths. A near-flat
+                // ray uses a clamped height here and is faded out below.
+                float rayLength = (CLOUD_HEIGHT - u_eye.y) / max(viewDir.y, 0.01);
                 vec2 layerPos = u_eye.xz + viewDir.xz * rayLength;
                 float detail = 1.0 - smoothstep(CLOUD_DETAIL_NEAR, CLOUD_DETAIL_FAR, rayLength);
                 float density = cloudDensity(layerPos, detail);
-                float coverage = smoothstep(CLOUD_COVERAGE, CLOUD_COVERAGE + CLOUD_EDGE, density);
-                if (coverage <= 0.0) return vec2(0.0);
+                float edge = max(fwidth(density), CLOUD_EDGE_MIN);
+                float coverage = smoothstep(CLOUD_COVERAGE - edge, CLOUD_COVERAGE + edge, density);
 
                 // Lit edges: if the cloud is thinner a step toward the sun, this side faces it
                 float lit = 0.6;
@@ -1447,8 +1478,9 @@ ${SKY_COLOR_GLSL}
                 }
                 // Thicker is darker underneath
                 float shade = lit * (1.0 - 0.35 * smoothstep(CLOUD_COVERAGE, CLOUD_COVERAGE + 0.25, density));
+                float tone = toneBands(shade, max(fwidth(shade), CLOUD_EDGE_MIN));
                 float horizonFade = smoothstep(0.0, CLOUD_HORIZON_FADE, viewDir.y);
-                return vec2(shade, coverage * horizonFade);
+                return vec2(tone, coverage * horizonFade);
             }
 
             // The sun and moon, as discs in the sky. Their angular radius matches the old spheres
@@ -1463,6 +1495,29 @@ ${SKY_COLOR_GLSL}
                 return 1.0 - smoothstep(radius - pixelAngle, radius + pixelAngle, angle);
             }
 
+            // The high layer: thin streaks far above the puffy clouds, drawn behind them.
+            // Higher, and stretched noise cells (more cells across x than along z) make streaks.
+            const float CLOUD_HIGH_HEIGHT = 150.0;
+            const vec2 CLOUD_HIGH_SCALE = vec2(0.01, 0.03);
+            const float CLOUD_HIGH_COVERAGE = 0.68;
+            // Partly see-through, and sparse: an accent behind the puffy clouds, not a second sky
+            const float CLOUD_HIGH_OPACITY = 0.4;
+            // Shifts the high layer into a different part of the noise, so it doesn't copy the low one
+            const vec2 CLOUD_HIGH_SEED = vec2(97.0, 41.0);
+
+            // Coverage of the high layer (0..1), already scaled by its opacity and horizon fade
+            float highCloudAt(vec3 viewDir) {
+                // As in cloudAt: everything fwidth needs, on every pixel, before any early return
+                vec2 layerPos = u_eye.xz + viewDir.xz * ((CLOUD_HIGH_HEIGHT - u_eye.y) / max(viewDir.y, 0.01));
+                vec2 p = layerPos * CLOUD_HIGH_SCALE + CLOUD_HIGH_SEED;
+                vec2 travel = vec2(CLOUD_PERIOD * u_cloudTime / CLOUD_CYCLE);
+                float density = 0.7 * valueNoise(p + CLOUD_HIGH_LAPS_0 * travel)
+                    + 0.3 * valueNoise(p * 2.0 + CLOUD_HIGH_LAPS_1 * travel);
+                float edge = max(fwidth(density), CLOUD_EDGE_MIN);
+                float coverage = smoothstep(CLOUD_HIGH_COVERAGE - edge, CLOUD_HIGH_COVERAGE + edge, density);
+                return coverage * CLOUD_HIGH_OPACITY * smoothstep(0.0, CLOUD_HORIZON_FADE, viewDir.y);
+            }
+
             void main() {
                 vec3 viewDir = normalize(v_far.xyz / v_far.w - v_near.xyz / v_near.w);
                 // Before any branch: derivatives need neighbouring pixels on the same path. From the
@@ -1475,12 +1530,15 @@ ${SKY_COLOR_GLSL}
                 color = mix(color, u_sunDisc, disc(viewDir, u_sunDirection, SUN_RADIUS, pixelAngle) * u_sunVisibility);
                 color = mix(color, u_moonDisc, disc(viewDir, u_moonDirection, MOON_RADIUS, pixelAngle) * u_moonVisibility);
 
-                // Clouds over the sky and stars. Provisional tones until Plan 6: the horizon color,
-                // darkened in shade and lightened toward white where lit.
+                // Clouds, high layer first so the low puffy layer passes in front of it. Colors come
+                // from the palette: the three tones (0, 0.5, 1) map to shadow, mid and light, and
+                // the high streaks take the light tone.
+                color = mix(color, u_cloudLight, highCloudAt(viewDir));
                 vec2 cloud = cloudAt(viewDir);
-                vec3 dark = u_skyHorizon * 0.75;
-                vec3 light = mix(u_skyHorizon, vec3(1.0), 0.6);
-                color = mix(color, mix(dark, light, cloud.x), cloud.y);
+                vec3 tone = cloud.x < 0.5
+                    ? mix(u_cloudShadow, u_cloudMid, cloud.x * 2.0)
+                    : mix(u_cloudMid, u_cloudLight, cloud.x * 2.0 - 1.0);
+                color = mix(color, tone, cloud.y);
 
                 fragColor = vec4(color, 1.0);
             }
@@ -1511,6 +1569,9 @@ ${SKY_COLOR_GLSL}
             moonDisc: gl.getUniformLocation(program, 'u_moonDisc'),
             sunVisibility: gl.getUniformLocation(program, 'u_sunVisibility'),
             moonVisibility: gl.getUniformLocation(program, 'u_moonVisibility'),
+            cloudLight: gl.getUniformLocation(program, 'u_cloudLight'),
+            cloudMid: gl.getUniformLocation(program, 'u_cloudMid'),
+            cloudShadow: gl.getUniformLocation(program, 'u_cloudShadow'),
         };
         this.skyVAO = gl.createVertexArray();
     }
@@ -1539,6 +1600,9 @@ ${SKY_COLOR_GLSL}
         gl.uniform3f(locs.moonDisc, sky.moonDisc.x, sky.moonDisc.y, sky.moonDisc.z);
         gl.uniform1f(locs.sunVisibility, sky.sunVisibility);
         gl.uniform1f(locs.moonVisibility, sky.moonVisibility);
+        gl.uniform3f(locs.cloudLight, sky.cloudLight.x, sky.cloudLight.y, sky.cloudLight.z);
+        gl.uniform3f(locs.cloudMid, sky.cloudMid.x, sky.cloudMid.y, sky.cloudMid.z);
+        gl.uniform3f(locs.cloudShadow, sky.cloudShadow.x, sky.cloudShadow.y, sky.cloudShadow.z);
 
         gl.disable(gl.DEPTH_TEST);
         gl.depthMask(false);

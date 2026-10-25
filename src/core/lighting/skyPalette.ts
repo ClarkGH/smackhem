@@ -22,6 +22,10 @@ export interface TimeOfDayPalette {
     // Values from colorguide.org/sun: Noon Sun by day, Sunburst Orange at dawn, Tropic Sun at sunset.
     // Separate from sunLight so daylight can stay near-neutral. The moon's disc uses moonLight.
     sunDisc: Vec3;
+    // The clouds' three flat tones: lit tops, middles, shaded undersides
+    cloudLight: Vec3;
+    cloudMid: Vec3;
+    cloudShadow: Vec3;
     // Light that reaches every surface regardless of direction, 0..1
     ambient: number;
     // How visible the stars are, 0..1
@@ -35,7 +39,9 @@ export interface SkyKey extends TimeOfDayPalette {
 }
 
 // The palette's colors, blended in one loop. The numbers (ambient, stars) are blended after it.
-export const PALETTE_COLORS = ['horizon', 'upper', 'zenith', 'glow', 'sunLight', 'moonLight', 'sunDisc'] as const;
+export const PALETTE_COLORS = [
+    'horizon', 'upper', 'zenith', 'glow', 'sunLight', 'moonLight', 'sunDisc', 'cloudLight', 'cloudMid', 'cloudShadow',
+] as const;
 
 const hours = (h: number): number => h / 24;
 
@@ -55,6 +61,9 @@ export const createPalette = (): TimeOfDayPalette => ({
     sunLight: { x: 0, y: 0, z: 0 },
     moonLight: { x: 0, y: 0, z: 0 },
     sunDisc: { x: 0, y: 0, z: 0 },
+    cloudLight: { x: 0, y: 0, z: 0 },
+    cloudMid: { x: 0, y: 0, z: 0 },
+    cloudShadow: { x: 0, y: 0, z: 0 },
     ambient: 0,
     stars: 0,
 });
@@ -71,6 +80,10 @@ const NIGHT = {
     sunLight: hex(0xffb38a),
     moonLight: MOONLIGHT,
     sunDisc: hex(0xffa333),
+    // Dark silhouettes against the stars
+    cloudLight: hex(0x4a5180),
+    cloudMid: hex(0x343a66),
+    cloudShadow: hex(0x22264a),
     ambient: 0.12,
     stars: 1,
 };
@@ -86,6 +99,10 @@ const DAY = {
     sunLight: hex(0xfeedc2),
     moonLight: MOONLIGHT,
     sunDisc: hex(0xf7d038),
+    // White over blue-grey
+    cloudLight: hex(0xf4f7fa),
+    cloudMid: hex(0xc9d6e3),
+    cloudShadow: hex(0x8fa3ba),
     ambient: 0.5,
     stars: 0,
 };
@@ -108,6 +125,10 @@ export const SKY_KEYS: readonly SkyKey[] = [
         sunLight: hex(0xffb38a),
         moonLight: MOONLIGHT,
         sunDisc: hex(0xffa333),
+        // Peach, pink, violet
+        cloudLight: hex(0xffd9c2),
+        cloudMid: hex(0xf2a7a0),
+        cloudShadow: hex(0x8a6fa8),
         ambient: 0.3,
         stars: 0,
     },
@@ -127,6 +148,10 @@ export const SKY_KEYS: readonly SkyKey[] = [
         sunLight: hex(0xffb070),
         moonLight: MOONLIGHT,
         sunDisc: hex(0xf38b21),
+        // Gold, coral, purple-blue
+        cloudLight: hex(0xffd08a),
+        cloudMid: hex(0xf4a08a),
+        cloudShadow: hex(0x7a5a9a),
         ambient: 0.3,
         stars: 0,
     },
@@ -140,6 +165,10 @@ export const SKY_KEYS: readonly SkyKey[] = [
         sunLight: hex(0xffb070),
         moonLight: MOONLIGHT,
         sunDisc: hex(0xf38b21),
+        // Muted lilac to deep violet, the warmth fading
+        cloudLight: hex(0xb48cc8),
+        cloudMid: hex(0x7e66aa),
+        cloudShadow: hex(0x45407a),
         ambient: 0.2,
         stars: 0.25,
     },

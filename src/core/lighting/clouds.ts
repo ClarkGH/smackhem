@@ -21,6 +21,16 @@ export const CLOUD_OCTAVE_LAPS: readonly (readonly [number, number])[] = [
     [-4, 9],
 ];
 
+/**
+ * The high, thin layer's two octaves, the same way. It sits higher and its cells are stretched
+ * into streaks, so one lap reads as slower across the sky than the low layer, and in a
+ * different direction, so the low puffy clouds visibly slide past it.
+ */
+export const CLOUD_HIGH_OCTAVE_LAPS: readonly (readonly [number, number])[] = [
+    [0, 1],
+    [1, 2],
+];
+
 // Sim time wrapped to the cycle, so the shader's offsets stay small after hours of play
 export const cloudTimeAt = (simulationTime: number): number => (
     ((simulationTime % CLOUD_CYCLE_SECONDS) + CLOUD_CYCLE_SECONDS) % CLOUD_CYCLE_SECONDS
