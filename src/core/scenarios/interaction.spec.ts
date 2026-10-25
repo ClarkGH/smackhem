@@ -125,11 +125,33 @@ describe('NPC speech - scenario (stub platform)', () => {
     });
 
     it('says nothing to an NPC behind you, or out of reach', () => {
-        const { gameState, press } = withNpcs([npcAt('behind', 0, 1.5), npcAt('far', 0, -2.5)]);
+        // far's edge is 2.5 away, past the reach of 2
+        const { gameState, press } = withNpcs([npcAt('behind', 0, 1.5), npcAt('far', 0, -3)]);
 
         press({ interact: true });
 
         expect(gameState.discrete.activeSpeech).toBeNull();
+    });
+
+    it('reaches a big NPC by its edge, not its centre', () => {
+        // Centre 3 away: size 3 puts the edge at 1.5, in reach. Size 1 puts it at 2.5, out of reach.
+        const big = withNpcs([{ ...npcAt('big', 0, -3), size: 3 }]);
+        const small = withNpcs([npcAt('small', 0, -3)]);
+
+        big.press({ interact: true });
+        small.press({ interact: true });
+
+        expect(big.gameState.discrete.activeSpeech?.npcId).toBe('big');
+        expect(small.gameState.discrete.activeSpeech).toBeNull();
+    });
+
+    it('picks the nearer edge, so a big NPC can win over a smaller, closer-centred one', () => {
+        // Centres: big 2.5 away (edge 1.0), small 1.9 away (edge 1.4)
+        const { gameState, press } = withNpcs([{ ...npcAt('big', 0.4, -2.5), size: 3 }, npcAt('small', -0.3, -1.9)]);
+
+        press({ interact: true });
+
+        expect(gameState.discrete.activeSpeech?.npcId).toBe('big');
     });
 
     it('talks to the nearer of two NPCs', () => {
@@ -239,7 +261,8 @@ describe('interact prompt - scenario (stub platform)', () => {
     });
 
     it('shows nothing when nothing is in reach and in front', () => {
-        const { gameState, prompt, tick } = withNpcs([npcAt('behind', 0, 1.5), npcAt('far', 0, -2.5)]);
+        // far's edge is 2.5 away, past the reach of 2
+        const { gameState, prompt, tick } = withNpcs([npcAt('behind', 0, 1.5), npcAt('far', 0, -3)]);
 
         tick();
 
