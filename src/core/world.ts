@@ -104,9 +104,10 @@ export class World {
             if (!chunk.hasContent) return;
 
             const [chunkX, chunkZ] = chunk.id.split(',').map(Number);
+            // North is -z (the camera's forward at yaw 0, as the debug HUD's compass reads), east +x
             const neighbors: Array<[number, number, 'north' | 'south' | 'east' | 'west']> = [
-                [chunkX, chunkZ + 1, 'north'],
-                [chunkX, chunkZ - 1, 'south'],
+                [chunkX, chunkZ - 1, 'north'],
+                [chunkX, chunkZ + 1, 'south'],
                 [chunkX + 1, chunkZ, 'east'],
                 [chunkX - 1, chunkZ, 'west'],
             ];
@@ -129,9 +130,9 @@ export class World {
 
         switch (side) {
             case 'north':
-                return createAABB({ x: min.x, y: -1, z: max.z - t }, { x: max.x, y: h, z: max.z + t });
-            case 'south':
                 return createAABB({ x: min.x, y: -1, z: min.z - t }, { x: max.x, y: h, z: min.z + t });
+            case 'south':
+                return createAABB({ x: min.x, y: -1, z: max.z - t }, { x: max.x, y: h, z: max.z + t });
             case 'east':
                 return createAABB({ x: max.x - t, y: -1, z: min.z }, { x: max.x + t, y: h, z: max.z });
             default: // 'west'

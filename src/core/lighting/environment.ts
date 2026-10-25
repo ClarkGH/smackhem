@@ -9,7 +9,14 @@ export const DAY_LENGTH_SECONDS = 120;
 
 export default class EnvironmentSystem {
     // Configuration Constants
-    private readonly DECLINATION_OFFSET = 0.0;
+    // Latitude of the sun's path, about the southern US: at noon the sun is 90° minus this above
+    // the horizon, toward the south (+z). An equinox sun, so whatever the latitude it rises due east
+    // at 06:00 and sets due west at 18:00, in step with the palette's dawn and sunset.
+    private readonly LATITUDE = (35 * Math.PI) / 180;
+
+    private readonly cosLatitude = Math.cos(this.LATITUDE);
+
+    private readonly sinLatitude = Math.sin(this.LATITUDE);
 
     // Shadows fade in as the caster climbs from SHADOW_FADE_LOW to SHADOW_FADE_HIGH (direction y).
     // Below that they'd stretch for dozens of units, and at dawn/dusk both bodies sit there,
@@ -57,37 +64,22 @@ export default class EnvironmentSystem {
     public starTime = 0.0;
 
     // Recyclable internal objects to prevent per-frame garbage collection
-    private readonly sunAzimuth = { value: 0 };
-
-    private readonly sunElevation = { value: 0 };
-
     private readonly sunDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 };
 
     private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 };
 
     constructor(private cameraFar: number) {} // I assure you, this is useful
 
-    private computeSunSpherical(timeOfDay: number, outAzimuth: { value: number }, outElevation: { value: number }): void {
+    // One circle, tilted south by the latitude: due east at 06:00, highest at noon, due west at
+    // 18:00, lowest (to the north, under the floor) at midnight. Already unit length.
+    private computeSunDirection(timeOfDay: number, out: Vec3): void {
         const angle = (timeOfDay - 0.25) * Math.PI * 2;
-        // We are mindfully overriding the function parameter's memory
-        outAzimuth.value = Math.PI / 2 + angle;
-        outElevation.value = Math.sin(angle) + this.DECLINATION_OFFSET;
+        out.x = Math.cos(angle);
+        out.y = Math.sin(angle) * this.cosLatitude;
+        out.z = Math.sin(angle) * this.sinLatitude;
     }
 
-    // sinElevation is already the sine of the angle above the horizon (-1..1), as computeSunSpherical gives it
-    private sphericalToDirection(azimuth: number, sinElevation: number, out: Vec3): void {
-        const clamped = Math.max(-1, Math.min(1, sinElevation));
-        const cosElev = Math.sqrt(1 - clamped * clamped);
-        out.x = cosElev * Math.sin(azimuth);
-        out.y = clamped;
-        out.z = cosElev * Math.cos(azimuth);
-
-        const len = Math.sqrt(out.x * out.x + out.y * out.y + out.z * out.z);
-        if (len > 0.0001) {
-            out.x /= len; out.y /= len; out.z /= len;
-        }
-    }
-
+    // elevation: the direction's height (y), the sine of the angle above the horizon
     private computeCelestialVisibility(elevation: number): number {
         const FADE_BAND = 0.15;
         const t = Math.max(0, Math.min(1, (elevation + FADE_BAND) / (2 * FADE_BAND)));
@@ -114,19 +106,16 @@ export default class EnvironmentSystem {
         this.cloudTime = cloudTimeAt(interpolatedState.simulationTime);
         this.starTime = starTimeAt(interpolatedState.simulationTime);
 
-        this.computeSunSpherical(this.timeOfDay, this.sunAzimuth, this.sunElevation);
-
-        // Sun vector mapping
-        this.sphericalToDirection(this.sunAzimuth.value, this.sunElevation.value, this.lightDirection);
+        this.computeSunDirection(this.timeOfDay, this.lightDirection);
         this.ambientIntensity = this.palette.ambient;
 
-        // Moon vector mapping (Offset by PI)
-        const moonAzimuth = this.sunAzimuth.value + Math.PI;
-        const moonElevation = -this.sunElevation.value;
-        this.sphericalToDirection(moonAzimuth, moonElevation, this.moonLightDirection);
+        // The moon is always straight opposite the sun
+        this.moonLightDirection.x = -this.lightDirection.x;
+        this.moonLightDirection.y = -this.lightDirection.y;
+        this.moonLightDirection.z = -this.lightDirection.z;
 
-        this.sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
-        this.moonVisibility = this.computeCelestialVisibility(moonElevation);
+        this.sunVisibility = this.computeCelestialVisibility(this.lightDirection.y);
+        this.moonVisibility = this.computeCelestialVisibility(this.moonLightDirection.y);
 
         // The palette sets each body's color and warmth; visibility fades it across the horizon,
         // in step with shadow strength, which uses visibility too

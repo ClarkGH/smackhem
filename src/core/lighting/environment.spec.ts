@@ -50,6 +50,56 @@ describe('EnvironmentSystem shadow caster', () => {
     });
 });
 
+describe('EnvironmentSystem sun path', () => {
+    it('rises due east (+x) at 06:00 and sets due west at 18:00', () => {
+        const rise = at(0.25).lightDirection;
+        const set = at(0.75).lightDirection;
+        expect(rise.x).toBeCloseTo(1, 6);
+        expect(rise.y).toBeCloseTo(0, 6);
+        expect(rise.z).toBeCloseTo(0, 6);
+        expect(set.x).toBeCloseTo(-1, 6);
+        expect(set.y).toBeCloseTo(0, 6);
+        expect(set.z).toBeCloseTo(0, 6);
+    });
+
+    it('is highest at noon, due south (+z) and not straight overhead', () => {
+        const noon = at(0.5).lightDirection;
+        expect(noon.x).toBeCloseTo(0, 6);
+        expect(noon.z).toBeGreaterThan(0);
+        expect(noon.y).toBeLessThan(1);
+        [0.3, 0.4, 0.45, 0.55, 0.6, 0.7].forEach((t) => {
+            expect(at(t).lightDirection.y).toBeLessThan(noon.y);
+        });
+    });
+
+    // A real sun's path is one circle across the sky. The old path ran its compass direction and
+    // height separately, which made a V through the zenith: off to one side before noon and after.
+    it('keeps to one circle all day: every direction lies in the plane of sunrise and noon', () => {
+        const rise = at(0.25).lightDirection;
+        const noon = at(0.5).lightDirection;
+        // The circle's axis, square to both
+        const axis = {
+            x: rise.y * noon.z - rise.z * noon.y,
+            y: rise.z * noon.x - rise.x * noon.z,
+            z: rise.x * noon.y - rise.y * noon.x,
+        };
+        for (let i = 0; i < 96; i += 1) {
+            const d = at(i / 96).lightDirection;
+            expect(Math.hypot(d.x, d.y, d.z)).toBeCloseTo(1, 6);
+            expect(d.x * axis.x + d.y * axis.y + d.z * axis.z).toBeCloseTo(0, 6);
+        }
+    });
+
+    it('keeps the moon straight opposite the sun', () => {
+        [0, 0.2, 0.5, 0.8].forEach((t) => {
+            const environment = at(t);
+            expect(environment.moonLightDirection.x).toBeCloseTo(-environment.lightDirection.x, 6);
+            expect(environment.moonLightDirection.y).toBeCloseTo(-environment.lightDirection.y, 6);
+            expect(environment.moonLightDirection.z).toBeCloseTo(-environment.lightDirection.z, 6);
+        });
+    });
+});
+
 describe('EnvironmentSystem sun for cloud edges', () => {
     // The sky shader scales its lit cloud edges by the sun's horizontal length times its
     // visibility (cloudAt in webGLRenderer.ts). These are the inputs that has to be smooth.
@@ -57,8 +107,9 @@ describe('EnvironmentSystem sun for cloud edges', () => {
         Math.hypot(environment.lightDirection.x, environment.lightDirection.z) * environment.sunVisibility
     );
 
-    it('has no lit edges with the sun overhead at noon or below the horizon at midnight', () => {
-        expect(edgeStrength(at(0.5))).toBeCloseTo(0, 5);
+    it('has softer lit edges with the sun high at noon, and none with it below the horizon at midnight', () => {
+        expect(edgeStrength(at(0.5))).toBeGreaterThan(0);
+        expect(edgeStrength(at(0.5))).toBeLessThan(edgeStrength(at(0.27)));
         expect(edgeStrength(at(0))).toBe(0);
     });
 

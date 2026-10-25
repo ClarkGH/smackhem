@@ -108,8 +108,10 @@ describe('debug menu - scenario (stub platform)', () => {
 
         const caster = scenario.renderer.getShadowCaster();
         expect(caster.strength).toBeCloseTo(1, 5);
-        // Straight overhead at noon
-        expect(caster.direction.y).toBeCloseTo(1, 5);
+        // High in the south at noon (+z), neither east nor west
+        expect(caster.direction.x).toBeCloseTo(0, 5);
+        expect(caster.direction.z).toBeGreaterThan(0);
+        expect(caster.direction.y).toBeGreaterThan(0.5);
         expect(caster.focus).toEqual(scenario.gameLoop.getRenderCamera().position);
 
         scenario.click('Shadows');
