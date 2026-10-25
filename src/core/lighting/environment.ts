@@ -1,7 +1,8 @@
-import { Vec3, Mat4 } from '../../types/common';
+import { Vec3 } from '../../types/common';
 import { GameState } from '../gameState';
-import { identity, smoothstep } from '../math/mathHelpers';
+import { smoothstep } from '../math/mathHelpers';
 import { createPalette, paletteAt, type TimeOfDayPalette } from './skyPalette';
+import { cloudTimeAt } from './clouds';
 
 export default class EnvironmentSystem {
     // Configuration Constants
@@ -29,10 +30,6 @@ export default class EnvironmentSystem {
 
     public readonly moonColorWithVisibility: Vec3 = { x: 0, y: 0, z: 0 };
 
-    public readonly sunTransform: Mat4 = identity();
-
-    public readonly moonTransform: Mat4 = identity();
-
     // This frame's palette (sky, light colors, ambient, stars), filled once per update.
     // RenderSystem reads the sky from here too, so sky and lighting come from one evaluation.
     public readonly palette: TimeOfDayPalette = createPalette();
@@ -50,6 +47,10 @@ export default class EnvironmentSystem {
     public shadowStrength = 0.0;
 
     public timeOfDay = 0.0;
+
+    // Sim time wrapped to the cloud cycle. From sim time, not the time of day, so a Debug
+    // time-of-day override doesn't move the clouds.
+    public cloudTime = 0.0;
 
     // Recyclable internal objects to prevent per-frame garbage collection
     private readonly sunAzimuth = { value: 0 };
@@ -99,20 +100,10 @@ export default class EnvironmentSystem {
         out.z = cameraPosition.z + dirVec.z * distance;
     }
 
-    private computeCelestialTransform(position: Vec3, size: number, out: Mat4): void {
-        const o = out.elements;
-        o[0] = size; o[1] = 0; o[2] = 0; o[3] = 0;
-        o[4] = 0; o[5] = size; o[6] = 0; o[7] = 0;
-        o[8] = 0; o[9] = 0; o[10] = size; o[11] = 0;
-        o[12] = position.x; o[13] = position.y; o[14] = position.z; o[15] = 1;
-    }
-
     // timeOfDayOverride (0..1) replaces the clock, for the debug menu. It never changes simulation time.
     public update(
         gameState: GameState,
         cameraPosition: Vec3,
-        sunSize: number,
-        moonSize: number,
         timeOfDayOverride: number | null = null,
     ): void {
         const interpolatedState = gameState.interpolated;
@@ -120,6 +111,7 @@ export default class EnvironmentSystem {
 
         this.timeOfDay = timeOfDayOverride ?? this.computeTimeOfDay(interpolatedState.simulationTime);
         paletteAt(this.timeOfDay, this.palette);
+        this.cloudTime = cloudTimeAt(interpolatedState.simulationTime);
 
         this.computeSunSpherical(this.timeOfDay, this.sunAzimuth, this.sunElevation);
 
@@ -155,7 +147,7 @@ export default class EnvironmentSystem {
         const fade = smoothstep((caster.y - this.SHADOW_FADE_LOW) / (this.SHADOW_FADE_HIGH - this.SHADOW_FADE_LOW));
         this.shadowStrength = casterVisibility * fade;
 
-        // Position placements tracking camera offset anchor
+        // Where the sun and moon would be, for the debug HUD (the sky shader draws them by direction)
         this.sunDirectionForPosition.x = this.lightDirection.x;
         this.sunDirectionForPosition.y = this.lightDirection.y;
         this.sunDirectionForPosition.z = this.lightDirection.z;
@@ -165,9 +157,5 @@ export default class EnvironmentSystem {
         this.moonDirectionForPosition.y = this.moonLightDirection.y;
         this.moonDirectionForPosition.z = this.moonLightDirection.z;
         this.computeCelestialPosition(this.moonDirectionForPosition, celestialDistance, cameraPosition, this.moonPosition);
-
-        // Compute local space transform translation matrices
-        this.computeCelestialTransform(this.sunPosition, sunSize, this.sunTransform);
-        this.computeCelestialTransform(this.moonPosition, moonSize, this.moonTransform);
     }
 }

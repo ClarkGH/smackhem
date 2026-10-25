@@ -36,7 +36,7 @@ const key = (name: SkyKeyName) => {
 // The sun's height at a time of day, through the debug override
 const sunHeight = (timeOfDay: number): number => {
     const environment = new EnvironmentSystem(100);
-    environment.update(createGameState(), { x: 0, y: 0, z: 0 }, 1, 1, timeOfDay);
+    environment.update(createGameState(), { x: 0, y: 0, z: 0 }, timeOfDay);
     return environment.lightDirection.y;
 };
 

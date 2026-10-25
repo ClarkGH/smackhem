@@ -18,6 +18,12 @@ export interface SkyState {
     sunDirection: Vec3;
     zenith: Vec3;
     stars: number;
+    cloudTime: number;
+    moonDirection: Vec3;
+    sunDisc: Vec3;
+    moonDisc: Vec3;
+    sunVisibility: number;
+    moonVisibility: number;
 }
 
 export interface Renderer {
@@ -27,7 +33,7 @@ export interface Renderer {
     setViewPosition?(_eye: Vec3): void;
     setShadowCaster?(_direction: Vec3, _strength: number, _focus: Vec3): void;
     setShadowBias?(_scale: number): void;
-    drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean, _opacity?: number): void;
+    drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean): void;
     endFrame(): void;
     createPlaneMesh(_size: number): MeshHandle;
     createCubeMesh(_size: number): MeshHandle;

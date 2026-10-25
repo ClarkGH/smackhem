@@ -8,6 +8,7 @@ import type { GameEvent } from '../events';
 import { createDebugSettings, type DebugSettings } from '../settings/debugSettings';
 import { createScenario, type Scenario } from '../../testing/scenario';
 import { createPalette, paletteAt } from '../lighting/skyPalette';
+import { cloudTimeAt } from '../lighting/clouds';
 import EnvironmentSystem from '../lighting/environment';
 import { createGameState } from '../gameState';
 
@@ -151,7 +152,7 @@ describe('debug menu - scenario (stub platform)', () => {
 
             // The sun's own direction, whatever the hour
             const environment = new EnvironmentSystem(100);
-            environment.update(createGameState(), { x: 0, y: 0, z: 0 }, 1, 1, hour / 24);
+            environment.update(createGameState(), { x: 0, y: 0, z: 0 }, hour / 24);
             expect(sky.sunDirection).toEqual(environment.lightDirection);
             if (hour === 0) {
                 // Midnight: below the horizon, and not the moon the shadows switch to
@@ -162,22 +163,39 @@ describe('debug menu - scenario (stub platform)', () => {
         });
     });
 
-    it('draws the sun disc in its palette color, faded by opacity instead of darkened', () => {
+    it('puts the sun and moon in the sky state: directions, palette disc colors, visibilities', () => {
         scenario.click('Debug');
         setTime(6);
 
         const environment = new EnvironmentSystem(100);
-        environment.update(createGameState(), { x: 0, y: 0, z: 0 }, 1, 1, 6 / 24);
+        environment.update(createGameState(), { x: 0, y: 0, z: 0 }, 6 / 24);
+        // 06:00: the sun is on the horizon, partly visible, so its disc is fading, not dark
         expect(environment.sunVisibility).toBeGreaterThan(0);
         expect(environment.sunVisibility).toBeLessThan(1);
 
-        const sunDraw = scenario.renderer.getLightSourceDraws().find(
-            (d) => d.color.x === environment.palette.sunDisc.x
-                && d.color.y === environment.palette.sunDisc.y
-                && d.color.z === environment.palette.sunDisc.z,
-        );
-        expect(sunDraw).toBeDefined();
-        expect(sunDraw!.opacity).toBeCloseTo(environment.sunVisibility, 6);
+        const sky = scenario.renderer.getSky();
+        expect(sky.sunDisc).toEqual(environment.palette.sunDisc);
+        expect(sky.moonDisc).toEqual(environment.palette.moonLight);
+        expect(sky.sunVisibility).toBeCloseTo(environment.sunVisibility, 6);
+        expect(sky.moonVisibility).toBeCloseTo(environment.moonVisibility, 6);
+        expect(sky.moonDirection).toEqual(environment.moonLightDirection);
+        expect(sky.sunDirection).toEqual(environment.lightDirection);
+    });
+
+    it('sends a cloud time that follows sim time, not the Debug time of day', () => {
+        const { gameState } = scenario;
+        // Resume, so sim time runs, then a few seconds of play
+        scenario.press({ menu: true });
+        scenario.tick(120);
+        const sky = scenario.renderer.getSky();
+        expect(sky.cloudTime).toBeCloseTo(cloudTimeAt(gameState.interpolated.simulationTime), 6);
+        expect(sky.cloudTime).toBeGreaterThan(0);
+
+        // Overriding the time of day leaves the clouds where they are
+        scenario.press({ menu: true });
+        scenario.click('Debug');
+        setTime(18);
+        expect(scenario.renderer.getSky().cloudTime).toBeCloseTo(sky.cloudTime, 6);
     });
 
     it('stops at 23:45 and steps back to Live', () => {

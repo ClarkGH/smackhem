@@ -43,6 +43,12 @@ export default class NullRenderer implements Renderer {
         glow: { x: 0, y: 0, z: 0 },
         sunDirection: { x: 0, y: 0, z: 0 },
         stars: 0,
+        cloudTime: 0,
+        moonDirection: { x: 0, y: 0, z: 0 },
+        sunDisc: { x: 0, y: 0, z: 0 },
+        moonDisc: { x: 0, y: 0, z: 0 },
+        sunVisibility: 0,
+        moonVisibility: 0,
     };
 
     // Whether setSky came between the last endFrame and this beginFrame, for the ordering contract.
@@ -54,15 +60,17 @@ export default class NullRenderer implements Renderer {
     public beginFrame(): void {
         this.frameCount += 1;
         this.meshModels.length = 0;
-        this.lightSourceDraws.length = 0;
         this.skySetBeforeBegin = this.skySetBetweenFrames;
     }
 
     public setSky(_sky: SkyState): void {
-        (['horizon', 'upper', 'zenith', 'glow', 'sunDirection'] as const).forEach((field) => {
+        (['horizon', 'upper', 'zenith', 'glow', 'sunDirection', 'moonDirection', 'sunDisc', 'moonDisc'] as const).forEach((field) => {
             this.sky[field].x = _sky[field].x; this.sky[field].y = _sky[field].y; this.sky[field].z = _sky[field].z;
         });
         this.sky.stars = _sky.stars;
+        this.sky.cloudTime = _sky.cloudTime;
+        this.sky.sunVisibility = _sky.sunVisibility;
+        this.sky.moonVisibility = _sky.moonVisibility;
         this.skySetBetweenFrames = true;
     }
 
@@ -74,6 +82,12 @@ export default class NullRenderer implements Renderer {
             glow: { ...this.sky.glow },
             sunDirection: { ...this.sky.sunDirection },
             stars: this.sky.stars,
+            cloudTime: this.sky.cloudTime,
+            moonDirection: { ...this.sky.moonDirection },
+            sunDisc: { ...this.sky.sunDisc },
+            moonDisc: { ...this.sky.moonDisc },
+            sunVisibility: this.sky.sunVisibility,
+            moonVisibility: this.sky.moonVisibility,
         };
     }
 
@@ -114,18 +128,8 @@ export default class NullRenderer implements Renderer {
         this.viewProj.set(_viewProj.elements);
     }
 
-    // Light sources drawn this frame (sun, moon, debug walls), copied
-    private readonly lightSourceDraws: Array<{ color: Vec3; opacity: number }> = [];
-
-    public drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean, _opacity?: number): void {
+    public drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean): void {
         this.meshModels.push(_model);
-        if (_isLightSource) {
-            this.lightSourceDraws.push({ color: { ..._color }, opacity: _opacity ?? 1 });
-        }
-    }
-
-    public getLightSourceDraws(): ReadonlyArray<{ color: Vec3; opacity: number }> {
-        return this.lightSourceDraws;
     }
 
     public endFrame(): void {

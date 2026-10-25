@@ -121,17 +121,9 @@ export class GameLoop {
     private debugSettings?: DebugSettings;
 
     // Constants
-    private readonly SUN_SIZE = 0.5; // Radius of sun orb (sphere)
-
-    private readonly MOON_SIZE = 0.4; // Radius of moon orb (sphere)
-
     private readonly WALL_DEBUG_COLOR: Vec3 = { x: 1, y: 0, z: 0 }; // Color of the wall debug mesh
 
     // Mesh objects
-    private readonly sunMesh;
-
-    private readonly moonMesh;
-
     private readonly wallDebugMesh;
 
     // Mouse look waiting for the next tick, so a frame that runs no tick doesn't drop it
@@ -187,8 +179,6 @@ export class GameLoop {
         this.snapshotCamera();
 
         // Mesh objects
-        this.sunMesh = renderer.createSphereMesh(this.SUN_SIZE * 10, 16);
-        this.moonMesh = renderer.createSphereMesh(this.MOON_SIZE * 10, 16);
         this.wallDebugMesh = renderer.createCubeMesh(1);
 
         this.renderSystem = new RenderSystem(
@@ -196,8 +186,6 @@ export class GameLoop {
             this.world,
             this.environmentSystem,
             this.getAspectRatio,
-            this.sunMesh,
-            this.moonMesh,
             this.wallDebugMesh,
         );
 
@@ -405,8 +393,6 @@ export class GameLoop {
         this.environmentSystem.update(
             this.gameState,
             renderCamera.position,
-            1.0,
-            1.0,
             quarter === null ? null : quarter / QUARTERS_PER_DAY,
         );
         if (debug) {

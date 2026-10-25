@@ -294,23 +294,16 @@ The palette's `ambient` for the time of day, blended with every other palette va
 
 **Visual Celestial Objects:**
 
-Both the sun and moon are rendered as visible spheres in the sky:
+The sun and moon are part of the sky: discs drawn **in the sky shader**, after the gradient and stars and **before the clouds**, so clouds pass in front of them. Within one shader the order of the code is the draw order, so no depth tricks are needed. (They used to be sphere meshes drawn after the sky pass, which always landed in front of the clouds.)
 
-- **Positioning**: Placed at infinite distance along light direction vector
-  - Distance: `CELESTIAL_DISTANCE = camera.far - 1.0` (ensures visibility)
-  - Position: `camera.position + (lightDirection * CELESTIAL_DISTANCE)`
-
-- **Size Constants**:
-  - `SUN_SIZE = 0.5` (radius of sun sphere)
-  - `MOON_SIZE = 0.4` (radius of moon sphere)
-
+- **Where:** the sun at `sunDirection`, the moon at `moonDirection`, both sent in `SkyState`. A disc covers the directions within its angular radius (`SUN_RADIUS` 0.0506, `MOON_RADIUS` 0.0404, the old spheres' size), with an edge about a pixel soft.
 - **Colors** (from the palette):
   - Sun: `sunDisc`, a golden orb, never white against the blue sky. Noon Sun `#F7D038` through the day, brightening to Light Sun `#FDE87A` at the 12:00 noon key and deepening again; Sunburst Orange `#FFA333` at dawn, Tropic Sun `#F38B21` at sunset (colorguide.org/sun). It's separate from `sunLight`, so daylight can stay near-neutral while the orb stays golden.
-  - Moon: `moonLight` (cool blue).
-
-- **Visibility**: drawn at full color with **opacity** = the body's visibility (0–1), blended over the sky pass, so a setting sun fades **into** the sky behind it (halo included) instead of darkening into a blot. `drawMesh`'s optional `_opacity` carries it; only light sources use it.
+  - Moon: `moonDisc`, the palette's `moonLight` (cool blue).
+- **Visibility:** each disc is blended into the sky by its body's visibility (0–1), so a setting sun fades **into** the sky behind it, halo included, instead of darkening into a blot.
   - Sun fades in at dawn, fades out at dusk
   - Moon fades in at dusk, fades out at dawn
+- `EnvironmentSystem` still computes `sunPosition` / `moonPosition` (along each direction, just inside the camera's far distance) for the debug HUD.
 
 **Time Mapping:**
 
@@ -347,6 +340,16 @@ The sky is **sky state**, not lighting (R-3): core works out what it should be, 
 - **Sky pass** (renderer): one triangle larger than the screen, drawn first in the lit replay with no depth test or write, so everything draws over it. Each pixel's exact view direction comes from un-projecting the near and far planes with `inverse(viewProj)`.
 - **`skyColor(viewDir)`** (`SKY_COLOR_GLSL`, shared so fog can reuse it): horizon → upper by `HORIZON_BAND` (view height 0.25), upper → zenith above that, horizon color below the horizon. The glow has two parts: a **halo** centered on the sun (`HALO_POWER`), so it rises and sets with it, and a wide **band** along the horizon on the sun's compass side (`BAND_POWER`, `BAND_HEIGHT`, `BAND_STRENGTH`). It's **screen**-blended (`color + glow × amount × (1 − color)`), so it tints toward the glow color without clipping to white, and black glow still adds nothing. (A first version weighted the whole glow toward the horizon: since the sun rises straight up, the bright spot stayed pinned to the horizon as the sun climbed, and adding it clipped to a flat white patch.)
 - `beginFrame` still clears to `horizon` as a fallback.
+
+### Clouds
+
+Procedural, like the rest of the sky: no textures. Drawn in the sky pass's `main` over the gradient, stars, sun and moon (so they hide all of them), **not** in `skyColor()`, so fog never paints clouds onto distant objects.
+
+- **A flat layer** `CLOUD_HEIGHT` (60) above the floor. Each upward view ray meets it at `eye.xz + viewDir.xz × (60 − eye.y) / viewDir.y`, and the noise is evaluated there. Perspective makes clouds large overhead and small and bunched toward the horizon. They fade out over the lowest `CLOUD_HORIZON_FADE` (0.2) of view height.
+- **Shape:** value noise (random values at grid corners, smoothly blended) in four octaves, weighted 0.6 / 0.25 / 0.1 / 0.05 toward the big shapes, at `CLOUD_SCALE` 0.014 cells per unit. Coverage is `smoothstep(0.5, 0.57, density)`. Far away (`CLOUD_DETAIL_NEAR` 250 to `_FAR` 800 units along the ray) the two fine octaves fade to their average, or they'd shimmer into streaks near the horizon.
+- **Hash** (32-bit unsigned, wrapping), on a cell wrapped to the 256-cell period first: `h = (x * 0x8DA6B343) ^ (z * 0xD8163841)`, then `h ^= h >> 16; h *= 0x7FEB352D; h ^= h >> 15; h *= 0x846CA68B; h ^= h >> 16`. The value is the top 24 bits as 0..1.
+- **Shading in 2D:** compare the density here with the density 8 units toward the sun. Thinner toward the sun means this edge faces it, so it's lighter; thick middles are darker. The result is a shade value. For now it blends a darkened and a lightened horizon color; Plan 6 maps it to palette cloud tones.
+- **Motion** (`core/lighting/clouds.ts`, shared with the shader): core sends `cloudTime`, sim time wrapped to `CLOUD_CYCLE_SECONDS` (12000), through `SkyState`. Each octave travels a whole number of its 256-cell periods per cycle (`CLOUD_OCTAVE_LAPS`: (1,0), (3,1), (5,−2), (−4,9)), so the big shapes drift about 1.5 units/s while finer layers slide across them in other directions. Clouds drift **and** change shape, grow, thin, split and merge, with no simulation. Whole lap counts make the wrap at the end of a cycle invisible (`clouds.spec.ts` checks it). Cloud time follows sim time, not the time of day, so a Debug time override doesn't move the clouds.
 
 ### Fog
 

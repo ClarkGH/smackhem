@@ -34,6 +34,12 @@ export default class RenderSystem {
         glow: { x: 0, y: 0, z: 0 },
         sunDirection: { x: 0, y: 1, z: 0 },
         stars: 0,
+        cloudTime: 0,
+        moonDirection: { x: 0, y: -1, z: 0 },
+        sunDisc: { x: 0, y: 0, z: 0 },
+        moonDisc: { x: 0, y: 0, z: 0 },
+        sunVisibility: 0,
+        moonVisibility: 0,
     };
 
     constructor(
@@ -42,8 +48,6 @@ export default class RenderSystem {
         private environmentSystem: EnvironmentSystem,
         private getAspectRatio: () => number,
         // Mesh geometries passed down from core asset ownership contexts
-        private sunMesh: any,
-        private moonMesh: any,
         private wallDebugMesh: any,
     ) {
         // Pre-allocate tracking transforms to strictly prevent garbage collection spikes
@@ -80,7 +84,7 @@ export default class RenderSystem {
         });
     }
 
-    private renderCelestialBodies(focus: Vec3, shadowsEnabled: boolean): void {
+    private declareLighting(focus: Vec3, shadowsEnabled: boolean): void {
         if (this.renderer.setShadowCaster) {
             this.renderer.setShadowCaster(
                 this.environmentSystem.shadowLightDirection,
@@ -96,25 +100,6 @@ export default class RenderSystem {
         }
         if (this.renderer.setAmbientIntensity) {
             this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
-        }
-        if (this.environmentSystem.sunVisibility > 0) {
-            // Full color, faded by opacity: the disc fades into the sky instead of darkening into a blot
-            this.renderer.drawMesh(
-                this.sunMesh,
-                this.environmentSystem.sunTransform,
-                this.environmentSystem.palette.sunDisc,
-                true,
-                this.environmentSystem.sunVisibility,
-            );
-        }
-        if (this.environmentSystem.moonVisibility > 0) {
-            this.renderer.drawMesh(
-                this.moonMesh,
-                this.environmentSystem.moonTransform,
-                this.environmentSystem.palette.moonLight,
-                true,
-                this.environmentSystem.moonVisibility,
-            );
         }
     }
 
@@ -135,6 +120,16 @@ export default class RenderSystem {
             this.sky[field].x = palette[field].x; this.sky[field].y = palette[field].y; this.sky[field].z = palette[field].z;
         });
         this.sky.stars = palette.stars;
+        this.sky.cloudTime = this.environmentSystem.cloudTime;
+        // The sun and moon are part of the sky: drawn in the sky shader, before the clouds, so
+        // clouds pass in front of them. Each fades into the sky by its visibility.
+        const environment = this.environmentSystem;
+        const moon = environment.moonLightDirection;
+        this.sky.moonDirection.x = moon.x; this.sky.moonDirection.y = moon.y; this.sky.moonDirection.z = moon.z;
+        this.sky.sunDisc.x = palette.sunDisc.x; this.sky.sunDisc.y = palette.sunDisc.y; this.sky.sunDisc.z = palette.sunDisc.z;
+        this.sky.moonDisc.x = palette.moonLight.x; this.sky.moonDisc.y = palette.moonLight.y; this.sky.moonDisc.z = palette.moonLight.z;
+        this.sky.sunVisibility = environment.sunVisibility;
+        this.sky.moonVisibility = environment.moonVisibility;
         // Always the sun, even below the horizon (afterglow), never shadowLightDirection,
         // which switches to the moon at night and would swing the glow across the sky at dawn
         const sun = this.environmentSystem.lightDirection;
@@ -152,7 +147,7 @@ export default class RenderSystem {
 
             this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
 
-            this.renderCelestialBodies(camera.position, shadowsEnabled);
+            this.declareLighting(camera.position, shadowsEnabled);
 
             this.world.getVisibleMeshes().forEach((sm) => {
                 this.renderer.drawMesh(sm.mesh, sm.transform, sm.color);
@@ -198,7 +193,7 @@ export default class RenderSystem {
 
             this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
 
-            this.renderCelestialBodies(camera.position, shadowsEnabled);
+            this.declareLighting(camera.position, shadowsEnabled);
 
             this.world.getVisibleMeshes().forEach((sm) => {
                 this.renderer.drawMesh(sm.mesh, sm.transform, sm.color);

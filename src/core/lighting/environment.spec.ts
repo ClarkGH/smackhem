@@ -8,7 +8,7 @@ const ORIGIN = { x: 0, y: 0, z: 0 };
 // Environment at a time of day (0..1), through the debug override
 const at = (timeOfDay: number): EnvironmentSystem => {
     const environment = new EnvironmentSystem(100);
-    environment.update(createGameState(), ORIGIN, 1, 1, timeOfDay);
+    environment.update(createGameState(), ORIGIN, timeOfDay);
     return environment;
 };
 
