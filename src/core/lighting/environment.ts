@@ -3,11 +3,12 @@ import { GameState } from '../gameState';
 import { smoothstep } from '../math/mathHelpers';
 import { createPalette, paletteAt, type TimeOfDayPalette } from './skyPalette';
 import { cloudTimeAt } from './clouds';
+import { starTimeAt } from './stars';
+
+export const DAY_LENGTH_SECONDS = 120;
 
 export default class EnvironmentSystem {
     // Configuration Constants
-    private readonly DAY_LENGTH_SECONDS = 120;
-
     private readonly DECLINATION_OFFSET = 0.0;
 
     // Shadows fade in as the caster climbs from SHADOW_FADE_LOW to SHADOW_FADE_HIGH (direction y).
@@ -52,6 +53,9 @@ export default class EnvironmentSystem {
     // time-of-day override doesn't move the clouds.
     public cloudTime = 0.0;
 
+    // Sim time wrapped to the star twinkle cycle, from sim time for the same reason
+    public starTime = 0.0;
+
     // Recyclable internal objects to prevent per-frame garbage collection
     private readonly sunAzimuth = { value: 0 };
 
@@ -62,10 +66,6 @@ export default class EnvironmentSystem {
     private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 };
 
     constructor(private cameraFar: number) {} // I assure you, this is useful
-
-    public computeTimeOfDay(simTime: number): number {
-        return (simTime % this.DAY_LENGTH_SECONDS) / this.DAY_LENGTH_SECONDS;
-    }
 
     private computeSunSpherical(timeOfDay: number, outAzimuth: { value: number }, outElevation: { value: number }): void {
         const angle = (timeOfDay - 0.25) * Math.PI * 2;
@@ -109,9 +109,10 @@ export default class EnvironmentSystem {
         const interpolatedState = gameState.interpolated;
         const celestialDistance = this.cameraFar - 1.0;
 
-        this.timeOfDay = timeOfDayOverride ?? this.computeTimeOfDay(interpolatedState.simulationTime);
+        this.timeOfDay = timeOfDayOverride ?? gameState.timeOfDay;
         paletteAt(this.timeOfDay, this.palette);
         this.cloudTime = cloudTimeAt(interpolatedState.simulationTime);
+        this.starTime = starTimeAt(interpolatedState.simulationTime);
 
         this.computeSunSpherical(this.timeOfDay, this.sunAzimuth, this.sunElevation);
 

@@ -13,6 +13,7 @@ export interface SaveData {
         cameraPosition: Vec3;
         cameraYaw: number;
         simulationTime: number;
+        timeOfDay: number;
     };
     // Event/quest flags, empty until the flag system exists
     flags: Record<string, boolean>;

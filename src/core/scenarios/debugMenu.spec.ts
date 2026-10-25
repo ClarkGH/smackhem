@@ -9,6 +9,7 @@ import { createDebugSettings, type DebugSettings } from '../settings/debugSettin
 import { createScenario, type Scenario } from '../../testing/scenario';
 import { createPalette, paletteAt } from '../lighting/skyPalette';
 import { cloudTimeAt } from '../lighting/clouds';
+import { starTimeAt } from '../lighting/stars';
 import EnvironmentSystem from '../lighting/environment';
 import { createGameState } from '../gameState';
 
@@ -194,6 +195,21 @@ describe('debug menu - scenario (stub platform)', () => {
         scenario.click('Debug');
         setTime(18);
         expect(scenario.renderer.getSky().cloudTime).toBeCloseTo(sky.cloudTime, 6);
+    });
+
+    it('sends a star time that follows sim time, not the Debug time of day', () => {
+        const { gameState } = scenario;
+        scenario.press({ menu: true });
+        scenario.tick(120);
+        const sky = scenario.renderer.getSky();
+        expect(sky.starTime).toBeCloseTo(starTimeAt(gameState.interpolated.simulationTime), 6);
+        expect(sky.starTime).toBeGreaterThan(0);
+
+        // Overriding the time of day leaves the twinkle where it is
+        scenario.press({ menu: true });
+        scenario.click('Debug');
+        setTime(18);
+        expect(scenario.renderer.getSky().starTime).toBeCloseTo(sky.starTime, 6);
     });
 
     it('stops at 23:45 and steps back to Live', () => {

@@ -8,6 +8,7 @@ import { computeLightViewProj } from './shadowMath';
 import {
     CLOUD_CYCLE_SECONDS, CLOUD_HIGH_OCTAVE_LAPS, CLOUD_NOISE_PERIOD, CLOUD_OCTAVE_LAPS,
 } from '../../../core/lighting/clouds';
+import { STAR_CYCLE_SECONDS, STAR_TWINKLE_SLOT_SECONDS } from '../../../core/lighting/stars';
 
 // A number as a GLSL float literal (GLSL won't turn 256 into 256.0 for you)
 const glslFloat = (value: number): string => (Number.isInteger(value) ? `${value}.0` : `${value}`);
@@ -218,6 +219,7 @@ export default class WebGLRenderer implements Renderer {
         cloudMid: { x: 0.8, y: 0.8, z: 0.8 },
         cloudShadow: { x: 0.6, y: 0.6, z: 0.6 },
         cloudTime: 0,
+        starTime: 0,
         moonDirection: { x: 0, y: -1, z: 0 },
         sunDisc: { x: 0, y: 0, z: 0 },
         moonDisc: { x: 0, y: 0, z: 0 },
@@ -240,6 +242,7 @@ export default class WebGLRenderer implements Renderer {
         stars: WebGLUniformLocation | null;
         eye: WebGLUniformLocation | null;
         cloudTime: WebGLUniformLocation | null;
+        starTime: WebGLUniformLocation | null;
         moonDirection: WebGLUniformLocation | null;
         sunDisc: WebGLUniformLocation | null;
         moonDisc: WebGLUniformLocation | null;
@@ -258,6 +261,7 @@ export default class WebGLRenderer implements Renderer {
             stars: null,
             eye: null,
             cloudTime: null,
+            starTime: null,
             moonDirection: null,
             sunDisc: null,
             moonDisc: null,
@@ -1243,6 +1247,7 @@ ${LIGHT_CARD_GLSL}
         });
         this.sky.stars = sky.stars;
         this.sky.cloudTime = sky.cloudTime;
+        this.sky.starTime = sky.starTime;
         (['cloudLight', 'cloudMid', 'cloudShadow'] as const).forEach((field) => {
             this.sky[field].x = sky[field].x; this.sky[field].y = sky[field].y; this.sky[field].z = sky[field].z;
         });
@@ -1287,6 +1292,7 @@ ${LIGHT_CARD_GLSL}
             uniform float u_skyStars;
             uniform vec3 u_eye;
             uniform float u_cloudTime;
+            uniform float u_starTime;
             uniform vec3 u_moonDirection;
             uniform vec3 u_sunDisc;
             uniform vec3 u_moonDisc;
@@ -1329,6 +1335,32 @@ ${SKY_COLOR_GLSL}
                 return float(h >> 8u) / 16777216.0;
             }
 
+            // Twinkle: now and then a star dims briefly. Its time is cut into slots
+            // (core/lighting/stars.ts); per slot, a hash of the star and the slot number decides
+            // whether it dips, at the slot's start. Slot numbers repeat every cycle, so wrapping
+            // starTime is invisible. Dims only: brightening would pass the speckle-in's values.
+            const float STAR_TWINKLE_SLOT = ${glslFloat(STAR_TWINKLE_SLOT_SECONDS)};
+            const float STAR_TWINKLE_SLOTS = ${glslFloat(STAR_CYCLE_SECONDS / STAR_TWINKLE_SLOT_SECONDS)};
+            // Share of slots in which a star twinkles: about 1 in 12, so roughly every 40 s each
+            const float STAR_TWINKLE_CHANCE = 0.08;
+            // Seconds a dip lasts, and how much of the star's light it takes at its deepest
+            const float STAR_TWINKLE_LENGTH = 0.5;
+            const float STAR_TWINKLE_DEPTH = 0.7;
+
+            // 1 when steady, down to 1 - STAR_TWINKLE_DEPTH in a dip
+            float starTwinkle(uint h) {
+                // The star's own offset, so stars don't all change slot together
+                float t = u_starTime / STAR_TWINKLE_SLOT + starUnit(h);
+                uint slot = uint(mod(floor(t), STAR_TWINKLE_SLOTS));
+                // The star hash again, with the star's value and the slot number in place of a cell
+                if (starUnit(starHash(h, slot, 0u)) >= STAR_TWINKLE_CHANCE) return 1.0;
+                // One dip at the slot's start, 0 -> 1 -> 0 and flat at both ends, so no pop
+                float x = fract(t) * STAR_TWINKLE_SLOT / STAR_TWINKLE_LENGTH;
+                if (x >= 1.0) return 1.0;
+                float dip = 4.0 * x * (1.0 - x);
+                return 1.0 - STAR_TWINKLE_DEPTH * dip * dip;
+            }
+
             // pixelAngle: how much the view direction changes per screen pixel
             float starLight(vec3 viewDir, float pixelAngle) {
                 if (u_skyStars <= 0.0 || viewDir.y <= 0.0) return 0.0;
@@ -1352,10 +1384,12 @@ ${SKY_COLOR_GLSL}
                 uint h = starHash(face, uint(cell.x), uint(cell.y));
                 if (starUnit(h) >= STAR_DENSITY) return 0.0;
 
-                // Further values from the same hash: position (kept off the cell's edges) and brightness
+                // Further values from the same hash: position (kept off the cell's edges), brightness
+                // and twinkle
                 uint h2 = h * 0x27D4EB2Du;
                 uint h3 = h2 * 0x165667B1u;
                 uint h4 = h3 * 0x9E3779B9u;
+                uint h5 = h4 * 0x85EBCA6Bu;
                 vec2 center = cell + 0.2 + 0.6 * vec2(starUnit(h2), starUnit(h3));
                 float b = starUnit(h4);
                 // Squared: many faint stars, few bright ones
@@ -1380,7 +1414,7 @@ ${SKY_COLOR_GLSL}
                 float radius = radiusPixels * pixelAngle;
                 float spot = 1.0 - smoothstep(radius * 0.5, radius, length(viewDir - starDir));
 
-                return spot * brightness * show * smoothstep(0.0, STAR_HORIZON_FADE, viewDir.y);
+                return spot * brightness * starTwinkle(h5) * show * smoothstep(0.0, STAR_HORIZON_FADE, viewDir.y);
             }
 
             // Clouds: a flat layer high above the world, shaped by noise where each view ray meets it.
@@ -1469,12 +1503,15 @@ ${SKY_COLOR_GLSL}
                 float edge = max(fwidth(density), CLOUD_EDGE_MIN);
                 float coverage = smoothstep(CLOUD_COVERAGE - edge, CLOUD_COVERAGE + edge, density);
 
-                // Lit edges: if the cloud is thinner a step toward the sun, this side faces it
+                // Lit edges: if the cloud is thinner a step toward the sun, this side faces it.
+                // Strongest with the sun low to the side, gone with it overhead (no horizontal part)
+                // or below the horizon (no visibility), so the fallback below is reached smoothly.
                 float lit = 0.6;
                 vec2 sunFlat = u_sunDirection.xz;
                 if (length(sunFlat) > 0.001) {
                     float towardSun = cloudDensity(layerPos + normalize(sunFlat) * CLOUD_LIGHT_STEP, detail);
-                    lit = clamp(0.6 + (density - towardSun) * 4.0, 0.0, 1.0);
+                    float edgeStrength = length(sunFlat) * u_sunVisibility;
+                    lit = clamp(0.6 + (density - towardSun) * 4.0 * edgeStrength, 0.0, 1.0);
                 }
                 // Thicker is darker underneath
                 float shade = lit * (1.0 - 0.35 * smoothstep(CLOUD_COVERAGE, CLOUD_COVERAGE + 0.25, density));
@@ -1581,6 +1618,7 @@ ${SKY_COLOR_GLSL}
             stars: gl.getUniformLocation(program, 'u_skyStars'),
             eye: gl.getUniformLocation(program, 'u_eye'),
             cloudTime: gl.getUniformLocation(program, 'u_cloudTime'),
+            starTime: gl.getUniformLocation(program, 'u_starTime'),
             moonDirection: gl.getUniformLocation(program, 'u_moonDirection'),
             sunDisc: gl.getUniformLocation(program, 'u_sunDisc'),
             moonDisc: gl.getUniformLocation(program, 'u_moonDisc'),
@@ -1612,6 +1650,7 @@ ${SKY_COLOR_GLSL}
         gl.uniform1f(locs.stars, sky.stars);
         gl.uniform3f(locs.eye, this.eye.x, this.eye.y, this.eye.z);
         gl.uniform1f(locs.cloudTime, sky.cloudTime);
+        gl.uniform1f(locs.starTime, sky.starTime);
         gl.uniform3f(locs.moonDirection, sky.moonDirection.x, sky.moonDirection.y, sky.moonDirection.z);
         gl.uniform3f(locs.sunDisc, sky.sunDisc.x, sky.sunDisc.y, sky.sunDisc.z);
         gl.uniform3f(locs.moonDisc, sky.moonDisc.x, sky.moonDisc.y, sky.moonDisc.z);

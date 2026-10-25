@@ -47,6 +47,7 @@ export default class NullRenderer implements Renderer {
         cloudMid: { x: 0, y: 0, z: 0 },
         cloudShadow: { x: 0, y: 0, z: 0 },
         cloudTime: 0,
+        starTime: 0,
         moonDirection: { x: 0, y: 0, z: 0 },
         sunDisc: { x: 0, y: 0, z: 0 },
         moonDisc: { x: 0, y: 0, z: 0 },
@@ -72,6 +73,7 @@ export default class NullRenderer implements Renderer {
         });
         this.sky.stars = _sky.stars;
         this.sky.cloudTime = _sky.cloudTime;
+        this.sky.starTime = _sky.starTime;
         this.sky.sunVisibility = _sky.sunVisibility;
         this.sky.moonVisibility = _sky.moonVisibility;
         this.skySetBetweenFrames = true;
@@ -89,6 +91,7 @@ export default class NullRenderer implements Renderer {
             cloudMid: { ...this.sky.cloudMid },
             cloudShadow: { ...this.sky.cloudShadow },
             cloudTime: this.sky.cloudTime,
+            starTime: this.sky.starTime,
             moonDirection: { ...this.sky.moonDirection },
             sunDisc: { ...this.sky.sunDisc },
             moonDisc: { ...this.sky.moonDisc },

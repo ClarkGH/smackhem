@@ -53,9 +53,11 @@ export interface DiscreteState {
 export interface GameState {
     interpolated: InterpolatedState;
     discrete: DiscreteState;
+    timeOfDay: number;
 }
 
 export const createGameState = (initialMode: GameMode = 'world_3d'): GameState => ({
+    timeOfDay: 0,
     interpolated: {
         cameraPosition: { x: 0, y: PLAYER_HEIGHT, z: 0 },
         cameraYaw: 0,

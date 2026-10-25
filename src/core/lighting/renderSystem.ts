@@ -38,6 +38,7 @@ export default class RenderSystem {
         cloudMid: { x: 0, y: 0, z: 0 },
         cloudShadow: { x: 0, y: 0, z: 0 },
         cloudTime: 0,
+        starTime: 0,
         moonDirection: { x: 0, y: -1, z: 0 },
         sunDisc: { x: 0, y: 0, z: 0 },
         moonDisc: { x: 0, y: 0, z: 0 },
@@ -124,6 +125,7 @@ export default class RenderSystem {
         });
         this.sky.stars = palette.stars;
         this.sky.cloudTime = this.environmentSystem.cloudTime;
+        this.sky.starTime = this.environmentSystem.starTime;
         // The sun and moon are part of the sky: drawn in the sky shader, before the clouds, so
         // clouds pass in front of them. Each fades into the sky by its visibility.
         const environment = this.environmentSystem;

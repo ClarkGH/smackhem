@@ -30,7 +30,7 @@ import Instance3DSystem from './instance';
 import MenuSystem from './menu/menuSystem';
 import { createDefaultSettings, type Settings } from './settings/settings';
 import { QUARTERS_PER_DAY, type DebugSettings } from './settings/debugSettings';
-import EnvironmentSystem from './lighting/environment';
+import EnvironmentSystem, { DAY_LENGTH_SECONDS } from './lighting/environment';
 import RenderSystem from './lighting/renderSystem';
 
 // Simulation step, 60 ticks per second. Exported so tests step the loop exactly.
@@ -254,6 +254,8 @@ export class GameLoop {
 
         // Normal 3D simulation updates
         interpolatedState.simulationTime += dt;
+        // Seconds into a share of the day, wrapped so it always means where in the day (0..1)
+        this.gameState.timeOfDay = (this.gameState.timeOfDay + dt / DAY_LENGTH_SECONDS) % 1;
 
         this.camera.yaw += lookYaw;
         this.camera.pitch -= lookPitch;
@@ -345,6 +347,7 @@ export class GameLoop {
     private quitToMainMenu(): void {
         const previousMode = this.gameState.discrete.gameMode;
         const fresh = createGameState('main_menu');
+        this.gameState.timeOfDay = fresh.timeOfDay;
         this.gameState.discrete = fresh.discrete;
         this.gameState.interpolated = fresh.interpolated;
 

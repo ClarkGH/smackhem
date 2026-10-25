@@ -103,6 +103,7 @@ describe('pause menu - scenario (stub platform)', () => {
 
             expect(gameState.discrete).toEqual(fresh.discrete);
             expect(gameState.interpolated).toEqual(fresh.interpolated);
+            expect(gameState.timeOfDay).toBe(fresh.timeOfDay);
             expect(gameLoop.getRenderCamera().position).toEqual(fresh.interpolated.cameraPosition);
             expect(overlay.lastView?.title).toBe('Smackhem');
             expect(modeChanges.at(-1)).toEqual({

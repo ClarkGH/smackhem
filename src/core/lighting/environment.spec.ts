@@ -50,6 +50,36 @@ describe('EnvironmentSystem shadow caster', () => {
     });
 });
 
+describe('EnvironmentSystem sun for cloud edges', () => {
+    // The sky shader scales its lit cloud edges by the sun's horizontal length times its
+    // visibility (cloudAt in webGLRenderer.ts). These are the inputs that has to be smooth.
+    const edgeStrength = (environment: EnvironmentSystem): number => (
+        Math.hypot(environment.lightDirection.x, environment.lightDirection.z) * environment.sunVisibility
+    );
+
+    it('has no lit edges with the sun overhead at noon or below the horizon at midnight', () => {
+        expect(edgeStrength(at(0.5))).toBeCloseTo(0, 5);
+        expect(edgeStrength(at(0))).toBe(0);
+    });
+
+    it('has lit edges with the sun low at sunrise and sunset', () => {
+        expect(edgeStrength(at(0.27))).toBeGreaterThan(0.5);
+        expect(edgeStrength(at(0.73))).toBeGreaterThan(0.5);
+    });
+
+    it('never jumps in strength across a whole day', () => {
+        const STEPS = 2400; // 0.05 s apart on a 120 s day
+        let previous = edgeStrength(at(0));
+        let biggestJump = 0;
+        for (let i = 1; i <= STEPS; i += 1) {
+            const strength = edgeStrength(at(i / STEPS));
+            biggestJump = Math.max(biggestJump, Math.abs(strength - previous));
+            previous = strength;
+        }
+        expect(biggestJump).toBeLessThan(0.02);
+    });
+});
+
 describe('EnvironmentSystem light from the palette', () => {
     // At every key: ambient is the palette's, and each body's light is its palette color
     // faded by its own visibility. Expected values come from the key table.
