@@ -49,7 +49,7 @@ export interface DiscreteState {
     sceneCharacterPositionGrid: { x: number; y: number };
     isTransitioningPitch: boolean;
     targetPitch: number;
-    // The NPC line on screen, null when nobody is talking. Counts down in fixed ticks.
+    // The NPC line on screen, null when nobody is talking. Stays until Interact or Back closes it (see GameLoop).
     activeSpeech: { npcId: string; line: string;} | null;
 }
 

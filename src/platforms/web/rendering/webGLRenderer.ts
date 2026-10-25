@@ -29,6 +29,9 @@ const SHADOW_DEPTH_RADIUS = 100;
 // The shadow map lives on its own texture unit, sprites use unit 0
 const SHADOW_TEXTURE_UNIT = 1;
 
+// The sky's colors and directions setSky copies each frame, listed once rather than every frame (M-1)
+const SKY_VEC3_FIELDS = ['horizon', 'upper', 'zenith', 'glow', 'sunDirection', 'cloudLight', 'cloudMid', 'cloudShadow'] as const;
+
 // Where a billboard point sits on the card it casts from: upright, facing the shadow light.
 // Shared by the billboard's shadow lookup (receiving) and the billboard caster (depth pass), so the
 // two always agree. Assumes an upright billboard model: column 0 = right * size, column 3 = anchor.
@@ -1240,17 +1243,13 @@ ${LIGHT_CARD_GLSL}
     }
 
     public setSky(sky: SkyState): void {
-        (['horizon', 'upper', 'zenith', 'glow', 'sunDirection'] as const).forEach((field) => {
-            this.sky[field].x = sky[field].x;
-            this.sky[field].y = sky[field].y;
-            this.sky[field].z = sky[field].z;
-        });
+        for (let i = 0; i < SKY_VEC3_FIELDS.length; i += 1) {
+            const field = SKY_VEC3_FIELDS[i];
+            this.sky[field].x = sky[field].x; this.sky[field].y = sky[field].y; this.sky[field].z = sky[field].z;
+        }
         this.sky.stars = sky.stars;
         this.sky.cloudTime = sky.cloudTime;
         this.sky.starTime = sky.starTime;
-        (['cloudLight', 'cloudMid', 'cloudShadow'] as const).forEach((field) => {
-            this.sky[field].x = sky[field].x; this.sky[field].y = sky[field].y; this.sky[field].z = sky[field].z;
-        });
         this.sky.moonDirection.x = sky.moonDirection.x;
         this.sky.moonDirection.y = sky.moonDirection.y;
         this.sky.moonDirection.z = sky.moonDirection.z;

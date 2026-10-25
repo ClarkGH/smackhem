@@ -40,6 +40,12 @@ export default class RenderSystem {
     // NPC textures by asset ID. null while loading, or if the load failed.
     private readonly npcTextures: Map<string, TextureHandle | null> = new Map();
 
+    // Handed to the renderer every frame. They point at the environment's vectors, which are
+    // filled in place, so they're built once in the constructor (M-1)
+    private readonly sunLight: { direction: Vec3; color: Vec3 };
+
+    private readonly moonLight: { direction: Vec3; color: Vec3 };
+
     // Viewport the scene projection was last built for, rebuilt only when it changes (M-1)
     private sceneOrthoWidth = 0;
 
@@ -78,6 +84,8 @@ export default class RenderSystem {
         this.billboardTransform = { elements: new Float32Array(16) };
         this.sceneSpriteTransform = { elements: new Float32Array(16) };
         this.sceneOrthoProj = { elements: new Float32Array(16) };
+        this.sunLight = { direction: environmentSystem.lightDirection, color: environmentSystem.sunColorWithVisibility };
+        this.moonLight = { direction: environmentSystem.moonLightDirection, color: environmentSystem.moonColorWithVisibility };
     }
 
     private computeScaledTransform(center: Vec3, scale: Vec3, out: Mat4): void {
@@ -184,10 +192,7 @@ export default class RenderSystem {
             );
         }
         if (this.renderer.setCelestialLighting) {
-            this.renderer.setCelestialLighting(
-                { direction: this.environmentSystem.lightDirection, color: this.environmentSystem.sunColorWithVisibility },
-                { direction: this.environmentSystem.moonLightDirection, color: this.environmentSystem.moonColorWithVisibility },
-            );
+            this.renderer.setCelestialLighting(this.sunLight, this.moonLight);
         }
         if (this.renderer.setAmbientIntensity) {
             this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
