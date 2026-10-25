@@ -119,6 +119,20 @@ describe('ChunkLoader NPCs', () => {
         expect(chunk.collisionAABBs).toContain(box);
     });
 
+    it('skips an infinite size, which JSON gives for 1e999', () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        // Built by hand, JSON.stringify would write Infinity as null
+        const json = `{ "version": 2, "id": "1,2", "meshes": [], "npcs": [
+            { "id": "huge", "sprite": "npc-lmao", "pos": [0, 0, 0], "size": 1e999, "line": "Hi" }
+        ] }`;
+
+        const chunk = new ChunkLoader().loadChunkFromJSON(json, 1, 2, new NullRenderer());
+
+        expect(chunk.npcs).toEqual([]);
+        expect(chunk.collisionAABBs).toEqual([]);
+    });
+
     it('loads a chunk without npcs as none', () => {
         expect(loadNpcs(undefined).npcs).toEqual([]);
     });

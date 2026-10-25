@@ -33,6 +33,7 @@ The loader expects version 2 (`EXPECTED_SCHEMA_VERSION` in `src/services/chunkLo
 - **1:** chunk files carried their own `bounds`.
 - **2 (current):** no `bounds`. Chunk bounds are worked out in code from the chunk's coordinates. Meshes are inline, as below.
 - **The bump to 2 (October 2026):** the loader had been left expecting version 1 after the format moved on, so every version-2 file logged a warning on load. The loader now expects 2. The five remaining version-1 files around spawn had already dropped `bounds`, so only their `version` number changed.
+- **NPCs within v2 (October 2026):** chunks gained an optional `npcs` array. It's optional and only adds to the format, so every existing v2 file still loads unchanged, and the version stayed at 2.
 
 When the format changes again: bump `EXPECTED_SCHEMA_VERSION`, update or migrate the files, add a line here, and extend `chunkLoader.spec.ts`'s version tests.
 
@@ -83,6 +84,26 @@ When the format changes again: bump `EXPECTED_SCHEMA_VERSION`, update or migrate
 - `pyramid`: Uses `scale[0]` for base size and height. The mesh's base is at its origin, so `yPos = pos[1]` (no lift).
 - `sphere`: Uses `scale[0]` for **diameter** (radius = `scale[0]/2`). Y position is automatically adjusted: `yPos = pos[1] + radius` to center sphere on Y axis. Optional `segments` (number) for sphere subdivision (default: 12).
 - `prism`: Uses `scale[0]` for width, `scale[1]` for height, `scale[2]` for depth. Y position is automatically adjusted: `yPos = pos[1] + scale[1]/2` to center prism on Y axis.
+
+**Optional Fields:**
+
+- `npcs` (array): Non-combat characters standing in the chunk. Missing means none.
+
+**NPC Object Fields:**
+
+- `id` (string): Unique NPC identifier, e.g. `"npc_01"`. Conversations and the interact prompt refer to it.
+- `sprite` (string): Texture asset ID, never a path (A-1). E.g. `"npc-lmao"` for `assets/images/npc-lmao.png`.
+- `pos` (number[3]): The sprite's **base**, relative to the chunk center, like a mesh's `pos`.
+- `size` (number): Billboard width and height, and its collision box: `size` wide on X and Z, from `pos[1]` up to `pos[1] + size`. It must be positive and finite.
+- `line` (string): What it says when interacted with.
+
+```json
+"npcs": [
+  { "id": "npc_01", "sprite": "npc-lmao", "pos": [1.5, 0, -1.5], "size": 1, "line": "Me NPC, me no do nuthin' yet.. but me look great!" }
+]
+```
+
+**Loading never trusts an entry:** an NPC missing a field, or with a size that isn't a positive finite number, is skipped with a warning, and the rest of the chunk still loads. (`JSON.parse` reads `1e999` as `Infinity`, which would be an endless box.)
 
 **Position Adjustment Notes:**
 
@@ -156,6 +177,7 @@ Pure data. No logic. Portable forever.
 - Missing chunk files: System creates an empty fallback chunk (floor plane only) instead of failing
 - Invalid JSON: Logs error and creates empty fallback chunk
 - Invalid mesh types: Falls back to creating a cube mesh
+- Invalid NPC entries: Skipped with a warning (see NPC Object Fields)
 
 **Empty Chunk Fallback:**
 When a chunk file is missing or fails to load, the system automatically creates an empty chunk containing only a floor plane at the chunk's world coordinates. This ensures the game continues to function even if chunk files haven't been created yet.

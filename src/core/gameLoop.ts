@@ -39,6 +39,10 @@ import InteractionSystem, { type Interactor } from './interaction';
 // Simulation step, 60 ticks per second. Exported so tests step the loop exactly.
 export const FIXED_DT = 1 / 60;
 
+// The most one frame can catch up (15 ticks). After a stall (a switched tab, a blocked thread)
+// the game carries on from where it was instead of running seconds of ticks at once.
+export const MAX_FRAME_DT = 0.25;
+
 // Radians per unit of mouse movement
 const MOUSE_LOOK_SCALE = 0.005;
 
@@ -363,7 +367,7 @@ export class GameLoop {
     }
 
     public update(deltaTime: number): void {
-        this.accumulator += deltaTime;
+        this.accumulator += Math.min(deltaTime, MAX_FRAME_DT);
 
         const intentSnapshot = this.input.getIntent();
         this.pendingLook.yaw += intentSnapshot.look.yaw;

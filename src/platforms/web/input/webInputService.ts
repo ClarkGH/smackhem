@@ -1,7 +1,7 @@
 import type { Input, PlayerIntent, Step } from '../../../services/input';
 import { createInputState, type InputState } from '../../../core/input';
 import {
-    createWebInputState, setupWebInput, syncWebInput, type WebInputState,
+    createWebInputState, setupWebInput, syncWebInput, type InputDevice, type WebInputState,
 } from './webInput';
 
 type MenuPointer = NonNullable<PlayerIntent['menuPointer']>;
@@ -34,6 +34,11 @@ export class WebInputService implements Input {
     // Right-click in the menu
     public pressBack(): void {
         this.webState.back = true;
+    }
+
+    // For on-screen prompts, platform-side only: core never knows which device is in use (I-1)
+    public getLastDevice(): InputDevice {
+        return this.webState.lastDevice;
     }
 
     // From the menu overlay, see WebInputState.menuOpen

@@ -26,6 +26,7 @@
   - [Party Structure](#party-structure)
   - [Party/Enemy Behavior](#partyenemy-behavior)
 - [Collision System](#collision-system)
+- [Interaction System](#interaction-system)
 - [Scene System](#scene-system)
 - [Menu System](#menu-system)
 - [Navigation](#navigation)
@@ -52,9 +53,19 @@ Each chunk is:
 Chunk {
   id: ChunkID;
   bounds: AABB;
-  collisionAABBs: AABB[];
+  collisionAABBs: AABB[]; // NPC boxes included, the same objects as Npc.collisionAABB
   meshes: StaticMesh[];
   hasContent: boolean;
+  npcs: Npc[];
+}
+
+Npc {
+  id: string;
+  textureId: string; // asset ID
+  position: Vec3;    // world space, base of the sprite
+  size: number;
+  collisionAABB: AABB;
+  line: string;
 }
 
 StaticMesh {
@@ -391,12 +402,38 @@ This is cheap, readable, and portable.
 - Player vs world.
 - No physics engine.
 - Deterministic.
+- NPCs block the player and the instance circle: their boxes go into the chunk's `collisionAABBs`, so collision needs no NPC-specific code.
 
 This is console-friendly and debuggable.
 
+## Interaction System
+
+`InteractionSystem` (`src/core/interaction.ts`) decides what Interact reaches, and opens conversations.
+
+- **Interactables:**
+  - **Aiming:** anything with an `id`, `position` and `size` (`Interactable`) can be aimed at. NPCs are the only kind so far.
+  - **What happens:** each kind decides that itself. For an NPC, it opens its line.
+  - **Typing:** `findTarget` is generic, so each kind gets its own type back and nothing has to cast.
+- **The interactor:**
+  - **Who:** whoever does the reaching (`Interactor { position, facing }`). `GameLoop` picks it: the camera in `world_3d` (with its yaw), and the circle in `instance_3d` once the instance is fully open (`facing: null`, so it reaches all the way round).
+  - **Ticks:** it only runs if the tick *started* in that mode, so a press that changes mode (leaving the 2D scene) can't also interact.
+- **The target:**
+  - **Picking it:** every tick, the target is the nearest interactable within `INTERACT_RANGE` (2 units across the floor), and in front (within 45°) when the interactor has a facing.
+  - **One target for both:** it's stored in `DiscreteState.interactTarget`. The prompt shows it and Interact acts on it, so the two can't disagree.
+  - **Never stale:** it's cleared at the start of every tick and set again only by whichever interactor runs, so it's never left over from a mode that stopped running it.
+- **Conversations are modal:**
+  - **Open:** while `DiscreteState.activeSpeech` is set, `GameLoop` runs nothing else that tick. There's no time or day/night, no moving or looking, and no instance toggle; only the pause menu still opens.
+  - **Close:** Interact or Back closes it. The closing tick returns early, so the same press can't open a new one.
+  - **Time:** "time stopped" isn't a flag of its own. It's worked out from `activeSpeech`, so the two can't drift apart.
+- **On screen:**
+  - **Placement:** `GameLoop.render` places the speech bubble and the prompt over the NPC's head (`position.y + size + 0.2`), using `RenderSystem.projectToViewport` with the frame's camera.
+  - **Hidden:** while paused, in other modes, and while the point is behind the camera.
+  - **Drawing:** each is handed to its platform overlay (`SpeechOverlay`, `PromptOverlay`) as plain data (`SpeechView`, `PromptView`), or `null` to hide it, sent once.
+  - **Prompt label:** the platform chooses it from the last-used device. Core never knows which device is in use (I-1).
+
 ## Scene System
 
-The 2D scene system (more TBD).
+The 2D scene system (more TBD). Entered from Pause → Debug → Enter 2D Scene: the menu closes and publishes `scene_2d_requested`, and `GameLoop` calls `Scene2DSystem.enter`, which only works from `world_3d`. Interact leaves it.
 
 ## Menu System
 
@@ -417,7 +454,7 @@ The 2D scene system (more TBD).
   - **Quit to Main Menu** asks first, with No selected. Yes publishes `quit_to_main_menu_requested`, and `GameLoop` resets to a fresh boot: new game state (the shared `GameState` object keeps its identity, its contents are replaced), the camera at the start with no render blending, the menu back on its first screen, and `game_mode_changed` to `main_menu`.
   - **Lost cursor:** on the web, losing the captured cursor during play (Escape, switching windows) also opens the pause menu, because browsers may not pass that Escape on to the page.
 - **New Game:** sets `world_3d` and publishes `game_mode_changed`, using the same previous-mode pattern as the scene and instance systems.
-- **The menu owns the tick:** in `main_menu` or while paused, `GameLoop.updateSimulation` runs only the menu and returns. So one press of interact can't confirm New Game and also enter the 2D scene.
+- **The menu owns the tick:** in `main_menu` or while paused, `GameLoop.updateSimulation` runs only the menu and returns. So one press of interact can't confirm New Game and also reach the world, such as talking to an NPC standing in front of the camera.
 - **Sound:** choosing an enabled item, or going back, plays `ui_menu_select` on the `ui` bus. Moving the selection and disabled items stay silent.
 - **Settings rows:** Master/Music/Ambient/SFX/UI volume (steps of 10%), Mouse Sensitivity and Controller Sensitivity (0.2×–2×, steps of 0.1), Invert Mouse Y and Invert Controller Y, Render Scale, Window Size (native only), Fullscreen, then Accessibility and Back.
   - **Display rows depend on the platform:** the screens are built from `DisplayCapabilities`. Window Size is hidden on the web, and Fullscreen is greyed out where the browser won't allow it. The menu also redraws on any `settings_changed`, so the Fullscreen value stays true when Escape exits fullscreen. See [Rendering](rendering.md#display-size-and-resolution).

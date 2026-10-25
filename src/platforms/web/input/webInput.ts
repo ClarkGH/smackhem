@@ -26,6 +26,9 @@ const PAD_BUTTON = {
     RIGHT: 15,
 } as const;
 
+// Which device the player last touched, so on-screen prompts can show its button
+export type InputDevice = 'keyboard' | 'gamepad';
+
 const STICK_DEADZONE = 0.15;
 // A left stick push past this counts as one menu step
 const STICK_NAVIGATE_THRESHOLD = 0.5;
@@ -52,6 +55,7 @@ export interface WebInputState {
     // Previous frame's gamepad state, to act on presses rather than holds
     padButtons: boolean[];
     padStickStep: { x: number; y: number };
+    lastDevice: InputDevice;
 }
 
 export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => ({
@@ -72,6 +76,7 @@ export const createWebInputState = (keyMapping?: KeyMapping): WebInputState => (
     navigate: { x: 0, y: 0 },
     padButtons: [],
     padStickStep: { x: 0, y: 0 },
+    lastDevice: 'keyboard',
 });
 
 export const setupWebInput = (
@@ -83,10 +88,12 @@ export const setupWebInput = (
         // Several events can arrive per frame, keep all of them
         webState.axes.mouseLookX += e.movementX;
         webState.axes.mouseLookY += e.movementY;
+        webState.lastDevice = 'keyboard';
     });
 
     const handleKeyDown = (e: KeyboardEvent) => {
         webState.pressedKeys.add(e.key);
+        webState.lastDevice = 'keyboard';
         // Toggle debug HUD on F3 (debug keys live on the F-keys, see docs/controls.md)
         if (e.key === 'F3') {
             webState.toggleDebugHUD = true;
@@ -128,6 +135,9 @@ export const setupWebInput = (
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    // Keys let go while the page doesn't have focus (an alert, another tab) never send keyup,
+    // so forget them all rather than walk on forever
+    window.addEventListener('blur', () => webState.pressedKeys.clear());
 
     canvas.addEventListener('click', () => {
         canvas.requestPointerLock();
@@ -232,6 +242,11 @@ export const syncWebInput = (
         const padDown = justPressed(PAD_BUTTON.DOWN);
         const padLeft = justPressed(PAD_BUTTON.LEFT);
         const padRight = justPressed(PAD_BUTTON.RIGHT);
+
+        // Any press or stick push makes the pad the device prompts show
+        const padTouched = padA || padB || padY || padStart || padUp || padDown || padLeft || padRight
+            || padMoveX !== 0 || padMoveY !== 0 || finalLookRateX !== 0 || finalLookRateY !== 0;
+        if (padTouched) webState.lastDevice = 'gamepad';
 
         if (padA) interact = true;
         if (padB) back = true;

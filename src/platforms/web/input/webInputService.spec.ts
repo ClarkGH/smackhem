@@ -41,6 +41,44 @@ describe('WebInputService', () => {
         expect(frame().interact).toBe(false);
     });
 
+    it('forgets held keys when the window loses focus, whose keyup never arrives', () => {
+        key('w');
+        expect(frame().move.y).toBe(1);
+
+        window.dispatch('blur');
+
+        expect(frame().move.y).toBe(0);
+    });
+
+    describe('last-used device, for on-screen prompts', () => {
+        it('starts on the keyboard', () => {
+            expect(input.getLastDevice()).toBe('keyboard');
+        });
+
+        it('switches to the pad on a button press, and back on a key', () => {
+            const pad = {
+                axes: [0, 0, 0, 0],
+                buttons: Array.from({ length: 17 }, () => ({ pressed: false })),
+            };
+            vi.stubGlobal('navigator', { getGamepads: () => [pad] });
+
+            pad.buttons[0].pressed = true;
+            frame();
+            expect(input.getLastDevice()).toBe('gamepad');
+
+            key('w');
+            expect(input.getLastDevice()).toBe('keyboard');
+        });
+
+        it('stays on the keyboard when a connected pad only drifts inside its deadzone', () => {
+            vi.stubGlobal('navigator', { getGamepads: () => [{ axes: [0.1, 0, 0.1, 0], buttons: [] }] });
+
+            frame();
+
+            expect(input.getLastDevice()).toBe('keyboard');
+        });
+    });
+
     it('Escape is both back and the menu button', () => {
         key('Escape');
 

@@ -124,7 +124,7 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
         opened: (open) => input.setMenuOpen(open),
     });
     const speech = new WebSpeechOverlay(container);
-    const prompt = new WebPromptOverlay(container);
+    const prompt = new WebPromptOverlay(container, () => input.getLastDevice());
 
     // Browsers block audio until a user gesture, unlock on the first one
     const unlockAudio = () => {

@@ -24,6 +24,7 @@ Status: ✅ works now, 🔜 planned.
 - Mouse movement is added up over a frame and applied once, on the next simulation tick. Look speed is the same at any frame rate, and nothing is lost on a frame that runs no tick.
 - The stick turns at up to 2.5 rad/s (about 143°/s) at full tilt, applied every tick.
 - Mouse movement made while a menu is open is dropped, so starting a game never jolts the camera.
+- On the web, keys held when the page loses focus (another window, a browser dialog) are forgotten, because their release never arrives. Otherwise you'd keep walking when you came back.
 
 Controller buttons act on the press, not while held. The sticks ignore drift below 0.15.
 
@@ -33,10 +34,15 @@ Controller buttons act on the press, not while held. The sticks ignore drift bel
 |---|---|---|---|
 | Move | W A S D, arrow keys | Left stick | ✅ |
 | Look | Mouse (click the game to capture the cursor) | Right stick | ✅ (separate sensitivity and invert per device in Settings) |
-| Interact / talk | E | A | ✅ |
-| 2D scene toggle *(temporary, uses interact)* | E | A | ✅ |
+| Interact / talk (with whatever the prompt is over) | E | A | ✅ |
+| Close a conversation | E or Escape/Backspace | A or B | ✅ |
 | Instance toggle *(temporary)* | Space | Y | ✅ |
 | Pause menu | Escape | Start | ✅ |
+
+**Talking:**
+- A small prompt over a character shows that Interact will reach them. Its label follows the device you last touched: **E** on keyboard, **Ⓐ** on a controller.
+- A conversation holds everything until you close it, so it waits for however long you take to read. You can't move or look, the day stops, and the instance toggle does nothing. The pause menu still opens.
+- **In the world** you talk to the nearest character within 2 units and within 45° of where you're looking. **In the instance** the circle talks to the nearest one within 2 units in any direction.
 
 ## Menus
 
@@ -65,12 +71,13 @@ Toggleable, never needed to play (Rule D-1).
 | Debug HUD | F3 | ✅ |
 | Wireframe | Pause menu → Debug (dev server only) | ✅ |
 | Time of Day | Pause menu → Debug (dev server only) | ✅ |
+| Enter the 2D scene | Pause menu → Debug → Enter 2D Scene (dev server only); Interact leaves it | ✅ |
 
 ## Open Questions
 
 - **The mode toggles are temporary.** Eventually world events will start instances and 2D scenes, not buttons:
   - Space/Y (instance) will be freed. Until then Space is fine: it usually means jump, but the game has none.
-  - E/A will go back to being interact only.
+  - The 2D scene is only reachable from the Debug menu for now. Interact inside it still leaves it.
 - **The `pause` intent's name.** It drives the instance toggle, not a pause. Renaming it (e.g. `toggleInstance`) would free "pause" for the real pause menu.
 
 ## Navigation

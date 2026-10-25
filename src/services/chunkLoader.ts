@@ -360,8 +360,9 @@ export class ChunkLoader {
                 id, sprite, pos, size, line,
             } = npcJSON;
             if (typeof id !== 'string' || typeof sprite !== 'string' || typeof line !== 'string'
-                || typeof size !== 'number' || !(size > 0) || !Array.isArray(pos)) {
-                console.warn(`Skipping NPC ${i}: needs id, sprite, line, pos and a positive size`);
+                // Finite as well: JSON.parse reads 1e999 as Infinity, an endless box nobody could move in
+                || typeof size !== 'number' || !Number.isFinite(size) || size <= 0 || !Array.isArray(pos)) {
+                console.warn(`Skipping NPC ${i}: needs id, sprite, line, pos and a positive, finite size`);
                 return;
             }
 

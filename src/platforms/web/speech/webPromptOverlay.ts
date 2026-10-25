@@ -1,19 +1,22 @@
 import type { PromptOverlay, PromptView } from '../../../services/promptOverlay';
+import type { InputDevice } from '../input/webInput';
+
+// The Interact button on each device, see docs/controls.md
+const INTERACT_LABEL: Record<InputDevice, string> = { keyboard: 'E', gamepad: 'Ⓐ' };
 
 /**
  * Web interact prompt: a small key hint over whatever Interact would reach.
- * A rough placeholder like the speech bubble. The label could follow the last-used device later.
+ * A rough placeholder like the speech bubble. The label follows the last device the player touched.
  */
 export default class WebPromptOverlay implements PromptOverlay {
     private readonly hint: HTMLDivElement;
 
-    constructor(container: HTMLElement) {
+    constructor(container: HTMLElement, private getDevice: () => InputDevice) {
         if (getComputedStyle(container).position === 'static') {
             container.style.position = 'relative';
         }
 
         const hint = document.createElement('div');
-        hint.textContent = 'E / Ⓐ';
         Object.assign(hint.style, {
             position: 'absolute',
             display: 'none',
@@ -35,6 +38,8 @@ export default class WebPromptOverlay implements PromptOverlay {
             this.hint.style.display = 'none';
             return;
         }
+        const label = INTERACT_LABEL[this.getDevice()];
+        if (this.hint.textContent !== label) this.hint.textContent = label;
         this.hint.style.left = `${view.x * 100}%`;
         this.hint.style.top = `${view.y * 100}%`;
         this.hint.style.display = 'block';
