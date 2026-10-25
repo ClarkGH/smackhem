@@ -1,6 +1,8 @@
 import type { Renderer, TextureHandle } from '../services/renderer';
 import type { Input, PlayerIntent } from '../services/input';
 import type { MenuOverlay } from '../services/menuOverlay';
+import type { SpeechOverlay, SpeechView } from '../services/speechOverlay';
+import type { PromptOverlay, PromptView } from '../services/promptOverlay';
 import type { DisplayCapabilities } from '../services/display';
 import type { TypeSafeEventBus } from './events';
 import {
@@ -32,6 +34,7 @@ import { createDefaultSettings, type Settings } from './settings/settings';
 import { QUARTERS_PER_DAY, type DebugSettings } from './settings/debugSettings';
 import EnvironmentSystem, { DAY_LENGTH_SECONDS } from './lighting/environment';
 import RenderSystem from './lighting/renderSystem';
+import InteractionSystem, { type Interactor } from './interaction';
 
 // Simulation step, 60 ticks per second. Exported so tests step the loop exactly.
 export const FIXED_DT = 1 / 60;
@@ -68,6 +71,10 @@ export interface GameLoopOptions {
     gameState: GameState;
     debugHUD?: DebugHUD;
     menuOverlay?: MenuOverlay;
+    // The NPC speech bubble, nothing shown when left out
+    speechOverlay?: SpeechOverlay;
+    // The interact prompt over the target, nothing shown when left out
+    promptOverlay?: PromptOverlay;
     // Shared with the menu and main.ts, defaults when left out
     settings?: Settings;
     // What the platform's display can do, nothing when left out
@@ -94,6 +101,8 @@ export class GameLoop {
 
     private environmentSystem: EnvironmentSystem;
 
+    private interactionSystem: InteractionSystem;
+
     private partyMemberTexture1: TextureHandle | null = null;
 
     // Core objects
@@ -113,6 +122,10 @@ export class GameLoop {
     private debugHUD?: DebugHUD;
 
     private menuOverlay?: MenuOverlay;
+
+    private speechOverlay?: SpeechOverlay;
+
+    private promptOverlay?: PromptOverlay;
 
     // Shared, changed in place by the menu
     private settings: Settings;
@@ -140,6 +153,21 @@ export class GameLoop {
     // Pre-allocated scratch fields
     private readonly wallDebugTransform: Mat4 = identity();
 
+    // The camera in the world, the circle in the instance, see interaction.ts
+    private readonly interactor: Interactor = { position: { x: 0, y: 0, z: 0 }, facing: 0 };
+
+    // Filled in place every frame the bubble shows (M-1)
+    private readonly speechView: SpeechView = { text: '', x: 0, y: 0 };
+
+    private readonly promptView: PromptView = { x: 0, y: 0 };
+
+    private readonly speechHead: Vec3 = { x: 0, y: 0, z: 0 };
+
+    // Whether each overlay was last told to show, so hiding is sent once
+    private speechShown = false;
+
+    private promptShown = false;
+
     constructor({
         renderer,
         input,
@@ -149,6 +177,8 @@ export class GameLoop {
         gameState,
         debugHUD,
         menuOverlay,
+        speechOverlay,
+        promptOverlay,
         settings,
         displayCapabilities,
         debugSettings,
@@ -165,12 +195,15 @@ export class GameLoop {
         this.menuSystem = new MenuSystem(this.eventBus, this.settings, displayCapabilities, debugSettings);
         this.debugHUD = debugHUD;
         this.menuOverlay = menuOverlay;
+        this.speechOverlay = speechOverlay;
+        this.promptOverlay = promptOverlay;
 
         // Core objects
         this.camera = createCamera();
         this.collisionContext = createCollisionContext();
         this.instance3DSystem = new Instance3DSystem(this.collisionContext, this.world, this.camera, this.eventBus, this.settings);
         this.environmentSystem = new EnvironmentSystem(this.camera.far);
+        this.interactionSystem = new InteractionSystem(this.world);
 
         // Seed camera
         this.camera.position = { ...this.gameState.interpolated.cameraPosition };
@@ -194,6 +227,7 @@ export class GameLoop {
         });
 
         this.eventBus.subscribe('quit_to_main_menu_requested', () => this.quitToMainMenu());
+        this.eventBus.subscribe('scene_2d_requested', () => this.scene2DSystem.enter(this.gameState));
 
         // Load party textures asynchronously
         this.loadPartyTextures();
@@ -239,6 +273,19 @@ export class GameLoop {
             return;
         }
 
+        // Set again below by whichever interactor runs this tick, so it's never stale (no prompt while talking)
+        discreteState.interactTarget = null;
+
+        // A conversation is modal: the world waits (no time, moving or looking) until Interact or Back closes it.
+        // Returning here also means the closing press can't open a new one.
+        if (discreteState.activeSpeech) {
+            if (intent.interact || intent.back) discreteState.activeSpeech = null;
+            return;
+        }
+
+        // Before the scene's update, so a press that changes mode (leaving the scene) can't also talk to an NPC
+        const startedInMode = discreteState.gameMode;
+
         this.scene2DSystem.update(dt, this.gameState, intent);
         this.instance3DSystem.update(dt, this.gameState, intent);
 
@@ -250,6 +297,17 @@ export class GameLoop {
         }
 
         if (discreteState.gameMode === 'scene_2d') return;
+
+        // The circle talks once the instance is fully open, reaching all the way round (it has no facing)
+        if (startedInMode === 'instance_3d' && discreteState.instanceIsActive && !discreteState.instanceIsTransitioning) {
+            const circle = interpolatedState.instanceCharacterPosition;
+            this.interactor.position.x = circle.x;
+            this.interactor.position.y = circle.y;
+            this.interactor.position.z = circle.z;
+            this.interactor.facing = null;
+            this.interactionSystem.update(this.gameState, intent, this.interactor);
+        }
+
         if (discreteState.gameMode === 'instance_3d' || discreteState.isTimeFrozen) return;
 
         // Normal 3D simulation updates
@@ -295,6 +353,13 @@ export class GameLoop {
 
             interpolatedState.cameraPosition = { ...this.camera.position };
         }
+
+        // Copied, camera.position is replaced rather than mutated by some systems
+        this.interactor.position.x = this.camera.position.x;
+        this.interactor.position.y = this.camera.position.y;
+        this.interactor.position.z = this.camera.position.z;
+        this.interactor.facing = this.camera.yaw;
+        if (startedInMode === 'world_3d') this.interactionSystem.update(this.gameState, intent, this.interactor);
     }
 
     public update(deltaTime: number): void {
@@ -313,8 +378,8 @@ export class GameLoop {
             }
         }
 
-        // The instance toggle, not the pause menu, and not while paused
-        if (intentSnapshot.pause && !this.gameState.discrete.isPaused) {
+        // The instance toggle, not the pause menu, and not while paused or talking
+        if (intentSnapshot.pause && !this.gameState.discrete.isPaused && !this.gameState.discrete.activeSpeech) {
             if (this.gameState.discrete.isTimeFrozen) {
                 this.instance3DSystem.unPropagateInstance(this.gameState);
             } else {
@@ -417,6 +482,57 @@ export class GameLoop {
             this.wallDebugTransform,
             debug ? debug.shadows : true,
         );
+
+        this.renderSpeech();
+        this.renderPrompt();
+    }
+
+    // Where over an NPC's head lands on screen, false when it can't be shown: menus, other modes, behind the camera
+    private projectOverHead(npcId: string, out: { x: number; y: number }): boolean {
+        const { gameMode, isPaused } = this.gameState.discrete;
+        if (isPaused || (gameMode !== 'world_3d' && gameMode !== 'instance_3d')) return false;
+        const npc = this.world.findNpc(npcId);
+        if (!npc) return false;
+        const head = this.speechHead;
+        head.x = npc.position.x;
+        head.y = npc.position.y + npc.size + 0.2;
+        head.z = npc.position.z;
+        return this.renderSystem.projectToViewport(head, out);
+    }
+
+    // The bubble sits over the speaker's head
+    private renderSpeech(): void {
+        if (!this.speechOverlay) return;
+        const { activeSpeech } = this.gameState.discrete;
+
+        let visible = false;
+        if (activeSpeech) {
+            visible = this.projectOverHead(activeSpeech.npcId, this.speechView);
+            this.speechView.text = activeSpeech.line;
+        }
+
+        if (visible) {
+            this.speechOverlay.render(this.speechView);
+            this.speechShown = true;
+        } else if (this.speechShown) {
+            this.speechOverlay.render(null);
+            this.speechShown = false;
+        }
+    }
+
+    // The prompt sits over whatever Interact would reach right now
+    private renderPrompt(): void {
+        if (!this.promptOverlay) return;
+        const { interactTarget } = this.gameState.discrete;
+        const visible = interactTarget !== null && this.projectOverHead(interactTarget, this.promptView);
+
+        if (visible) {
+            this.promptOverlay.render(this.promptView);
+            this.promptShown = true;
+        } else if (this.promptShown) {
+            this.promptOverlay.render(null);
+            this.promptShown = false;
+        }
     }
 
     // TODO: Do we even need this if it lives in state? Should it live in state?

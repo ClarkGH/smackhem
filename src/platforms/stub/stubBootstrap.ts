@@ -3,6 +3,8 @@ import StubClock from './stubClock';
 import StubInput from './stubInput';
 import StubAudioService from './stubAudioService';
 import NullMenuOverlay from './nullMenuOverlay';
+import NullSpeechOverlay from './nullSpeechOverlay';
+import NullPromptOverlay from './nullPromptOverlay';
 import MemoryStore from './memoryStore';
 import StubDisplay from './stubDisplay';
 import type { PlatformServices } from '../../services/platform';
@@ -104,6 +106,7 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
         collisionAABBs: [],
         meshes,
         hasContent: true,
+        npcs: [],
     };
 };
 
@@ -160,6 +163,8 @@ const createStubPlatform = async (): Promise<PlatformServices> => ({
     input: new StubInput(),
     audio: new StubAudioService(),
     menu: new NullMenuOverlay(),
+    speech: new NullSpeechOverlay(),
+    prompt: new NullPromptOverlay(),
     storage: new MemoryStore(),
     display: new StubDisplay(),
     getAspectRatio: () => 16 / 9,

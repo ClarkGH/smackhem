@@ -10,6 +10,7 @@ import { MENU_SELECT_SOUND } from '../menu/menuSystem';
 import StubAudioService, { type StubPlaybackHandle } from '../../platforms/stub/stubAudioService';
 import type { PlayerIntent } from '../../services/input';
 import { createScenario, type Scenario } from '../../testing/scenario';
+import { createDebugSettings } from '../settings/debugSettings';
 
 describe('mode-driven audio - scenario (stub platform)', () => {
     let scenario: Scenario;
@@ -30,7 +31,7 @@ describe('mode-driven audio - scenario (stub platform)', () => {
     const voicesOf = (soundId: string): StubPlaybackHandle[] => audio.voices.filter((v) => v.id === soundId);
 
     beforeEach(async () => {
-        scenario = createScenario({ mode: 'main_menu' });
+        scenario = createScenario({ mode: 'main_menu', debugSettings: createDebugSettings() });
         audio = new StubAudioService();
         const audioSystem = new AudioSystem(audio, scenario.eventBus);
         await audioSystem.preload(AMBIENT_SOUND, 'ambient');
@@ -55,7 +56,9 @@ describe('mode-driven audio - scenario (stub platform)', () => {
 
     it('pauses the ambience in the 2D scene and resumes it on return', () => {
         startNewGame();
-        press({ interact: true });
+        scenario.enterScene();
+        // One flush deeper than interact was: scene request -> mode change -> pause request
+        scenario.tick();
         expect(scenario.gameState.discrete.gameMode).toBe('scene_2d');
         expect(voicesOf(AMBIENT_SOUND)[0].paused).toBe(true);
 
@@ -83,7 +86,7 @@ describe('mode-driven audio - scenario (stub platform)', () => {
 
     it('plays the mode change sound on every change, New Game included', () => {
         startNewGame();
-        press({ interact: true });
+        scenario.enterScene();
         press({ interact: true });
 
         expect(voicesOf(MODE_CHANGE_SOUND)).toHaveLength(3);

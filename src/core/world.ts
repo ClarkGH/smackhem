@@ -16,12 +16,22 @@ export interface StaticMesh {
     color: Vec3;
 }
 
+export interface Npc {
+    id: string;
+    textureId: string;
+    position: Vec3;
+    size: number;
+    collisionAABB: AABB;
+    line: string;
+}
+
 export interface Chunk {
     id: ChunkID;
     bounds: AABB;
     collisionAABBs: AABB[];
     meshes: StaticMesh[];
     hasContent: boolean; // Either there's map data or a tech demo without boundaries.
+    npcs: Npc[];
 }
 
 export class World {
@@ -30,6 +40,8 @@ export class World {
     private _visibleMeshesBuffer: StaticMesh[] = [];
 
     private _collidableAABBsBuffer: AABB[] = [];
+
+    private _visibleNpcsBuffer: Npc[] = [];
 
     public static getChunkID(x: number, z: number): ChunkID {
         return `${x},${z}`;
@@ -54,6 +66,27 @@ export class World {
         });
 
         return this._visibleMeshesBuffer;
+    }
+
+    public getVisibleNpcs(): Npc[] {
+        this._visibleNpcsBuffer.length = 0;
+
+        this.activeChunks.forEach((chunk) => {
+            this._visibleNpcsBuffer.push(...chunk.npcs);
+        });
+
+        return this._visibleNpcsBuffer;
+    }
+
+    // Undefined once its chunk has unloaded
+    public findNpc(npcId: string): Npc | undefined {
+        let found: Npc | undefined;
+        this.activeChunks.forEach((chunk) => {
+            for (let i = 0; i < chunk.npcs.length && !found; i += 1) {
+                if (chunk.npcs[i].id === npcId) found = chunk.npcs[i];
+            }
+        });
+        return found;
     }
 
     // Chunk index along one axis, a plain number so per-frame checks don't allocate (M-1)

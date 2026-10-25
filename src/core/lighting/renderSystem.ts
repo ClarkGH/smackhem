@@ -21,6 +21,17 @@ export default class RenderSystem {
 
     private readonly sceneOrthoProj: Mat4;
 
+    // Billboard facing, handed to the renderer, which copies it (M-1)
+    private readonly billboardNormal: Vec3 = { x: 0, y: 0, z: 1 };
+
+    private readonly billboardCenter: Vec3 = { x: 0, y: 0, z: 0 };
+
+    // The 3D view-projection drawn with this frame, for placing overlays over the world
+    private viewProj: Mat4 | null = null;
+
+    // NPC textures by asset ID. null while loading, or if the load failed.
+    private readonly npcTextures: Map<string, TextureHandle | null> = new Map();
+
     // Viewport the scene projection was last built for, rebuilt only when it changes (M-1)
     private sceneOrthoWidth = 0;
 
@@ -86,6 +97,74 @@ export default class RenderSystem {
             this.computeScaledTransform(center, scale, wallDebugTransform);
             this.renderer.drawMesh(this.wallDebugMesh, wallDebugTransform, WALL_DEBUG_COLOR, true);
         });
+    }
+
+    // A quad standing upright at center, turned to face the camera around the vertical axis
+    private drawBillboard(texture: TextureHandle, center: Vec3, size: number, camera: Camera): void {
+        const toCamera = this.billboardNormal;
+        toCamera.x = camera.position.x - center.x;
+        toCamera.y = 0;
+        toCamera.z = camera.position.z - center.z;
+        const dist = Math.sqrt(toCamera.x * toCamera.x + toCamera.z * toCamera.z);
+        if (dist > 0.001) {
+            toCamera.x /= dist; toCamera.z /= dist;
+        } else {
+            toCamera.x = 0; toCamera.z = 1;
+        }
+
+        // The quad lies on XZ: its x runs along the camera's right, its z stands up
+        const m = this.circleTransform.elements;
+        m[0] = -toCamera.z * size; m[1] = 0; m[2] = toCamera.x * size; m[3] = 0;
+        m[4] = 0; m[5] = 0; m[6] = 0; m[7] = 0;
+        m[8] = 0; m[9] = size; m[10] = 0; m[11] = 0;
+        m[12] = center.x; m[13] = center.y; m[14] = center.z; m[15] = 1;
+
+        this.renderer.drawTexturedQuad(texture, this.circleTransform, 1.0, toCamera);
+    }
+
+    // Loads each NPC's texture the first time it's seen, and draws it once loaded
+    private renderNpcs(camera: Camera): void {
+        const npcs = this.world.getVisibleNpcs();
+        for (let i = 0; i < npcs.length; i += 1) {
+            const npc = npcs[i];
+            if (!this.npcTextures.has(npc.textureId)) {
+                this.loadNpcTexture(npc.textureId);
+            }
+            const texture = this.npcTextures.get(npc.textureId);
+            if (texture) {
+                // Position is the sprite's base, the quad is centered on its origin
+                const center = this.billboardCenter;
+                center.x = npc.position.x;
+                center.y = npc.position.y + npc.size / 2;
+                center.z = npc.position.z;
+                this.drawBillboard(texture, center, npc.size, camera);
+            }
+        }
+    }
+
+    // A failed load stays null, so it's tried once and the NPC just isn't drawn
+    private loadNpcTexture(textureId: string): void {
+        this.npcTextures.set(textureId, null);
+        this.renderer.loadTexture(textureId)
+            .then((texture) => { this.npcTextures.set(textureId, texture); })
+            .catch((error) => { console.error(`Failed to load NPC texture '${textureId}':`, error); });
+    }
+
+    /**
+     * Where a world point lands on screen, 0..1 across the viewport with y down, using this frame's camera.
+     * False when it's behind the camera, or no 3D frame has been drawn yet.
+     */
+    public projectToViewport(point: Vec3, out: { x: number; y: number }): boolean {
+        if (!this.viewProj) return false;
+        const m = this.viewProj.elements;
+        // Column-major, like every Mat4 here
+        const clipX = m[0] * point.x + m[4] * point.y + m[8] * point.z + m[12];
+        const clipY = m[1] * point.x + m[5] * point.y + m[9] * point.z + m[13];
+        const clipW = m[3] * point.x + m[7] * point.y + m[11] * point.z + m[15];
+        if (clipW <= 0) return false;
+        out.x = (clipX / clipW + 1) / 2;
+        out.y = (1 - clipY / clipW) / 2;
+        return true;
     }
 
     private declareLighting(focus: Vec3, shadowsEnabled: boolean): void {
@@ -193,7 +272,8 @@ export default class RenderSystem {
             }
         } else {
             const aspect = this.getAspectRatio();
-            this.renderer.setViewProjection(getCameraMatrix(camera, aspect));
+            this.viewProj = getCameraMatrix(camera, aspect);
+            this.renderer.setViewProjection(this.viewProj);
             this.renderer.setViewPosition?.(camera.position);
 
             this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
@@ -204,28 +284,10 @@ export default class RenderSystem {
                 this.renderer.drawMesh(sm.mesh, sm.transform, sm.color);
             });
 
+            this.renderNpcs(camera);
+
             if (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive) && partyMemberTexture1) {
-                const pos = interpolatedState.instanceCharacterPosition;
-                const circleSize = INSTANCE_CHARACTER_SIZE;
-
-                const toCamera = { x: camera.position.x - pos.x, y: 0, z: camera.position.z - pos.z };
-                const dist = Math.sqrt(toCamera.x * toCamera.x + toCamera.z * toCamera.z);
-                if (dist > 0.001) {
-                    toCamera.x /= dist; toCamera.z /= dist;
-                } else {
-                    toCamera.x = 0; toCamera.z = 1;
-                }
-
-                const right = { x: -toCamera.z, y: 0, z: toCamera.x };
-                const up = { x: 0, y: 1, z: 0 };
-
-                const m = this.circleTransform.elements;
-                m[0] = right.x * circleSize; m[1] = right.y * circleSize; m[2] = right.z * circleSize; m[3] = 0;
-                m[4] = 0; m[5] = 0; m[6] = 0; m[7] = 0;
-                m[8] = up.x * circleSize; m[9] = up.y * circleSize; m[10] = up.z * circleSize; m[11] = 0;
-                m[12] = pos.x; m[13] = pos.y; m[14] = pos.z; m[15] = 1;
-
-                this.renderer.drawTexturedQuad(partyMemberTexture1, this.circleTransform, 1.0, toCamera);
+                this.drawBillboard(partyMemberTexture1, interpolatedState.instanceCharacterPosition, INSTANCE_CHARACTER_SIZE, camera);
             }
         }
 

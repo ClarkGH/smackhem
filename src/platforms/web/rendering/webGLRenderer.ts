@@ -1772,6 +1772,8 @@ ${FOG_GLSL}
             
             void main() {
             vec4 textureSample = texture(u_texture, v_texCoord);
+            // Like the shadow pass: see-through pixels write no depth, so they can't hide what's behind
+            if (textureSample.a < 0.5) discard;
             vec3 textureColor = textureSample.rgb;
             float textureAlpha = textureSample.a;
 

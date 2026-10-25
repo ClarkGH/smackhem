@@ -11,6 +11,8 @@ import WebGLRenderer from './rendering/webGLRenderer';
 import WebClock from './webClock';
 import WebAudioService from './audio/webAudioService';
 import WebMenuOverlay from './menu/webMenuOverlay';
+import WebSpeechOverlay from './speech/webSpeechOverlay';
+import WebPromptOverlay from './speech/webPromptOverlay';
 import LocalStorageStore from './localStorageStore';
 import WebDisplay from './webDisplay';
 
@@ -121,6 +123,8 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
         back: () => input.pressBack(),
         opened: (open) => input.setMenuOpen(open),
     });
+    const speech = new WebSpeechOverlay(container);
+    const prompt = new WebPromptOverlay(container);
 
     // Browsers block audio until a user gesture, unlock on the first one
     const unlockAudio = () => {
@@ -137,6 +141,8 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
         input,
         audio,
         menu,
+        speech,
+        prompt,
         storage: new LocalStorageStore(),
         display,
         canvas,

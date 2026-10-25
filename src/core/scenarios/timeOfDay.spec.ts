@@ -5,6 +5,7 @@ import {
     beforeEach,
 } from 'vitest';
 import { createScenario, FIXED_DT, type Scenario } from '../../testing/scenario';
+import { createDebugSettings } from '../settings/debugSettings';
 import { DAY_LENGTH_SECONDS } from '../lighting/environment';
 
 // How far one tick moves the day, as a fraction of it
@@ -14,7 +15,7 @@ describe('time of day - scenario (stub platform)', () => {
     let scenario: Scenario;
 
     beforeEach(() => {
-        scenario = createScenario({ mode: 'main_menu' });
+        scenario = createScenario({ mode: 'main_menu', debugSettings: createDebugSettings() });
         // New Game
         scenario.press({ interact: true });
     });
@@ -55,8 +56,8 @@ describe('time of day - scenario (stub platform)', () => {
     });
 
     it('stands still in the 2D scene', () => {
-        const { gameState, press, tick } = scenario;
-        press({ interact: true });
+        const { gameState, tick, enterScene } = scenario;
+        enterScene();
         expect(gameState.discrete.gameMode).toBe('scene_2d');
         const time = gameState.timeOfDay;
         tick(30);

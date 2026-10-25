@@ -5,6 +5,8 @@ import type { AudioService } from './audio';
 import type { MenuOverlay } from './menuOverlay';
 import type { KeyValueStore } from './storage';
 import type { DisplayService } from './display';
+import type { SpeechOverlay } from './speechOverlay';
+import { PromptOverlay } from './promptOverlay';
 
 /**
  * Platform services interface
@@ -16,6 +18,8 @@ export interface PlatformServices {
     input: Input;
     audio: AudioService;
     menu: MenuOverlay;
+    prompt: PromptOverlay;
+    speech: SpeechOverlay;
     storage: KeyValueStore;
     display: DisplayService;
     getAspectRatio: () => number;

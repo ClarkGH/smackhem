@@ -28,43 +28,8 @@ export class Scene2DSystem {
         const discreteState = gameState.discrete;
         const interpolatedState = gameState.interpolated;
 
-        // Scene entry/exit
-        if (intent.interact) {
-            if (discreteState.gameMode === 'world_3d') {
-                discreteState.savedCameraState = {
-                    position: { ...interpolatedState.cameraPosition },
-                    yaw: interpolatedState.cameraYaw,
-                    pitch: interpolatedState.cameraPitch,
-                };
-                discreteState.targetPitch = 0;
-                discreteState.isTransitioningPitch = true;
-                const previousMode = discreteState.gameMode;
-                discreteState.gameMode = 'scene_2d';
-
-                this.publishModeChange(previousMode, 'scene_2d');
-
-                discreteState.sceneIsTransitioning = true;
-                discreteState.sceneTransitionDirection = 1;
-                interpolatedState.sceneTransitionProgress = 0.0;
-                discreteState.sceneIsActive = false;
-            } else if (discreteState.gameMode === 'scene_2d') {
-                const previousMode = discreteState.gameMode;
-                discreteState.gameMode = 'world_3d';
-                this.publishModeChange(previousMode, 'world_3d');
-
-                discreteState.sceneIsActive = false;
-                discreteState.sceneIsTransitioning = false;
-                interpolatedState.sceneTransitionProgress = 0.0;
-                discreteState.isTransitioningPitch = false;
-
-                if (discreteState.savedCameraState) {
-                    interpolatedState.cameraPosition = { ...discreteState.savedCameraState.position };
-                    interpolatedState.cameraYaw = discreteState.savedCameraState.yaw;
-                    interpolatedState.cameraPitch = discreteState.savedCameraState.pitch;
-                    discreteState.savedCameraState = null;
-                }
-            }
-        }
+        // Entry is the Debug menu's (scene_2d_requested), interact only leaves
+        if (intent.interact) this.exit(gameState);
 
         if (discreteState.gameMode === 'scene_2d' && discreteState.sceneIsTransitioning) {
             // Reduced motion: the whole transition in one tick
@@ -105,6 +70,52 @@ export class Scene2DSystem {
 
             interpolatedState.sceneCharacterPositionPx.x = Math.max(0, Math.min(SCENE_WIDTH_PX - 1, interpolatedState.sceneCharacterPositionPx.x));
             interpolatedState.sceneCharacterPositionPx.y = Math.max(0, Math.min(SCENE_HEIGHT_PX - 1, interpolatedState.sceneCharacterPositionPx.y));
+        }
+    }
+
+    // Only from the open world, so never mid-instance
+    public enter(gameState: GameState): void {
+        const discreteState = gameState.discrete;
+        const interpolatedState = gameState.interpolated;
+        if (discreteState.gameMode !== 'world_3d') return;
+
+        discreteState.savedCameraState = {
+            position: { ...interpolatedState.cameraPosition },
+            yaw: interpolatedState.cameraYaw,
+            pitch: interpolatedState.cameraPitch,
+        };
+        discreteState.targetPitch = 0;
+        discreteState.isTransitioningPitch = true;
+        const previousMode = discreteState.gameMode;
+        discreteState.gameMode = 'scene_2d';
+
+        this.publishModeChange(previousMode, 'scene_2d');
+
+        discreteState.sceneIsTransitioning = true;
+        discreteState.sceneTransitionDirection = 1;
+        interpolatedState.sceneTransitionProgress = 0.0;
+        discreteState.sceneIsActive = false;
+    }
+
+    public exit(gameState: GameState): void {
+        const discreteState = gameState.discrete;
+        const interpolatedState = gameState.interpolated;
+        if (discreteState.gameMode !== 'scene_2d') return;
+
+        const previousMode = discreteState.gameMode;
+        discreteState.gameMode = 'world_3d';
+        this.publishModeChange(previousMode, 'world_3d');
+
+        discreteState.sceneIsActive = false;
+        discreteState.sceneIsTransitioning = false;
+        interpolatedState.sceneTransitionProgress = 0.0;
+        discreteState.isTransitioningPitch = false;
+
+        if (discreteState.savedCameraState) {
+            interpolatedState.cameraPosition = { ...discreteState.savedCameraState.position };
+            interpolatedState.cameraYaw = discreteState.savedCameraState.yaw;
+            interpolatedState.cameraPitch = discreteState.savedCameraState.pitch;
+            discreteState.savedCameraState = null;
         }
     }
 

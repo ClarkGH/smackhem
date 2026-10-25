@@ -24,6 +24,7 @@ export const MENU_SELECT_SOUND = 'ui_menu_select';
 type MenuAction =
     | 'new_game'
     | 'continue'
+    | 'enter_scene_2d'
     | 'load'
     | 'resume'
     | 'open_settings'
@@ -146,6 +147,7 @@ const buildScreens = (capabilities: DisplayCapabilities, hasDebug: boolean): Rec
             settingItem('Shadows', { kind: 'debugToggle', key: 'shadows' }),
             settingItem('Shadow Bias', { kind: 'shadowBias' }),
             settingItem('Time of Day', { kind: 'timeOfDay' }),
+            actionItem('Enter 2D Scene', 'enter_scene_2d'),
             actionItem('Back', 'back'),
         ],
     },
@@ -327,6 +329,11 @@ export class MenuSystem {
                 break;
             case 'resume':
                 this.resume(gameState);
+                break;
+            case 'enter_scene_2d':
+                // GameLoop enters the scene on the flush, after the menu has closed
+                this.resume(gameState);
+                this.eventBus.publish({ type: 'scene_2d_requested' });
                 break;
             case 'open_quit_confirm':
                 this.openScreen('quit_confirm');

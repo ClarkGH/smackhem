@@ -83,3 +83,56 @@ describe('ChunkLoader schema version', () => {
         expect(versionWarnings(1)).toBe(1);
     });
 });
+
+describe('ChunkLoader NPCs', () => {
+    const NPC = {
+        id: 'npc_01', sprite: 'npc-lmao', pos: [1.5, 0.5, -2], size: 1, line: 'Hello',
+    };
+
+    const loadNpcs = (npcs?: object[]) => {
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        const json = JSON.stringify({
+            version: 2, id: '1,2', meshes: [], npcs,
+        });
+        return new ChunkLoader().loadChunkFromJSON(json, 1, 2, new NullRenderer());
+    };
+
+    it('places an NPC relative to the chunk center, with its sprite and line', () => {
+        const [npc] = loadNpcs([NPC]).npcs;
+
+        expect(npc).toMatchObject({
+            id: 'npc_01',
+            textureId: 'npc-lmao',
+            size: 1,
+            line: 'Hello',
+            position: { x: 1 * CHUNK_SIZE + 1.5, y: 0.5, z: 2 * CHUNK_SIZE - 2 },
+        });
+    });
+
+    it('gives it a collision box from its base up by its size, shared with the chunk', () => {
+        const chunk = loadNpcs([NPC]);
+        const box = chunk.npcs[0].collisionAABB;
+
+        expect(box.min).toEqual({ x: 11, y: 0.5, z: 17.5 });
+        expect(box.max).toEqual({ x: 12, y: 1.5, z: 18.5 });
+        // The same object, so collision sees it
+        expect(chunk.collisionAABBs).toContain(box);
+    });
+
+    it('loads a chunk without npcs as none', () => {
+        expect(loadNpcs(undefined).npcs).toEqual([]);
+    });
+
+    it('skips a bad entry with a warning, keeping the rest', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const chunk = loadNpcs([
+            { ...NPC, id: 'no_line', line: undefined },
+            { ...NPC, id: 'zero_size', size: 0 },
+            NPC,
+        ]);
+
+        expect(chunk.npcs.map((npc) => npc.id)).toEqual(['npc_01']);
+        expect(chunk.collisionAABBs).toHaveLength(1);
+        expect(warn.mock.calls.filter(([message]) => String(message).startsWith('Skipping NPC'))).toHaveLength(2);
+    });
+});

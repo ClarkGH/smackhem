@@ -7,13 +7,14 @@ import {
 import type { GameEvent } from '../events';
 import { createGameState } from '../gameState';
 import { createScenario, type Scenario } from '../../testing/scenario';
+import { createDebugSettings } from '../settings/debugSettings';
 
 describe('pause menu - scenario (stub platform)', () => {
     let scenario: Scenario;
     let modeChanges: GameEvent[];
 
     beforeEach(() => {
-        scenario = createScenario({ mode: 'main_menu' });
+        scenario = createScenario({ mode: 'main_menu', debugSettings: createDebugSettings() });
         modeChanges = [];
         scenario.eventBus.subscribe('game_mode_changed', (e) => { modeChanges.push(e); });
         // New Game
@@ -54,10 +55,9 @@ describe('pause menu - scenario (stub platform)', () => {
 
     it('resumes into the mode it paused from', () => {
         const {
-            gameState, overlay, press, click,
+            gameState, overlay, press, click, enterScene,
         } = scenario;
-        // The 2D scene
-        press({ interact: true });
+        enterScene();
         expect(gameState.discrete.gameMode).toBe('scene_2d');
 
         press({ menu: true });
@@ -114,8 +114,9 @@ describe('pause menu - scenario (stub platform)', () => {
         });
 
         it('starts the next New Game fresh', () => {
-            const { gameState, press } = scenario;
-            press({ interact: true }); // Into the 2D scene
+            const { gameState, press, enterScene } = scenario;
+            enterScene();
+            expect(gameState.discrete.gameMode).toBe('scene_2d');
             quit();
 
             press({ interact: true }); // New Game

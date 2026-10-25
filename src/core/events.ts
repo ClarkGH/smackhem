@@ -18,6 +18,9 @@ export type GameEvent =
         soundId: string
     }
     | {
+        type: 'scene_2d_requested';
+    }
+    | {
         type: 'stop_sound_requested';
         soundId: string
     }

@@ -1,5 +1,5 @@
 import type { Renderer } from './renderer';
-import type { Chunk, StaticMesh } from '../core/world';
+import type { Chunk, Npc, StaticMesh } from '../core/world';
 import type { Vec3 } from '../types/common';
 import { AABB, createAABB } from '../core/math/aabb';
 import { createTranslationMatrix } from '../core/math/mathHelpers';
@@ -17,6 +17,17 @@ export interface MeshJSON {
 }
 
 /**
+ * JSON representation of an NPC (from file)
+ */
+export interface NpcJSON {
+    id: string;
+    sprite: string; // asset ID, e.g. "npc-lmao"
+    pos: number[]; // relative to chunk center, like meshes
+    size: number;
+    line: string;
+}
+
+/**
  * JSON representation of a chunk (from file)
  */
 export interface ChunkJSON {
@@ -24,6 +35,7 @@ export interface ChunkJSON {
     id: string;
     bounds: [number, number, number, number, number, number]; // [minX, minY, minZ, maxX, maxY, maxZ]
     meshes: MeshJSON[];
+    npcs?: NpcJSON[];
     template?: string; // Phase 2: template reference (future)
 }
 
@@ -311,6 +323,10 @@ export class ChunkLoader {
             };
             console.log(`  Mesh ${i}: type=${chunkJSON.meshes[i]?.type}, pos=(${pos.x}, ${pos.y}, ${pos.z}), color=(${mesh.color.x}, ${mesh.color.y}, ${mesh.color.z})`);
         });
+        // NPC boxes join the chunk's collision, so the player can't walk through them
+        const npcs = this.createNpcsFromJSON(chunkJSON.npcs, chunkCenterX, chunkCenterZ);
+        npcs.forEach((npc) => collisionAABBs.push(npc.collisionAABB));
+
         // Create bounds AABB from JSON bounds array
         // Create bounds AABB from JSON bounds array
         const bounds = createAABB(
@@ -324,7 +340,52 @@ export class ChunkLoader {
             meshes,
             collisionAABBs,
             hasContent: true,
+            npcs,
         };
+    }
+
+    /**
+     * NPCs from JSON, optional. A bad entry is skipped with a warning, the rest still load.
+     */
+    private createNpcsFromJSON(
+        npcsJSON: NpcJSON[] | undefined,
+        chunkCenterX: number,
+        chunkCenterZ: number,
+    ): Npc[] {
+        const npcs: Npc[] = [];
+        if (!Array.isArray(npcsJSON)) return npcs;
+
+        npcsJSON.forEach((npcJSON, i) => {
+            const {
+                id, sprite, pos, size, line,
+            } = npcJSON;
+            if (typeof id !== 'string' || typeof sprite !== 'string' || typeof line !== 'string'
+                || typeof size !== 'number' || !(size > 0) || !Array.isArray(pos)) {
+                console.warn(`Skipping NPC ${i}: needs id, sprite, line, pos and a positive size`);
+                return;
+            }
+
+            // Base of the sprite, like a mesh's pos
+            const position: Vec3 = {
+                x: chunkCenterX + (pos[0] || 0),
+                y: pos[1] || 0,
+                z: chunkCenterZ + (pos[2] || 0),
+            };
+            const half = size / 2;
+            npcs.push({
+                id,
+                textureId: sprite,
+                position,
+                size,
+                collisionAABB: createAABB(
+                    { x: position.x - half, y: position.y, z: position.z - half },
+                    { x: position.x + half, y: position.y + size, z: position.z + half },
+                ),
+                line,
+            });
+        });
+
+        return npcs;
     }
 
     /**
@@ -356,6 +417,7 @@ export class ChunkLoader {
             ],
             collisionAABBs: [],
             hasContent: false,
+            npcs: [],
         };
     }
 

@@ -7,6 +7,7 @@ import {
 import type { GameEvent } from '../events';
 import { createDefaultSettings } from '../settings/settings';
 import { createScenario, type Scenario } from '../../testing/scenario';
+import { createDebugSettings } from '../settings/debugSettings';
 
 type ModeChange = Extract<GameEvent, { type: 'game_mode_changed' }>;
 
@@ -15,7 +16,7 @@ describe('game_mode_changed - scenario (stub platform)', () => {
     let modeChanges: Array<Pick<ModeChange, 'previousMode' | 'currentMode'>>;
 
     beforeEach(() => {
-        scenario = createScenario();
+        scenario = createScenario({ debugSettings: createDebugSettings() });
         modeChanges = [];
         scenario.eventBus.subscribe('game_mode_changed', (event) => {
             modeChanges.push({ previousMode: event.previousMode, currentMode: event.currentMode });
@@ -23,9 +24,9 @@ describe('game_mode_changed - scenario (stub platform)', () => {
     });
 
     it('publishes entering and leaving the 2D scene', () => {
-        const { gameState, press } = scenario;
+        const { gameState, press, enterScene } = scenario;
 
-        press({ interact: true });
+        enterScene();
         expect(gameState.discrete.gameMode).toBe('scene_2d');
 
         press({ interact: true });
@@ -67,15 +68,27 @@ describe('game_mode_changed - scenario (stub platform)', () => {
     });
 
     it('cannot enter the 2D scene while leaving the instance', () => {
-        const { gameState, press, tick } = scenario;
+        const {
+            gameState, press, tick, enterScene,
+        } = scenario;
 
         press({ pause: true });
         tick(120);
 
         press({ pause: true });
-        press({ interact: true });
+        expect(gameState.discrete.instanceIsTransitioning).toBe(true);
+        enterScene();
 
         expect(gameState.discrete.gameMode).not.toBe('scene_2d');
+    });
+
+    it('does not enter the 2D scene on interact', () => {
+        const { gameState, press } = scenario;
+
+        press({ interact: true });
+
+        expect(gameState.discrete.gameMode).toBe('world_3d');
+        expect(modeChanges).toEqual([]);
     });
 });
 
@@ -83,7 +96,7 @@ describe('reduced motion - scenario (stub platform)', () => {
     const createReducedMotion = (reducedMotion: boolean): Scenario => {
         const settings = createDefaultSettings();
         settings.reducedMotion = reducedMotion;
-        return createScenario({ settings });
+        return createScenario({ settings, debugSettings: createDebugSettings() });
     };
 
     it('enters and leaves the instance within a couple of ticks', () => {
@@ -124,9 +137,9 @@ describe('reduced motion - scenario (stub platform)', () => {
     });
 
     it('opens the 2D scene in one tick', () => {
-        const { gameState, press } = createReducedMotion(true);
+        const { gameState, enterScene } = createReducedMotion(true);
 
-        press({ interact: true });
+        enterScene();
 
         expect(gameState.discrete.gameMode).toBe('scene_2d');
         expect(gameState.discrete.sceneIsActive).toBe(true);

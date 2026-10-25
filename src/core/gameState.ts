@@ -39,6 +39,7 @@ export interface DiscreteState {
     instanceIsActive: boolean;
     instanceIsTransitioning: boolean;
     instanceTransitionDirection: 1 | -1;
+    interactTarget: string | null;
     savedCameraState: { position: Vec3; yaw: number; pitch: number } | null;
     sceneIsActive: boolean
     sceneIsTransitioning: boolean;
@@ -48,6 +49,8 @@ export interface DiscreteState {
     sceneCharacterPositionGrid: { x: number; y: number };
     isTransitioningPitch: boolean;
     targetPitch: number;
+    // The NPC line on screen, null when nobody is talking. Counts down in fixed ticks.
+    activeSpeech: { npcId: string; line: string;} | null;
 }
 
 export interface GameState {
@@ -76,6 +79,7 @@ export const createGameState = (initialMode: GameMode = 'world_3d'): GameState =
         instanceIsActive: false,
         instanceIsTransitioning: false,
         instanceTransitionDirection: 1,
+        interactTarget: null,
         savedCameraState: null,
         sceneIsActive: false,
         sceneIsTransitioning: false,
@@ -83,5 +87,6 @@ export const createGameState = (initialMode: GameMode = 'world_3d'): GameState =
         sceneCharacterPositionGrid: { x: 12, y: 9 },
         isTransitioningPitch: false,
         targetPitch: 0,
+        activeSpeech: null,
     },
 });

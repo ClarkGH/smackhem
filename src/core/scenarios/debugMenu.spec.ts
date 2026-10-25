@@ -66,6 +66,15 @@ describe('debug menu - scenario (stub platform)', () => {
         expect(view.items[view.selected].label).toBe('Debug');
     });
 
+    it('enters the 2D scene, closing the menu', () => {
+        scenario.click('Debug');
+        scenario.click('Enter 2D Scene');
+
+        expect(scenario.gameState.discrete.gameMode).toBe('scene_2d');
+        expect(scenario.gameState.discrete.isPaused).toBe(false);
+        expect(scenario.overlay.lastView).toBeNull();
+    });
+
     it('toggles wireframe on the renderer without saving settings', () => {
         scenario.click('Debug');
         scenario.click('Wireframe');

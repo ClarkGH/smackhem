@@ -7,6 +7,8 @@ import type { DebugSettings } from '../core/settings/debugSettings';
 import { World } from '../core/world';
 import NullRenderer from '../platforms/stub/nullRenderer';
 import NullMenuOverlay from '../platforms/stub/nullMenuOverlay';
+import NullSpeechOverlay from '../platforms/stub/nullSpeechOverlay';
+import NullPromptOverlay from '../platforms/stub/nullPromptOverlay';
 import StubInput from '../platforms/stub/stubInput';
 import type { DisplayCapabilities } from '../services/display';
 import type { PlayerIntent } from '../services/input';
@@ -29,8 +31,12 @@ export interface Scenario {
     gameLoop: GameLoop;
     eventBus: TypeSafeEventBus;
     overlay: NullMenuOverlay;
+    speech: NullSpeechOverlay;
+    prompt: NullPromptOverlay;
     renderer: NullRenderer;
     settings: Settings;
+    // Empty to start, tests add chunks to it
+    world: World;
     // One frame with these inputs. Edge actions are pressed once, held ones (move, lookRate) stay set.
     press: (intent: Partial<PlayerIntent>) => void;
     // Frames of exactly one fixed tick each
@@ -39,6 +45,8 @@ export interface Scenario {
     frame: (seconds: number) => void;
     // Clicks a visible menu item by its label, as the overlay's hit-test would
     click: (label: string) => void;
+    // Pause -> Debug -> Enter 2D Scene, then one tick so the transition starts. Needs debugSettings.
+    enterScene: () => void;
 }
 
 export interface ScenarioOptions {
@@ -56,16 +64,21 @@ export const createScenario = (options: ScenarioOptions = {}): Scenario => {
     const gameState = createGameState(options.mode);
     const eventBus = new TypeSafeEventBus();
     const overlay = new NullMenuOverlay();
+    const speech = new NullSpeechOverlay();
+    const prompt = new NullPromptOverlay();
     const settings = options.settings ?? createDefaultSettings();
     const renderer = new NullRenderer();
+    const world = new World();
     const gameLoop = new GameLoop({
         renderer,
         input,
-        world: new World(),
+        world,
         getAspectRatio: () => 16 / 9,
         eventBus,
         gameState,
         menuOverlay: overlay,
+        speechOverlay: speech,
+        promptOverlay: prompt,
         settings,
         displayCapabilities: options.displayCapabilities,
         debugSettings: options.debugSettings,
@@ -93,7 +106,14 @@ export const createScenario = (options: ScenarioOptions = {}): Scenario => {
         press({ menuPointer: { index, clicked: true } });
     };
 
+    const enterScene = (): void => {
+        press({ menu: true });
+        click('Debug');
+        click('Enter 2D Scene');
+        tick();
+    };
+
     return {
-        input, gameState, gameLoop, eventBus, overlay, renderer, settings, press, tick, frame, click,
+        input, gameState, gameLoop, eventBus, overlay, speech, prompt, renderer, settings, world, press, tick, frame, click, enterScene,
     };
 };

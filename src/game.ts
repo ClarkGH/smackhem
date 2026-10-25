@@ -107,6 +107,8 @@ export const createGame = async ({
         gameState,
         debugHUD,
         menuOverlay: platform.menu,
+        speechOverlay: platform.speech,
+        promptOverlay: platform.prompt,
         settings,
         displayCapabilities: platform.display.capabilities(),
         debugSettings,
