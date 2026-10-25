@@ -26,6 +26,16 @@ Chunk coordinates are offset by 10000 to ensure all filenames are non-negative. 
 
 #### Version 2: Inline Chunk Format (Current)
 
+The loader expects version 2 (`EXPECTED_SCHEMA_VERSION` in `src/services/chunkLoader.ts`). A file with another version still loads, but logs a "version mismatch" warning, so an out-of-date file shows up in the console rather than failing silently.
+
+**Version history:**
+
+- **1:** chunk files carried their own `bounds`.
+- **2 (current):** no `bounds`. Chunk bounds are worked out in code from the chunk's coordinates. Meshes are inline, as below.
+- **The bump to 2 (October 2026):** the loader had been left expecting version 1 after the format moved on, so every version-2 file logged a warning on load. The loader now expects 2. The five remaining version-1 files around spawn had already dropped `bounds`, so only their `version` number changed.
+
+When the format changes again: bump `EXPECTED_SCHEMA_VERSION`, update or migrate the files, add a line here, and extend `chunkLoader.spec.ts`'s version tests.
+
 ```json
 {
   "version": 2,
@@ -69,14 +79,14 @@ Chunk coordinates are offset by 10000 to ensure all filenames are non-negative. 
 **Mesh Type-Specific Parameters:**
 
 - `plane`: Uses `scale[0]` for plane size. Y position is not adjusted (plane sits at `pos[1]`).
-- `cube`: Uses `scale[0]` for cube size. Y position is automatically adjusted: `yPos = pos[1] + scale[1]/2` to center cube on Y axis.
-- `pyramid`: Uses `scale[0]` for base size. Y position is automatically adjusted: `yPos = pos[1] + scale[1] * 0.6` for proper pyramid centering.
+- `cube`: One size, `scale[0]`, for every axis (drawing and collision). An uneven scale logs a warning and uses `scale[0]`; use a `prism` for uneven boxes. Y position: `yPos = pos[1] + scale[0]/2`, since the mesh is centered on its origin.
+- `pyramid`: Uses `scale[0]` for base size and height. The mesh's base is at its origin, so `yPos = pos[1]` (no lift).
 - `sphere`: Uses `scale[0]` for **diameter** (radius = `scale[0]/2`). Y position is automatically adjusted: `yPos = pos[1] + radius` to center sphere on Y axis. Optional `segments` (number) for sphere subdivision (default: 12).
 - `prism`: Uses `scale[0]` for width, `scale[1]` for height, `scale[2]` for depth. Y position is automatically adjusted: `yPos = pos[1] + scale[1]/2` to center prism on Y axis.
 
 **Position Adjustment Notes:**
 
-Mesh Y positions are automatically adjusted based on mesh type to ensure proper centering and alignment. The `pos[1]` value represents the base/floor position, and the loader adjusts it upward for meshes that need to be centered (cubes, spheres, prisms, pyramids). Planes use `pos[1]` directly without adjustment.
+`pos[1]` is always the height of the mesh's **base**: 0 sits on the floor, higher values float. The loader lifts meshes that are centered on their origin (cubes, spheres, prisms) by half their height; pyramids and planes already have their base at their origin and use `pos[1]` as is. Each mesh's collision box spans exactly what's drawn, from `pos[1]` to `pos[1]` + its height (`chunkLoader.spec.ts` checks every shape).
 
 **Optional Fields (Future):**
 

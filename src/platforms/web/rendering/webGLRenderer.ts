@@ -76,6 +76,23 @@ const SKY_COLOR_GLSL = `
             }
 `;
 
+// Fog, shared by the mesh and billboard shaders so both fade the same way. Needs SKY_COLOR_GLSL
+// before it, and u_eye (the camera's position).
+const FOG_GLSL = `
+            // Fog starts at FOG_START and is complete at FOG_END (world units from the camera),
+            // before the floor ends (~60 units out), so the world melts into the sky behind it
+            const float FOG_START = 25.0;
+            const float FOG_END = 55.0;
+
+            // Distant surfaces take the sky's color in their direction, glow included
+            vec3 applyFog(vec3 color, vec3 worldPos) {
+                vec3 toPixel = worldPos - u_eye;
+                float pixelDistance = length(toPixel);
+                float fog = smoothstep(FOG_START, FOG_END, pixelDistance);
+                return mix(color, skyColor(toPixel / max(pixelDistance, 0.0001)), fog);
+            }
+`;
+
 // Shared by the mesh and billboard fragment shaders, which declare u_shadowMap and u_shadowStrength
 const SHADOW_SAMPLING_GLSL = `
             const float SHADOW_TEXEL = 1.0 / ${SHADOW_MAP_SIZE}.0;
@@ -371,10 +388,7 @@ export default class WebGLRenderer implements Renderer {
             out vec4 fragColor;
 ${SHADOW_SAMPLING_GLSL}
 ${SKY_COLOR_GLSL}
-            // Fog starts at FOG_START and is complete at FOG_END (world units from the camera),
-            // before the floor ends (~60 units out), so the world melts into the sky behind it
-            const float FOG_START = 25.0;
-            const float FOG_END = 55.0;
+${FOG_GLSL}
             // Lifts the lookup off the surface along its normal, about a texel, so a surface
             // doesn't shadow itself in speckles ("acne"). Too much and shadows detach from their base.
             const float NORMAL_OFFSET = 0.05;
@@ -408,12 +422,8 @@ ${SKY_COLOR_GLSL}
                 vec3 diffuse = (sunDiff * u_sunColor + moonDiff * u_moonColor) * shadowFactor(v_normal);
                 vec3 finalColor = u_color * (u_ambientIntensity + diffuse);
 
-                // Distant surfaces take the sky's color in their direction, glow included.
-                // Light sources returned above, so the sun and moon are never fogged.
-                vec3 toPixel = v_worldPos - u_eye;
-                float pixelDistance = length(toPixel);
-                float fog = smoothstep(FOG_START, FOG_END, pixelDistance);
-                finalColor = mix(finalColor, skyColor(toPixel / max(pixelDistance, 0.0001)), fog);
+                // Light sources returned above, so the sun and moon are never fogged
+                finalColor = applyFog(finalColor, v_worldPos);
                 
                 fragColor = vec4(finalColor, 1.0);
             }
@@ -1382,6 +1392,12 @@ ${SKY_COLOR_GLSL}
         gl.bindVertexArray(null);
     }
 
+    // Looks the uniform up by name each call, like the rest of the billboard draw (no per-draw allocation)
+    private setVec3Uniform(program: WebGLProgram, name: string, value: Vec3): void {
+        const loc = this.gl.getUniformLocation(program, name);
+        if (loc) this.gl.uniform3f(loc, value.x, value.y, value.z);
+    }
+
     public setViewPosition(eye: Vec3): void {
         this.eye.x = eye.x;
         this.eye.y = eye.y;
@@ -1425,6 +1441,7 @@ ${SKY_COLOR_GLSL}
             
             out vec2 v_texCoord;
             out vec3 v_lightClip;
+            out vec3 v_worldPos;
 
             // How far in front of its own light-facing card a pixel looks up its shadow
             const float SELF_CLEARANCE = 0.1;
@@ -1436,6 +1453,7 @@ ${LIGHT_CARD_GLSL}
                 vec4 worldPos = u_model * vec4(a_position.x, 0.0, a_position.z, 1.0);
                 
                 v_texCoord = a_texCoord;
+                v_worldPos = worldPos.xyz;
                 gl_Position = u_viewProj * worldPos;
 
                 // Shadows are looked up where this pixel would be on the card it casts from,
@@ -1456,12 +1474,22 @@ ${LIGHT_CARD_GLSL}
             uniform float u_ambientIntensity;
             uniform vec3 u_moonColor;
             uniform vec3 u_sunColor;
+            // Fog, as in the mesh shader: the sky's colors, the sun's direction and the camera
+            uniform vec3 u_skyHorizon;
+            uniform vec3 u_skyUpper;
+            uniform vec3 u_skyZenith;
+            uniform vec3 u_skyGlow;
+            uniform vec3 u_sunDirection;
+            uniform vec3 u_eye;
             
             in vec2 v_texCoord;
             in vec3 v_lightClip;
+            in vec3 v_worldPos;
             
             out vec4 fragColor;
 ${SHADOW_SAMPLING_GLSL}
+${SKY_COLOR_GLSL}
+${FOG_GLSL}
             // The lookup already sits in front of the sprite's own caster, so only a small fixed bias
             const float BILLBOARD_BIAS = 0.0002;
             
@@ -1475,7 +1503,8 @@ ${SHADOW_SAMPLING_GLSL}
             // so only shadow dims it. As in the mesh shader, ambient is never shadowed.
             vec3 diffuse = (u_sunColor + u_moonColor) * sampleShadow(v_lightClip, BILLBOARD_BIAS, 1.0);
 
-            vec3 finalColor = textureColor * (u_ambientIntensity + diffuse);
+            vec3 finalColor = applyFog(textureColor * (u_ambientIntensity + diffuse), v_worldPos);
+            // Fog changes the color only; see-through pixels stay see-through
             fragColor = vec4(finalColor, textureAlpha);
         }
         `;
@@ -1672,6 +1701,16 @@ ${SHADOW_SAMPLING_GLSL}
         if (shadowDirectionLoc) {
             gl.uniform3f(shadowDirectionLoc, this.shadowDirection.x, this.shadowDirection.y, this.shadowDirection.z);
         }
+
+        // Fog: the sky's colors, the sun's direction and the camera position
+        const { sky, eye } = this;
+        const program = this.textureProgram;
+        this.setVec3Uniform(program, 'u_skyHorizon', sky.horizon);
+        this.setVec3Uniform(program, 'u_skyUpper', sky.upper);
+        this.setVec3Uniform(program, 'u_skyZenith', sky.zenith);
+        this.setVec3Uniform(program, 'u_skyGlow', sky.glow);
+        this.setVec3Uniform(program, 'u_sunDirection', sky.sunDirection);
+        this.setVec3Uniform(program, 'u_eye', eye);
 
         // Enable alpha blending for transparency
         gl.enable(gl.BLEND);

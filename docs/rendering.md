@@ -353,10 +353,10 @@ The sky is **sky state**, not lighting (R-3): core works out what it should be, 
 Chunks load about 60 units around the player, so without fog the floor ends in a hard line against the sky. Fog blends distant surfaces toward the sky's color **in their own direction**, using the same `skyColor()` as the sky pass, so it matches the sky everywhere: blue by day, the sunset glow toward the sun, dark at night.
 
 - `RenderSystem` sends the camera position every frame (`setViewPosition`, next to `setViewProjection`), so the renderer can measure each pixel's distance and direction.
-- Amount: `smoothstep(FOG_START, FOG_END, distance)`, from 25 to 55 units, complete before the floor ends.
+- Amount: `smoothstep(FOG_START, FOG_END, distance)`, from 25 to 55 units, complete before the floor ends, so the edge can't show through.
 - **Light sources skip it** (the sun and moon are 99 units out and would vanish; debug walls stay crisp).
 - **No stars in fog:** stars are drawn in the sky pass, not in `skyColor()`.
-- Meshes only for now; billboards get the same fog next.
+- **Meshes and billboards fog the same way:** both shaders include `FOG_GLSL` (`applyFog(color, worldPos)`), so the distances live in one place. On a billboard fog changes only the color; see-through pixels stay see-through.
 
 ### Stars
 

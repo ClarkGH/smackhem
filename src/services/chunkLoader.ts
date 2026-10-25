@@ -27,7 +27,8 @@ export interface ChunkJSON {
     template?: string; // Phase 2: template reference (future)
 }
 
-const EXPECTED_SCHEMA_VERSION = 1;
+// Version 2: inline meshes, no bounds (see docs/data-formats.md)
+const EXPECTED_SCHEMA_VERSION = 2;
 
 /**
  * Chunk loader service - converts JSON chunk data into Chunk objects with mesh handles.
@@ -182,13 +183,18 @@ export class ChunkLoader {
                 break;
 
             case 'cube':
+                // A cube has one size, scale[0]. Uneven boxes are prisms.
+                if (scaleY !== scaleX || scaleZ !== scaleX) {
+                    console.warn(`Cube with uneven scale [${scaleX}, ${scaleY}, ${scaleZ}] uses only ${scaleX}; use a prism for uneven boxes`);
+                }
                 meshHandle = renderer.createCubeMesh(scaleX);
-                yPos = worldY + scaleY / 2; // Center cube on Y
+                yPos = worldY + scaleX / 2; // The mesh is centered on its origin
                 break;
 
             case 'pyramid':
+                // The mesh's base is already at its origin, so it sits at pos[1] as is
                 meshHandle = renderer.createPyramidMesh(scaleX);
-                yPos = worldY + scaleY * 0.6; // Adjust for pyramid center
+                yPos = worldY;
                 break;
 
             case 'prism':
@@ -220,7 +226,13 @@ export class ChunkLoader {
 
         let collisionAABB: AABB | null = null;
 
-        if (meshJSON.type === 'cube' || meshJSON.type === 'prism') {
+        if (meshJSON.type === 'cube') {
+            // One size on every axis, matching what's drawn
+            collisionAABB = createAABB(
+                { x: worldX - scaleX / 2, y: worldY, z: worldZ - scaleX / 2 },
+                { x: worldX + scaleX / 2, y: worldY + scaleX, z: worldZ + scaleX / 2 },
+            );
+        } else if (meshJSON.type === 'prism') {
             collisionAABB = createAABB(
                 {
                     x: worldX - scaleX / 2,
