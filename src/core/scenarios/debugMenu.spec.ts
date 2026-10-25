@@ -7,7 +7,7 @@ import {
 import type { GameEvent } from '../events';
 import { createDebugSettings, type DebugSettings } from '../settings/debugSettings';
 import { createScenario, type Scenario } from '../../testing/scenario';
-import { skyColorsAt } from '../lighting/skyPalette';
+import { createPalette, paletteAt } from '../lighting/skyPalette';
 import EnvironmentSystem from '../lighting/environment';
 import { createGameState } from '../gameState';
 
@@ -139,17 +139,13 @@ describe('debug menu - scenario (stub platform)', () => {
         [0, 6, 12, 18].forEach((hour) => {
             for (; stepsTaken < hour * 4 + 1; stepsTaken += 1) step('Time of Day', 1);
             const sky = scenario.renderer.getSky();
-            const expected = {
-                horizon: { x: 0, y: 0, z: 0 },
-                upper: { x: 0, y: 0, z: 0 },
-                zenith: { x: 0, y: 0, z: 0 },
-                glow: { x: 0, y: 0, z: 0 },
-                stars: 0,
-            };
-            skyColorsAt(hour / 24, expected);
+            const expected = createPalette();
+            paletteAt(hour / 24, expected);
             expect({
                 horizon: sky.horizon, upper: sky.upper, zenith: sky.zenith, glow: sky.glow, stars: sky.stars,
-            }).toEqual(expected);
+            }).toEqual({
+                horizon: expected.horizon, upper: expected.upper, zenith: expected.zenith, glow: expected.glow, stars: expected.stars,
+            });
             if (hour === 0) expect(sky.stars).toBe(1);
             if (hour === 12) expect(sky.stars).toBe(0);
 
@@ -164,6 +160,24 @@ describe('debug menu - scenario (stub platform)', () => {
             }
             expect(scenario.renderer.wasSkySetBeforeBeginFrame()).toBe(true);
         });
+    });
+
+    it('draws the sun disc in its palette color, faded by opacity instead of darkened', () => {
+        scenario.click('Debug');
+        setTime(6);
+
+        const environment = new EnvironmentSystem(100);
+        environment.update(createGameState(), { x: 0, y: 0, z: 0 }, 1, 1, 6 / 24);
+        expect(environment.sunVisibility).toBeGreaterThan(0);
+        expect(environment.sunVisibility).toBeLessThan(1);
+
+        const sunDraw = scenario.renderer.getLightSourceDraws().find(
+            (d) => d.color.x === environment.palette.sunDisc.x
+                && d.color.y === environment.palette.sunDisc.y
+                && d.color.z === environment.palette.sunDisc.z,
+        );
+        expect(sunDraw).toBeDefined();
+        expect(sunDraw!.opacity).toBeCloseTo(environment.sunVisibility, 6);
     });
 
     it('stops at 23:45 and steps back to Live', () => {

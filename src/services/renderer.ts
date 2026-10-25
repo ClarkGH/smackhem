@@ -24,9 +24,10 @@ export interface Renderer {
     setSky?(_sky: SkyState): void;
     beginFrame(): void;
     setViewProjection(_viewProj: Mat4): void;
+    setViewPosition?(_eye: Vec3): void;
     setShadowCaster?(_direction: Vec3, _strength: number, _focus: Vec3): void;
     setShadowBias?(_scale: number): void;
-    drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean): void;
+    drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean, _opacity?: number): void;
     endFrame(): void;
     createPlaneMesh(_size: number): MeshHandle;
     createCubeMesh(_size: number): MeshHandle;

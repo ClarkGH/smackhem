@@ -207,6 +207,8 @@ describe('StubPlatform - Chunk streaming smoke test', () => {
 
         const expectedViewProj = getCameraMatrix(gameLoop.getRenderCamera(), 16 / 9);
         expect(Array.from(renderer.getViewProjection())).toEqual(Array.from(expectedViewProj.elements));
+        // The eye, for fog distances: the same render camera
+        expect(renderer.getViewPosition()).toEqual(gameLoop.getRenderCamera().position);
 
         // By reference: if core still pre-multiplied, these would be its scratch MVP instead
         const models = renderer.getMeshModels();

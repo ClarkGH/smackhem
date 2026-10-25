@@ -9,7 +9,7 @@ export interface DrawCommand {
     matrix: Mat4; // model (mesh, texturedQuad) or full transform (screenQuad)
     color: Vec3; // mesh color, or clear rgb
     normal: Vec3; // texturedQuad lighting normal
-    alpha: number; // clear alpha
+    alpha: number; // clear alpha, or mesh opacity (1 = solid)
     isLightSource: boolean;
 }
 
@@ -56,11 +56,12 @@ export default class DrawList {
         return this.commands[index];
     }
 
-    public pushMesh(id: string, model: Mat4, color: Vec3, isLightSource: boolean): void {
+    public pushMesh(id: string, model: Mat4, color: Vec3, isLightSource: boolean, opacity: number = 1): void {
         const cmd = this.next('mesh', id);
         cmd.matrix.elements.set(model.elements);
         copyVec3(color, cmd.color);
         cmd.isLightSource = isLightSource;
+        cmd.alpha = opacity;
     }
 
     public pushTexturedQuad(id: string, model: Mat4, normal: Vec3): void {

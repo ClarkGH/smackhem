@@ -203,6 +203,9 @@ export default class WebGLRenderer implements Renderer {
             viewProj: null, horizon: null, upper: null, zenith: null, glow: null, sunDirection: null, stars: null,
         };
 
+    // Copied in by setViewPosition once per frame, for fog distances
+    private readonly eye: Vec3 = { x: 0, y: 0, z: 0 };
+
     // Copied in by setViewProjection once per frame, shared by every world draw
     private viewProj: Mat4 = identity();
 
@@ -256,9 +259,15 @@ export default class WebGLRenderer implements Renderer {
         moonColor: WebGLUniformLocation | null;
         ambientIntensity: WebGLUniformLocation | null;
         isLightSource: WebGLUniformLocation | null;
+        opacity: WebGLUniformLocation | null;
         lightViewProj: WebGLUniformLocation | null;
         shadowStrength: WebGLUniformLocation | null;
         shadowBiasScale: WebGLUniformLocation | null;
+        skyHorizon: WebGLUniformLocation | null;
+        skyUpper: WebGLUniformLocation | null;
+        skyZenith: WebGLUniformLocation | null;
+        skyGlow: WebGLUniformLocation | null;
+        eye: WebGLUniformLocation | null;
     } = {
             color: null,
             viewProj: null,
@@ -270,9 +279,15 @@ export default class WebGLRenderer implements Renderer {
             moonColor: null,
             ambientIntensity: null,
             isLightSource: null,
+            opacity: null,
             lightViewProj: null,
             shadowStrength: null,
             shadowBiasScale: null,
+            skyHorizon: null,
+            skyUpper: null,
+            skyZenith: null,
+            skyGlow: null,
+            eye: null,
         };
 
     private identityMatrix: Mat4;
@@ -337,16 +352,29 @@ export default class WebGLRenderer implements Renderer {
             uniform vec3 u_moonColor;
             uniform float u_ambientIntensity;
             uniform float u_isLightSource; // 1.0 if object is self-illuminated, 0.0 otherwise
+            uniform float u_opacity; // Light sources only: < 1 lets the sky behind show through
             uniform mat4 u_lightViewProj;
             uniform highp sampler2DShadow u_shadowMap;
             uniform float u_shadowStrength;
             uniform float u_shadowBiasScale;
+            // Fog: the sky's colors and the camera's position. skyColor() also reads u_sunDirection,
+            // declared above for sunlight: the same value, the sun's own direction.
+            uniform vec3 u_skyHorizon;
+            uniform vec3 u_skyUpper;
+            uniform vec3 u_skyZenith;
+            uniform vec3 u_skyGlow;
+            uniform vec3 u_eye;
             
             in vec3 v_normal;
             in vec3 v_worldPos;
             
             out vec4 fragColor;
 ${SHADOW_SAMPLING_GLSL}
+${SKY_COLOR_GLSL}
+            // Fog starts at FOG_START and is complete at FOG_END (world units from the camera),
+            // before the floor ends (~60 units out), so the world melts into the sky behind it
+            const float FOG_START = 25.0;
+            const float FOG_END = 55.0;
             // Lifts the lookup off the surface along its normal, about a texel, so a surface
             // doesn't shadow itself in speckles ("acne"). Too much and shadows detach from their base.
             const float NORMAL_OFFSET = 0.05;
@@ -360,7 +388,7 @@ ${SHADOW_SAMPLING_GLSL}
             
             void main() {
                 if (u_isLightSource > 0.5) {
-                    fragColor = vec4(u_color, 1.0);
+                    fragColor = vec4(u_color, u_opacity);
                     return;
                 }
 
@@ -379,6 +407,13 @@ ${SHADOW_SAMPLING_GLSL}
                 // Ambient is never shadowed.
                 vec3 diffuse = (sunDiff * u_sunColor + moonDiff * u_moonColor) * shadowFactor(v_normal);
                 vec3 finalColor = u_color * (u_ambientIntensity + diffuse);
+
+                // Distant surfaces take the sky's color in their direction, glow included.
+                // Light sources returned above, so the sun and moon are never fogged.
+                vec3 toPixel = v_worldPos - u_eye;
+                float pixelDistance = length(toPixel);
+                float fog = smoothstep(FOG_START, FOG_END, pixelDistance);
+                finalColor = mix(finalColor, skyColor(toPixel / max(pixelDistance, 0.0001)), fog);
                 
                 fragColor = vec4(finalColor, 1.0);
             }
@@ -408,9 +443,15 @@ ${SHADOW_SAMPLING_GLSL}
             moonColor: this.gl.getUniformLocation(this.program, 'u_moonColor'),
             ambientIntensity: this.gl.getUniformLocation(this.program, 'u_ambientIntensity'),
             isLightSource: this.gl.getUniformLocation(this.program, 'u_isLightSource'),
+            opacity: this.gl.getUniformLocation(this.program, 'u_opacity'),
             lightViewProj: this.gl.getUniformLocation(this.program, 'u_lightViewProj'),
             shadowStrength: this.gl.getUniformLocation(this.program, 'u_shadowStrength'),
             shadowBiasScale: this.gl.getUniformLocation(this.program, 'u_shadowBiasScale'),
+            skyHorizon: this.gl.getUniformLocation(this.program, 'u_skyHorizon'),
+            skyUpper: this.gl.getUniformLocation(this.program, 'u_skyUpper'),
+            skyZenith: this.gl.getUniformLocation(this.program, 'u_skyZenith'),
+            skyGlow: this.gl.getUniformLocation(this.program, 'u_skyGlow'),
+            eye: this.gl.getUniformLocation(this.program, 'u_eye'),
         };
 
         // The sampler's unit never changes, set once
@@ -954,11 +995,11 @@ ${LIGHT_CARD_GLSL}
         this.drawList.reset();
     }
 
-    public drawMesh(mesh: MeshHandle, model: Mat4, color: Vec3, isLightSource: boolean = false): void {
-        this.drawList.pushMesh(mesh.id, model, color, isLightSource);
+    public drawMesh(mesh: MeshHandle, model: Mat4, color: Vec3, isLightSource: boolean = false, opacity: number = 1): void {
+        this.drawList.pushMesh(mesh.id, model, color, isLightSource, opacity);
     }
 
-    private drawMeshNow(meshId: string, model: Mat4, color: Vec3, isLightSource: boolean): void {
+    private drawMeshNow(meshId: string, model: Mat4, color: Vec3, isLightSource: boolean, opacity: number): void {
         const webglMesh = this.meshes.get(meshId);
         if (!webglMesh || !this.program) {
             return;
@@ -970,6 +1011,10 @@ ${LIGHT_CARD_GLSL}
         // Set the light source uniform toggle
         if (this.uniformLocations.isLightSource) {
             this.gl.uniform1f(this.uniformLocations.isLightSource, isLightSource ? 1.0 : 0.0);
+        }
+
+        if (this.uniformLocations.opacity) {
+            this.gl.uniform1f(this.uniformLocations.opacity, opacity);
         }
 
         // Set color uniform (using cached location)
@@ -1046,12 +1091,33 @@ ${LIGHT_CARD_GLSL}
             this.gl.uniform1f(this.uniformLocations.shadowBiasScale, this.shadowBiasScale);
         }
 
+        // Fog's sky colors and the camera position
+        const { sky, eye } = this;
+        const locs = this.uniformLocations;
+        if (locs.skyHorizon) this.gl.uniform3f(locs.skyHorizon, sky.horizon.x, sky.horizon.y, sky.horizon.z);
+        if (locs.skyUpper) this.gl.uniform3f(locs.skyUpper, sky.upper.x, sky.upper.y, sky.upper.z);
+        if (locs.skyZenith) this.gl.uniform3f(locs.skyZenith, sky.zenith.x, sky.zenith.y, sky.zenith.z);
+        if (locs.skyGlow) this.gl.uniform3f(locs.skyGlow, sky.glow.x, sky.glow.y, sky.glow.z);
+        if (locs.eye) this.gl.uniform3f(locs.eye, eye.x, eye.y, eye.z);
+
+        // See-through light sources (a sun or moon near the horizon) blend over the sky pass,
+        // drawn before the replay, so they fade into the real sky behind them
+        const blend = isLightSource && opacity < 1;
+        if (blend) {
+            this.gl.enable(this.gl.BLEND);
+            this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+        }
+
         // Set wireframe mode
         if (this.wireframe) {
             this.gl.polygonOffset(0, 0);
             this.gl.drawArrays(this.gl.LINE_LOOP, 0, webglMesh.vertexCount);
         } else {
             this.gl.drawArrays(this.gl.TRIANGLES, 0, webglMesh.vertexCount);
+        }
+
+        if (blend) {
+            this.gl.disable(this.gl.BLEND);
         }
 
         this.gl.bindVertexArray(null);
@@ -1077,7 +1143,7 @@ ${LIGHT_CARD_GLSL}
             const cmd = list.get(i);
             switch (cmd.kind) {
                 case 'mesh':
-                    this.drawMeshNow(cmd.id, cmd.matrix, cmd.color, cmd.isLightSource);
+                    this.drawMeshNow(cmd.id, cmd.matrix, cmd.color, cmd.isLightSource, cmd.alpha);
                     break;
                 case 'texturedQuad':
                     this.drawTexturedQuadNow(cmd.id, cmd.matrix, cmd.normal);
@@ -1314,6 +1380,12 @@ ${SKY_COLOR_GLSL}
         gl.enable(gl.DEPTH_TEST);
 
         gl.bindVertexArray(null);
+    }
+
+    public setViewPosition(eye: Vec3): void {
+        this.eye.x = eye.x;
+        this.eye.y = eye.y;
+        this.eye.z = eye.z;
     }
 
     public setViewProjection(viewProj: Mat4): void {

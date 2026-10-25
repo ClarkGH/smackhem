@@ -4,7 +4,6 @@ import type { GameState } from '../gameState';
 import type { DebugHUD } from '../gameLoop';
 import { World } from '../world';
 import EnvironmentSystem from './environment';
-import { skyColorsAt } from './skyPalette';
 import { Vec3, Mat4 } from '../../types/common';
 import { getCameraMatrix, INSTANCE_CHARACTER_SIZE } from '../camera';
 import { SCENE_HEIGHT_PX, SCENE_TILE_SIZE, SCENE_WIDTH_PX } from '../scene';
@@ -99,10 +98,23 @@ export default class RenderSystem {
             this.renderer.setAmbientIntensity(this.environmentSystem.ambientIntensity);
         }
         if (this.environmentSystem.sunVisibility > 0) {
-            this.renderer.drawMesh(this.sunMesh, this.environmentSystem.sunTransform, this.environmentSystem.sunColorWithVisibility, true);
+            // Full color, faded by opacity: the disc fades into the sky instead of darkening into a blot
+            this.renderer.drawMesh(
+                this.sunMesh,
+                this.environmentSystem.sunTransform,
+                this.environmentSystem.palette.sunDisc,
+                true,
+                this.environmentSystem.sunVisibility,
+            );
         }
         if (this.environmentSystem.moonVisibility > 0) {
-            this.renderer.drawMesh(this.moonMesh, this.environmentSystem.moonTransform, this.environmentSystem.moonColorWithVisibility, true);
+            this.renderer.drawMesh(
+                this.moonMesh,
+                this.environmentSystem.moonTransform,
+                this.environmentSystem.palette.moonLight,
+                true,
+                this.environmentSystem.moonVisibility,
+            );
         }
     }
 
@@ -118,7 +130,11 @@ export default class RenderSystem {
     ): void {
         // Before beginFrame, which clears to this frame's sky. Every mode, so the renderer
         // never holds a stale sky (scene_2d's own clear covers it).
-        skyColorsAt(this.environmentSystem.timeOfDay, this.sky);
+        const { palette } = this.environmentSystem;
+        (['horizon', 'upper', 'zenith', 'glow'] as const).forEach((field) => {
+            this.sky[field].x = palette[field].x; this.sky[field].y = palette[field].y; this.sky[field].z = palette[field].z;
+        });
+        this.sky.stars = palette.stars;
         // Always the sun, even below the horizon (afterglow), never shadowLightDirection,
         // which switches to the moon at night and would swing the glow across the sky at dawn
         const sun = this.environmentSystem.lightDirection;
@@ -132,6 +148,7 @@ export default class RenderSystem {
         if (discreteState.gameMode === 'scene_2d') {
             const aspect = this.getAspectRatio();
             this.renderer.setViewProjection(getCameraMatrix(camera, aspect));
+            this.renderer.setViewPosition?.(camera.position);
 
             this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
 
@@ -177,6 +194,7 @@ export default class RenderSystem {
         } else {
             const aspect = this.getAspectRatio();
             this.renderer.setViewProjection(getCameraMatrix(camera, aspect));
+            this.renderer.setViewPosition?.(camera.position);
 
             this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
 

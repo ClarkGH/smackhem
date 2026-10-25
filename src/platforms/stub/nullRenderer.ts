@@ -54,6 +54,7 @@ export default class NullRenderer implements Renderer {
     public beginFrame(): void {
         this.frameCount += 1;
         this.meshModels.length = 0;
+        this.lightSourceDraws.length = 0;
         this.skySetBeforeBegin = this.skySetBetweenFrames;
     }
 
@@ -99,12 +100,32 @@ export default class NullRenderer implements Renderer {
         return this.shadowBiasScale;
     }
 
+    private readonly eye = { x: 0, y: 0, z: 0 };
+
+    public setViewPosition(_eye: Vec3): void {
+        this.eye.x = _eye.x; this.eye.y = _eye.y; this.eye.z = _eye.z;
+    }
+
+    public getViewPosition(): Vec3 {
+        return { ...this.eye };
+    }
+
     public setViewProjection(_viewProj: Mat4): void {
         this.viewProj.set(_viewProj.elements);
     }
 
-    public drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean): void {
+    // Light sources drawn this frame (sun, moon, debug walls), copied
+    private readonly lightSourceDraws: Array<{ color: Vec3; opacity: number }> = [];
+
+    public drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean, _opacity?: number): void {
         this.meshModels.push(_model);
+        if (_isLightSource) {
+            this.lightSourceDraws.push({ color: { ..._color }, opacity: _opacity ?? 1 });
+        }
+    }
+
+    public getLightSourceDraws(): ReadonlyArray<{ color: Vec3; opacity: number }> {
+        return this.lightSourceDraws;
     }
 
     public endFrame(): void {

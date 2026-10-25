@@ -1,27 +1,29 @@
 import { describe, it, expect } from 'vitest';
 import {
-    SKY_CHANNELS, SKY_KEYS, skyColorsAt, type SkyColors, type SkyKeyName,
+    PALETTE_COLORS, SKY_KEYS, createPalette, paletteAt, type TimeOfDayPalette, type SkyKeyName,
 } from './skyPalette';
 import EnvironmentSystem from './environment';
 import { createGameState } from '../gameState';
 
 const hours = (h: number): number => h / 24;
 
-const colorsAt = (timeOfDay: number): SkyColors => {
-    const out = {
-        horizon: { x: 0, y: 0, z: 0 },
-        upper: { x: 0, y: 0, z: 0 },
-        zenith: { x: 0, y: 0, z: 0 },
-        glow: { x: 0, y: 0, z: 0 },
-        stars: 0,
-    };
-    skyColorsAt(timeOfDay, out);
+const colorsAt = (timeOfDay: number): TimeOfDayPalette => {
+    const out = createPalette();
+    paletteAt(timeOfDay, out);
     return out;
 };
 
-// Just the sky values of a key (no name or time), for comparing against skyColorsAt
-const colorsOf = (k: SkyColors): SkyColors => ({
-    horizon: k.horizon, upper: k.upper, zenith: k.zenith, glow: k.glow, stars: k.stars,
+// Just the palette values of a key (no name or time), for comparing against paletteAt
+const colorsOf = (k: TimeOfDayPalette): TimeOfDayPalette => ({
+    horizon: k.horizon,
+    upper: k.upper,
+    zenith: k.zenith,
+    glow: k.glow,
+    sunLight: k.sunLight,
+    moonLight: k.moonLight,
+    sunDisc: k.sunDisc,
+    ambient: k.ambient,
+    stars: k.stars,
 });
 
 // Expected colors always come from the key table, so tuning a color never touches this spec
@@ -59,8 +61,8 @@ const sunCrossing = (rising: boolean): number => {
     throw new Error('The sun never crosses the horizon');
 };
 
-describe('skyColorsAt', () => {
-    // skyColorsAt keeps the last key at or before the time, which only means "latest" in a sorted table
+describe('paletteAt', () => {
+    // paletteAt keeps the last key at or before the time, which only means "latest" in a sorted table
     it('has its keys in time order, within one day', () => {
         SKY_KEYS.forEach((k, i) => {
             expect(k.time).toBeGreaterThanOrEqual(0);
@@ -69,7 +71,7 @@ describe('skyColorsAt', () => {
         });
     });
 
-    it('returns each key exactly at its time, all four colors', () => {
+    it('returns each key exactly at its time, every value', () => {
         SKY_KEYS.forEach((k) => {
             expect(colorsAt(k.time)).toEqual(colorsOf(k));
         });
@@ -87,7 +89,7 @@ describe('skyColorsAt', () => {
         const night = key('nightEnd');
         const dawn = key('dawn');
         const between = colorsAt(hours(5.5));
-        SKY_CHANNELS.forEach((channel) => {
+        PALETTE_COLORS.forEach((channel) => {
             (['x', 'y', 'z'] as const).forEach((rgb) => {
                 const low = Math.min(night[channel][rgb], dawn[channel][rgb]);
                 const high = Math.max(night[channel][rgb], dawn[channel][rgb]);
@@ -96,8 +98,10 @@ describe('skyColorsAt', () => {
                 expect(between[channel][rgb]).toBeLessThan(high);
             });
         });
-        expect(between.stars).toBeGreaterThan(Math.min(night.stars, dawn.stars));
-        expect(between.stars).toBeLessThan(Math.max(night.stars, dawn.stars));
+        (['stars', 'ambient'] as const).forEach((value) => {
+            expect(between[value]).toBeGreaterThan(Math.min(night[value], dawn[value]));
+            expect(between[value]).toBeLessThan(Math.max(night[value], dawn[value]));
+        });
     });
 
     it('shows stars through the whole night and none through the day', () => {
@@ -111,22 +115,45 @@ describe('skyColorsAt', () => {
         expect(key('morning').stars).toBe(0);
     });
 
-    it('holds the day colors from morning to afternoon', () => {
-        const day = colorsOf(key('morning'));
-        expect(colorsOf(key('afternoon'))).toEqual(day);
-        [7.5, 14, 16.5].forEach((h) => {
-            expect(colorsAt(hours(h))).toEqual(day);
+    it('holds the day sky from morning to afternoon, noon included', () => {
+        // Everything but the sun's light and disc, which have their own curve through the day (next test)
+        const skyOf = (p: TimeOfDayPalette) => {
+            const { sunLight: _sunLight, sunDisc: _sunDisc, ...rest } = colorsOf(p);
+            return rest;
+        };
+        const day = skyOf(key('morning'));
+        expect(skyOf(key('noon'))).toEqual(day);
+        expect(skyOf(key('afternoon'))).toEqual(day);
+        [7.5, 10, 12, 14, 16.5].forEach((h) => {
+            expect(skyOf(colorsAt(hours(h)))).toEqual(day);
         });
     });
 
-    it('never jumps in any color across a whole day, midnight included', () => {
+    it('brightens the sun\'s light and disc toward noon: the same at morning and afternoon, different at noon', () => {
+        (['sunLight', 'sunDisc'] as const).forEach((field) => {
+            expect(key('afternoon')[field]).toEqual(key('morning')[field]);
+            expect(key('noon')[field]).not.toEqual(key('morning')[field]);
+            expect(colorsAt(hours(12))[field]).toEqual(key('noon')[field]);
+            // Mid-morning sits strictly between the two, so the change is gradual
+            const morning = key('morning')[field];
+            const noon = key('noon')[field];
+            const midMorning = colorsAt(hours(9.75))[field];
+            (['x', 'y', 'z'] as const).forEach((rgb) => {
+                if (morning[rgb] === noon[rgb]) return;
+                expect(midMorning[rgb]).toBeGreaterThan(Math.min(morning[rgb], noon[rgb]));
+                expect(midMorning[rgb]).toBeLessThan(Math.max(morning[rgb], noon[rgb]));
+            });
+        });
+    });
+
+    it('never jumps in any value across a whole day, midnight included', () => {
         const STEPS = 2400; // 0.05 s apart on a 120 s day
         let previous = colorsAt(0);
         let biggestJump = 0;
         for (let i = 1; i <= STEPS; i += 1) {
             const colors = colorsAt(i / STEPS);
-            for (let c = 0; c < SKY_CHANNELS.length; c += 1) {
-                const channel = SKY_CHANNELS[c];
+            for (let c = 0; c < PALETTE_COLORS.length; c += 1) {
+                const channel = PALETTE_COLORS[c];
                 biggestJump = Math.max(
                     biggestJump,
                     Math.abs(colors[channel].x - previous[channel].x),
@@ -134,7 +161,11 @@ describe('skyColorsAt', () => {
                     Math.abs(colors[channel].z - previous[channel].z),
                 );
             }
-            biggestJump = Math.max(biggestJump, Math.abs(colors.stars - previous.stars));
+            biggestJump = Math.max(
+                biggestJump,
+                Math.abs(colors.stars - previous.stars),
+                Math.abs(colors.ambient - previous.ambient),
+            );
             previous = colors;
         }
         expect(biggestJump).toBeLessThan(0.02);

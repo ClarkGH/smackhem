@@ -1,16 +1,13 @@
 import { Vec3, Mat4 } from '../../types/common';
 import { GameState } from '../gameState';
 import { identity, smoothstep } from '../math/mathHelpers';
+import { createPalette, paletteAt, type TimeOfDayPalette } from './skyPalette';
 
 export default class EnvironmentSystem {
     // Configuration Constants
     private readonly DAY_LENGTH_SECONDS = 120;
 
     private readonly DECLINATION_OFFSET = 0.0;
-
-    private readonly SUN_COLOR: Vec3 = { x: 1.0, y: 0.85, z: 0.2 };
-
-    private readonly MOON_COLOR: Vec3 = { x: 0.4, y: 0.6, z: 0.9 };
 
     // Shadows fade in as the caster climbs from SHADOW_FADE_LOW to SHADOW_FADE_HIGH (direction y).
     // Below that they'd stretch for dozens of units, and at dawn/dusk both bodies sit there,
@@ -35,6 +32,10 @@ export default class EnvironmentSystem {
     public readonly sunTransform: Mat4 = identity();
 
     public readonly moonTransform: Mat4 = identity();
+
+    // This frame's palette (sky, light colors, ambient, stars), filled once per update.
+    // RenderSystem reads the sky from here too, so sky and lighting come from one evaluation.
+    public readonly palette: TimeOfDayPalette = createPalette();
 
     public ambientIntensity = 0.1;
 
@@ -86,12 +87,6 @@ export default class EnvironmentSystem {
         }
     }
 
-    private computeAmbientIntensity(elevation: number): number {
-        const normalizedElev = Math.max(0, Math.min(1, (elevation + 1) / 2));
-        const smoothT = normalizedElev * normalizedElev * (3 - 2 * normalizedElev);
-        return 0.1 + (0.5 - 0.1) * smoothT;
-    }
-
     private computeCelestialVisibility(elevation: number): number {
         const FADE_BAND = 0.15;
         const t = Math.max(0, Math.min(1, (elevation + FADE_BAND) / (2 * FADE_BAND)));
@@ -124,12 +119,13 @@ export default class EnvironmentSystem {
         const celestialDistance = this.cameraFar - 1.0;
 
         this.timeOfDay = timeOfDayOverride ?? this.computeTimeOfDay(interpolatedState.simulationTime);
+        paletteAt(this.timeOfDay, this.palette);
 
         this.computeSunSpherical(this.timeOfDay, this.sunAzimuth, this.sunElevation);
 
         // Sun vector mapping
         this.sphericalToDirection(this.sunAzimuth.value, this.sunElevation.value, this.lightDirection);
-        this.ambientIntensity = this.computeAmbientIntensity(this.sunElevation.value);
+        this.ambientIntensity = this.palette.ambient;
 
         // Moon vector mapping (Offset by PI)
         const moonAzimuth = this.sunAzimuth.value + Math.PI;
@@ -139,14 +135,16 @@ export default class EnvironmentSystem {
         this.sunVisibility = this.computeCelestialVisibility(this.sunElevation.value);
         this.moonVisibility = this.computeCelestialVisibility(moonElevation);
 
-        // Visibility color scaling
-        this.sunColorWithVisibility.x = this.SUN_COLOR.x * this.sunVisibility;
-        this.sunColorWithVisibility.y = this.SUN_COLOR.y * this.sunVisibility;
-        this.sunColorWithVisibility.z = this.SUN_COLOR.z * this.sunVisibility;
+        // The palette sets each body's color and warmth; visibility fades it across the horizon,
+        // in step with shadow strength, which uses visibility too
+        const { sunLight, moonLight } = this.palette;
+        this.sunColorWithVisibility.x = sunLight.x * this.sunVisibility;
+        this.sunColorWithVisibility.y = sunLight.y * this.sunVisibility;
+        this.sunColorWithVisibility.z = sunLight.z * this.sunVisibility;
 
-        this.moonColorWithVisibility.x = this.MOON_COLOR.x * this.moonVisibility;
-        this.moonColorWithVisibility.y = this.MOON_COLOR.y * this.moonVisibility;
-        this.moonColorWithVisibility.z = this.MOON_COLOR.z * this.moonVisibility;
+        this.moonColorWithVisibility.x = moonLight.x * this.moonVisibility;
+        this.moonColorWithVisibility.y = moonLight.y * this.moonVisibility;
+        this.moonColorWithVisibility.z = moonLight.z * this.moonVisibility;
 
         const sunCasts = this.sunVisibility >= this.moonVisibility;
         const caster = sunCasts ? this.lightDirection : this.moonLightDirection;

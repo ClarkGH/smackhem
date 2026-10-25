@@ -21,6 +21,17 @@ describe('DrawList', () => {
         expect(list.get(1).color.x).toBe(0.5);
     });
 
+    it('carries mesh opacity, solid by default', () => {
+        // A pooled command reused from a see-through draw must not stay see-through
+        const list = new DrawList(1);
+        const m = identity();
+        list.pushMesh('sun', m, { x: 1, y: 1, z: 0 }, true, 0.4);
+        expect(list.get(0).alpha).toBe(0.4);
+        list.reset();
+        list.pushMesh('cube', m, { x: 1, y: 1, z: 1 }, false);
+        expect(list.get(0).alpha).toBe(1);
+    });
+
     it('keeps call order across kinds', () => {
         // scene_2d draws meshes, then clears over them, then the screen quad
         const list = new DrawList(4);

@@ -89,7 +89,7 @@ Draws are recorded, not drawn on the spot: `endFrame` replays them in call order
 
 ## Lighting System
 
-The rendering system uses grayscale directional lighting with ambient and diffuse components. All lighting calculations are performed in shaders using world-space normals.
+The rendering system uses colored directional lighting (sun and moon) with ambient and diffuse components, and colors from the time-of-day palette (see [Sky](#sky)). Mesh colors themselves are grayscale. All lighting calculations are performed in shaders using world-space normals.
 
 ### Directional Light Direction
 
@@ -122,8 +122,8 @@ finalColor = baseColor * lightColor * lighting
 
 Where:
 
-- `ambientIntensity` = varies with time of day (0.1-0.5, dark night to bright day)
-- `lightColor` = varies with time of day (cool moon tones to warm sun tones, grayscale)
+- `ambientIntensity` = the palette's `ambient` for the time of day (0.12 at night to 0.5 by day)
+- `lightColor` = the palette's `sunLight` / `moonLight`, each faded by its body's visibility (warm and low at sunrise and sunset, near-white at noon, cool moonlight at night)
 - `baseColor` = mesh color (grayscale values)
 
 The ambient component ensures surfaces are never completely black, while the diffuse component provides directional shading.
@@ -183,17 +183,12 @@ The lighting system supports a deterministic sun/moon cycle that rotates light d
    - Normalized 3D vector in world space
    - Sun at peak (noon), moon at peak (midnight)
 
-2. **Light Color**: Visibility-based blending (sun and moon colors)
-   - Blended RGB values
-   - Blends between warm sun tones (bright at zenith, warm at horizon) with cool moon tones (bluish tones)
-   - Uses sun/moon visibility to weight the blend
-   - Sun color transitions from white (zenith) to red/orange (horizon) based on sun elevation
-   - Smooth interpolation via smoothstep function
-   - Note: Horizon-based warmth not added, yet (to be fine-tuned)
+2. **Light Color**: from the time-of-day palette (`sunLight`, `moonLight` in `SKY_KEYS`)
+   - The palette sets each body's color: warm at sunrise and sunset, near-white through the day, cool for the moon
+   - Each is multiplied by its body's visibility, so the light fades as the body crosses the horizon, in step with shadow strength
+   - Both bodies light the scene at once, each weighted by its own visibility
 
-3. **Ambient Intensity**: Elevation-based transitions
-   - Varies from 0.1 (dark night) to 0.5 (bright day) based on sun elevation
-   - Uses smoothstep interpolation for smooth transitions
+3. **Ambient Intensity**: the palette's `ambient` (0.12 at night, 0.3 at dawn and sunset, 0.5 by day), blended with the rest of the palette
 
 ### Renderer Interface Extension
 
@@ -278,16 +273,10 @@ The bodies visibility comes from their own elevation as we utilize a fade band.
 The fade band is the distance the fade extends from the horizon:
 
 ```typescript
-const sunVisibility = computeCelestialVisibility(timeOfDay);
-const moonVisibility = computeCelestialVisibility(timeOfDay);
-
-this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
-            this.sunColorWithVisibility.y = this.SUN_COLOR.y * sunVisibility;
-            this.sunColorWithVisibility.z = this.SUN_COLOR.z * sunVisibility;
-
-            this.moonColorWithVisibility.x = this.MOON_COLOR.x * moonVisibility;
-            this.moonColorWithVisibility.y = this.MOON_COLOR.y * moonVisibility;
-            this.moonColorWithVisibility.z = this.MOON_COLOR.z * moonVisibility;
+// The palette is evaluated once per update (paletteAt), then:
+const { sunLight, moonLight } = this.palette;
+this.sunColorWithVisibility.x = sunLight.x * this.sunVisibility;   // ...y, z likewise
+this.moonColorWithVisibility.x = moonLight.x * this.moonVisibility; // ...y, z likewise
 
             // Both bodies light the scene at once (weighted by their own visibility) -
             // no more picking one direction and discarding the other.
@@ -299,11 +288,9 @@ this.sunColorWithVisibility.x = this.SUN_COLOR.x * sunVisibility;
             }
 ```
 
-Note: Currently stays in cool colors a bit more than ideal (to be fine-tuned).
+**Ambient Intensity:**
 
-**Ambient Intensity (Elevation-Based):**
-
-Ambient intensity varies from 0.1 (dark night) to 0.5 (bright day) based on sun elevation, using smoothstep interpolation for smooth transitions.
+The palette's `ambient` for the time of day, blended with every other palette value, so the world's brightness changes exactly in step with the sky.
 
 **Visual Celestial Objects:**
 
@@ -317,11 +304,11 @@ Both the sun and moon are rendered as visible spheres in the sky:
   - `SUN_SIZE = 0.5` (radius of sun sphere)
   - `MOON_SIZE = 0.4` (radius of moon sphere)
 
-- **Colors**:
-  - Sun: `{ x: 1.0, y: 0.85, z: 0.2 }` (golden yellow)
-  - Moon: `{ x: 0.4, y: 0.6, z: 0.9 }` (cool blue)
+- **Colors** (from the palette):
+  - Sun: `sunDisc`, a golden orb, never white against the blue sky. Noon Sun `#F7D038` through the day, brightening to Light Sun `#FDE87A` at the 12:00 noon key and deepening again; Sunburst Orange `#FFA333` at dawn, Tropic Sun `#F38B21` at sunset (colorguide.org/sun). It's separate from `sunLight`, so daylight can stay near-neutral while the orb stays golden.
+  - Moon: `moonLight` (cool blue).
 
-- **Visibility**: Colors are multiplied by visibility factor (0-1) for smooth fade in/out
+- **Visibility**: drawn at full color with **opacity** = the body's visibility (0–1), blended over the sky pass, so a setting sun fades **into** the sky behind it (halo included) instead of darkening into a blot. `drawMesh`'s optional `_opacity` carries it; only light sources use it.
   - Sun fades in at dawn, fades out at dusk
   - Moon fades in at dusk, fades out at dawn
 
@@ -361,6 +348,16 @@ The sky is **sky state**, not lighting (R-3): core works out what it should be, 
 - **`skyColor(viewDir)`** (`SKY_COLOR_GLSL`, shared so fog can reuse it): horizon → upper by `HORIZON_BAND` (view height 0.25), upper → zenith above that, horizon color below the horizon. The glow has two parts: a **halo** centered on the sun (`HALO_POWER`), so it rises and sets with it, and a wide **band** along the horizon on the sun's compass side (`BAND_POWER`, `BAND_HEIGHT`, `BAND_STRENGTH`). It's **screen**-blended (`color + glow × amount × (1 − color)`), so it tints toward the glow color without clipping to white, and black glow still adds nothing. (A first version weighted the whole glow toward the horizon: since the sun rises straight up, the bright spot stayed pinned to the horizon as the sun climbed, and adding it clipped to a flat white patch.)
 - `beginFrame` still clears to `horizon` as a fallback.
 
+### Fog
+
+Chunks load about 60 units around the player, so without fog the floor ends in a hard line against the sky. Fog blends distant surfaces toward the sky's color **in their own direction**, using the same `skyColor()` as the sky pass, so it matches the sky everywhere: blue by day, the sunset glow toward the sun, dark at night.
+
+- `RenderSystem` sends the camera position every frame (`setViewPosition`, next to `setViewProjection`), so the renderer can measure each pixel's distance and direction.
+- Amount: `smoothstep(FOG_START, FOG_END, distance)`, from 25 to 55 units, complete before the floor ends.
+- **Light sources skip it** (the sun and moon are 99 units out and would vanish; debug walls stay crisp).
+- **No stars in fog:** stars are drawn in the sky pass, not in `skyColor()`.
+- Meshes only for now; billboards get the same fog next.
+
 ### Stars
 
 Drawn in the sky pass's `main`, **not** in `skyColor()`, so fog (which will reuse `skyColor()`) never gets stars. Deterministic and stateless: no textures, no time input, so the same view direction always shows the same star on every machine. To reproduce the field on another backend, match this exactly:
@@ -381,7 +378,7 @@ Drawn in the sky pass's `main`, **not** in `skyColor()`, so fog (which will reus
 
 Tunable in the shader: `STAR_GRID` 32, `STAR_DENSITY` 0.24 (about 700 above the horizon), `STAR_HORIZON_FADE`, `STAR_FADE_RANGE`. (A first version measured the dots in face coordinates: faces seen at an angle squashed them into dashes, so they're measured in view-direction space.)
 
-- **Palette** (`core/lighting/skyPalette.ts`): `SKY_KEYS` is a circular table of art-directed colors by time of day, four per key. `skyColorsAt` blends all four with the same segment and blend, so they move together. Night holds from 20:00 to 05:00, dawn is at 06:00, day holds from 07:30 to 16:30, then sunset at 18:00 and dusk at 19:00. `skyColorAt` smoothsteps from the last key at or before the time to the next, measuring forward across midnight. A hold is two neighbouring keys with the same color. Dawn and sunset sit where the sun crosses the horizon, which the spec checks against `EnvironmentSystem`.
+- **Palette** (`core/lighting/skyPalette.ts`): `SKY_KEYS` is a circular table of art-directed values by time of day, a `TimeOfDayPalette` per key: the sky (horizon, upper, zenith, glow), the light (`sunLight`, `moonLight`, `ambient`) and `stars`. `paletteAt` blends them all with the same segment and blend, so they move together. `EnvironmentSystem` evaluates it once per update; `RenderSystem` copies the sky fields from there, so the sky and the lighting always come from the same evaluation. Night holds from 20:00 to 05:00, dawn is at 06:00, the day's sky holds from 07:30 to 16:30, then sunset at 18:00 and dusk at 19:00. Daylight is the exception within the day: warm cream at 07:30 and 16:30, near-white at a 12:00 `noon` key, so it warms gradually away from high noon. The sun's disc is always golden (`sunDisc`, colors from colorguide.org/sun), never white. `paletteAt` smoothsteps from the last key at or before the time to the next, measuring forward across midnight. A hold is two neighbouring keys with the same color. Dawn and sunset sit where the sun crosses the horizon, which the spec checks against `EnvironmentSystem`.
 - **To the renderer**: `RenderSystem` fills a `SkyState` (palette colors, plus the sun's direction: always the sun, even below the horizon, never the shadow caster, which switches to the moon at night) and calls `setSky` **before** `beginFrame`, every frame and in every mode. `beginFrame` then clears to it, so the color always belongs to the current frame. In `scene_2d` the scene's own `clear()` draws over it.
 - **Tuning**: edit the hex values in `SKY_KEYS`, then check them with the Debug screen's Time of Day. The spec reads expected colors from the table, so color changes never touch a test.
 

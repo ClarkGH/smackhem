@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import EnvironmentSystem from './environment';
 import { createGameState } from '../gameState';
+import { SKY_KEYS } from './skyPalette';
 
 const ORIGIN = { x: 0, y: 0, z: 0 };
 
@@ -46,5 +47,27 @@ describe('EnvironmentSystem shadow caster', () => {
             previous = strength;
         }
         expect(biggestJump).toBeLessThan(0.02);
+    });
+});
+
+describe('EnvironmentSystem light from the palette', () => {
+    // At every key: ambient is the palette's, and each body's light is its palette color
+    // faded by its own visibility. Expected values come from the key table.
+    it('takes ambient and light colors from the palette at every key', () => {
+        SKY_KEYS.forEach((k) => {
+            const environment = at(k.time);
+            expect(environment.ambientIntensity).toBeCloseTo(k.ambient, 6);
+            (['x', 'y', 'z'] as const).forEach((rgb) => {
+                expect(environment.sunColorWithVisibility[rgb]).toBeCloseTo(k.sunLight[rgb] * environment.sunVisibility, 6);
+                expect(environment.moonColorWithVisibility[rgb]).toBeCloseTo(k.moonLight[rgb] * environment.moonVisibility, 6);
+            });
+        });
+    });
+
+    it('has no sunlight at midnight and full sunlight at noon', () => {
+        expect(at(0).sunColorWithVisibility).toEqual({ x: 0, y: 0, z: 0 });
+        const noon = at(0.5);
+        const day = SKY_KEYS.find((k) => k.name === 'noon')!;
+        expect(noon.sunColorWithVisibility.x).toBeCloseTo(day.sunLight.x, 6);
     });
 });

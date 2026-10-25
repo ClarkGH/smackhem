@@ -80,7 +80,7 @@ src/
 │  │  ├─ environment.ts       # Day/night cycle: sun, moon, ambient, and which body casts shadows
 │  │  ├─ environment.spec.ts  # Shadow caster choice and its dawn/dusk crossfade
 │  │  ├─ renderSystem.ts      # Declares the frame to the renderer: camera, lighting, draws
-│  │  ├─ skyPalette.ts        # Time-of-day sky color keys (holds, midnight wrap), pure
+│  │  ├─ skyPalette.ts        # TimeOfDayPalette keys: sky, light colors, ambient, stars (holds, wrap), pure
 │  │  └─ skyPalette.spec.ts   # Holds, wrap, continuity, dawn/sunset on the sun's horizon crossings
 │  ├─ menu/
 │  │  ├─ menu.ts              # Menu screen type
