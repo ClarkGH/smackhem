@@ -27,24 +27,24 @@ export class StubPlaybackHandle implements PlaybackHandle {
         this.id = id;
     }
 
-    pause(): void {
+    public pause(): void {
         this.paused = true;
     }
 
-    resume(): void {
+    public resume(): void {
         this.paused = false;
     }
 
-    stop(): void {
+    public stop(): void {
         this.stopped = true;
     }
 
-    isFinished(): boolean {
+    public isFinished(): boolean {
         return this.stopped || this.ended;
     }
 
     // Test-only: the sound played to its end
-    finish(): void {
+    public finish(): void {
         this.ended = true;
     }
 }
@@ -60,22 +60,22 @@ export default class StubAudioService implements AudioService {
 
     private volumes: Map<AudioCategory, number> = new Map();
 
-    async loadSound(soundId: string): Promise<SoundHandle> {
+    public async loadSound(soundId: string): Promise<SoundHandle> {
         return { id: soundId };
     }
 
-    play(sound: SoundHandle, category: AudioCategory = 'sfx', loop: boolean = false): PlaybackHandle {
+    public play(sound: SoundHandle, category: AudioCategory = 'sfx', loop: boolean = false): PlaybackHandle {
         this.playCalls.push({ id: sound.id, category, loop });
         const voice = new StubPlaybackHandle(sound.id);
         this.voices.push(voice);
         return voice;
     }
 
-    getVolume(category: AudioCategory): number {
+    public getVolume(category: AudioCategory): number {
         return this.volumes.get(category) ?? 1;
     }
 
-    setVolume(category: AudioCategory, volume: number): void {
+    public setVolume(category: AudioCategory, volume: number): void {
         this.volumes.set(category, Math.max(0, Math.min(1, volume)));
     }
 }

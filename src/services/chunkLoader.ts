@@ -273,7 +273,7 @@ export class ChunkLoader {
      * Load chunk from JSON data
      * Returns Chunk object with mesh handles ready for rendering
      */
-    loadChunkFromJSON(
+    public loadChunkFromJSON(
         jsonText: string,
         chunkX: number,
         chunkZ: number,
@@ -319,7 +319,7 @@ export class ChunkLoader {
      * Create empty chunk (fallback for missing chunks)
      * Contains only a floor plane
      */
-    createEmptyChunk(chunkX: number, chunkZ: number, renderer: Renderer): Chunk {
+    public createEmptyChunk(chunkX: number, chunkZ: number, renderer: Renderer): Chunk {
         const chunkCenterX = chunkX * CHUNK_SIZE;
         const chunkCenterZ = chunkZ * CHUNK_SIZE;
         const chunkId = `${chunkX},${chunkZ}`;
@@ -350,21 +350,21 @@ export class ChunkLoader {
     /**
      * Cache JSON text for a chunk (avoids re-parsing)
      */
-    cacheJSON(chunkId: string, jsonText: string): void {
+    public cacheJSON(chunkId: string, jsonText: string): void {
         this.cache.set(chunkId, JSON.parse(jsonText) as ChunkJSON);
     }
 
     /**
      * Get cached JSON for a chunk (if available)
      */
-    getCachedJSON(chunkId: string): ChunkJSON | undefined {
+    public getCachedJSON(chunkId: string): ChunkJSON | undefined {
         return this.cache.get(chunkId);
     }
 
     /**
      * Clear cache (useful for testing or memory management)
      */
-    clearCache(): void {
+    public clearCache(): void {
         this.cache.clear();
     }
 }

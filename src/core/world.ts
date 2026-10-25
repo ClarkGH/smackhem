@@ -25,28 +25,28 @@ export interface Chunk {
 }
 
 export class World {
-    activeChunks: Map<ChunkID, Chunk> = new Map();
+    public activeChunks: Map<ChunkID, Chunk> = new Map();
 
     private _visibleMeshesBuffer: StaticMesh[] = [];
 
     private _collidableAABBsBuffer: AABB[] = [];
 
-    static getChunkID(x: number, z: number): ChunkID {
+    public static getChunkID(x: number, z: number): ChunkID {
         return `${x},${z}`;
     }
 
-    addChunk(chunk: Chunk) {
+    public addChunk(chunk: Chunk) {
         this.activeChunks.set(chunk.id, chunk);
     }
 
-    removeChunk(chunkId: ChunkID) {
+    public removeChunk(chunkId: ChunkID) {
         const chunk = this.activeChunks.get(chunkId);
         if (!chunk) return;
 
         this.activeChunks.delete(chunkId);
     }
 
-    getVisibleMeshes(): StaticMesh[] {
+    public getVisibleMeshes(): StaticMesh[] {
         this._visibleMeshesBuffer.length = 0;
 
         this.activeChunks.forEach((chunk) => {
@@ -57,15 +57,15 @@ export class World {
     }
 
     // Chunk index along one axis, a plain number so per-frame checks don't allocate (M-1)
-    static getChunkIndex(coordinate: number): number {
+    public static getChunkIndex(coordinate: number): number {
         return Math.floor((coordinate + CHUNK_SIZE / 2) / CHUNK_SIZE);
     }
 
-    static getChunkCoords(position: Vec3): { x: number; z: number } {
+    public static getChunkCoords(position: Vec3): { x: number; z: number } {
         return { x: World.getChunkIndex(position.x), z: World.getChunkIndex(position.z) };
     }
 
-    static getChunksInRadius(
+    public static getChunksInRadius(
         chunkX: number,
         chunkZ: number,
         radius: number,
@@ -82,7 +82,7 @@ export class World {
     }
 
     // TODO: Add other mesh types to the collision system
-    getCollidableAABBs(): AABB[] {
+    public getCollidableAABBs(): AABB[] {
         this._collidableAABBsBuffer.length = 0;
 
         this.activeChunks.forEach((chunk) => {
@@ -97,7 +97,7 @@ export class World {
 
     // Expose wall AABBs
     // TODO: Consider making private for non-debug version
-    getBoundaryWallAABBs(): AABB[] {
+    public getBoundaryWallAABBs(): AABB[] {
         const walls: AABB[] = [];
 
         this.activeChunks.forEach((chunk) => {

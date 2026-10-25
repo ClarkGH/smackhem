@@ -29,7 +29,7 @@ export default class WebAssetLoader implements AssetLoader {
     /**
      * Load map data (legacy interface - for future use)
      */
-    async loadMap(_id: string): Promise<MapData> {
+    public async loadMap(_id: string): Promise<MapData> {
         // Not implemented yet - maps may contain multiple chunks
         // For now, we load chunks individually
         throw new Error('loadMap not implemented - use loadChunk instead');
@@ -38,7 +38,7 @@ export default class WebAssetLoader implements AssetLoader {
     /**
      * Load texture asset
      */
-    async loadTexture(assetId: string): Promise<ImageBitmap> {
+    public async loadTexture(assetId: string): Promise<ImageBitmap> {
         const response = await fetch(`/assets/${assetId}.png`);
         if (!response.ok) {
             throw new Error(`Failed to load texture: ${assetId}`);
@@ -61,7 +61,7 @@ export default class WebAssetLoader implements AssetLoader {
      * @param renderer - Renderer instance for mesh creation
      * @returns Promise<Chunk> - Loaded chunk with mesh handles
      */
-    async loadChunk(
+    public async loadChunk(
         chunkId: string,
         chunkX: number,
         chunkZ: number,
@@ -118,7 +118,7 @@ export default class WebAssetLoader implements AssetLoader {
     /**
      * Clear chunk cache (useful for testing or memory management)
      */
-    clearCache(): void {
+    public clearCache(): void {
         this.chunkCache.clear();
         this.chunkLoader.clearCache();
     }
@@ -126,7 +126,7 @@ export default class WebAssetLoader implements AssetLoader {
     /**
      * Get the chunk loader instance (for advanced usage)
      */
-    getChunkLoader(): ChunkLoader {
+    public getChunkLoader(): ChunkLoader {
         return this.chunkLoader;
     }
 }

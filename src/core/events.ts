@@ -54,11 +54,11 @@ export class TypeSafeEventBus implements EventBus {
 
     private processingQueue: GameEvent[] = [];
 
-    publish(event: GameEvent): void {
+    public publish(event: GameEvent): void {
         this.incomingQueue.push(event);
     }
 
-    flush(): void {
+    public flush(): void {
         if (this.incomingQueue.length === 0) return;
 
         this.processingQueue = this.incomingQueue;
@@ -77,7 +77,7 @@ export class TypeSafeEventBus implements EventBus {
         this.processingQueue = [];
     }
 
-    subscribe<K extends GameEvent['type']>(
+    public subscribe<K extends GameEvent['type']>(
         type: K,
         handler: (event: ExtractEvent<K>) => void,
     ): () => void {

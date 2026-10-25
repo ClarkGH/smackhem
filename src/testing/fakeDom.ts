@@ -10,18 +10,18 @@ type Listener = (event: any) => void;
 export class FakeEventTarget {
     private listeners = new Map<string, Listener[]>();
 
-    addEventListener(type: string, listener: Listener): void {
+    public addEventListener(type: string, listener: Listener): void {
         const list = this.listeners.get(type) ?? [];
         list.push(listener);
         this.listeners.set(type, list);
     }
 
-    removeEventListener(type: string, listener: Listener): void {
+    public removeEventListener(type: string, listener: Listener): void {
         this.listeners.set(type, (this.listeners.get(type) ?? []).filter((l) => l !== listener));
     }
 
     // Test-only: fires an event at every listener of that type
-    dispatch(type: string, event: Record<string, unknown> = {}): void {
+    public dispatch(type: string, event: Record<string, unknown> = {}): void {
         const full = { preventDefault: () => {}, ...event };
         (this.listeners.get(type) ?? []).forEach((listener) => listener(full));
     }
@@ -62,23 +62,23 @@ export class FakeContext2D {
 
     public miterLimit = 1;
 
-    clearRect(): void {
+    public clearRect(): void {
         this.drawn = [];
     }
 
-    fillRect(): void {
+    public fillRect(): void {
         // Background only, nothing to record
     }
 
-    fillText(text: string, x: number, y: number): void {
+    public fillText(text: string, x: number, y: number): void {
         this.drawn.push({ text, x, y });
     }
 
-    strokeText(): void {
+    public strokeText(): void {
         // Outline only, fillText records the text
     }
 
-    measureText(text: string): { width: number } {
+    public measureText(text: string): { width: number } {
         return { width: text.length * CHAR_WIDTH };
     }
 }
@@ -102,18 +102,18 @@ export class FakeElement extends FakeEventTarget {
     // Whether the next requestFullscreen is allowed
     public allowFullscreen = true;
 
-    appendChild(child: FakeElement): FakeElement {
+    public appendChild(child: FakeElement): FakeElement {
         this.children.push(child);
         // eslint-disable-next-line no-param-reassign
         child.parentElement = this;
         return child;
     }
 
-    getBoundingClientRect() {
+    public getBoundingClientRect() {
         return { ...this.rect, right: this.rect.left + this.rect.width, bottom: this.rect.top + this.rect.height };
     }
 
-    requestFullscreen(): Promise<void> {
+    public requestFullscreen(): Promise<void> {
         this.fullscreenRequests += 1;
         if (!this.allowFullscreen) return Promise.reject(new Error('Fullscreen is not allowed here'));
         if (current.document) {
@@ -123,7 +123,7 @@ export class FakeElement extends FakeEventTarget {
         return Promise.resolve();
     }
 
-    removeAttribute(): void {
+    public removeAttribute(): void {
         // Unused attributes
     }
 }
@@ -138,11 +138,11 @@ export class FakeCanvas extends FakeElement {
     // Counts assignments, since assigning a canvas size clears it even when the size is unchanged
     public sizeAssignments = 0;
 
-    getContext(): FakeContext2D {
+    public getContext(): FakeContext2D {
         return this.ctx;
     }
 
-    requestPointerLock(): void {
+    public requestPointerLock(): void {
         if (current.document) {
             current.document.pointerLockElement = this;
             current.document.dispatch('pointerlockchange');
@@ -176,23 +176,23 @@ export class FakeDocument extends FakeEventTarget implements DocumentState {
 
     public created: FakeElement[] = [];
 
-    createElement(tag: string): FakeElement {
+    public createElement(tag: string): FakeElement {
         const element = tag === 'canvas' ? new FakeCanvas() : new FakeElement();
         this.created.push(element);
         return element;
     }
 
-    getElementById(): null {
+    public getElementById(): null {
         return null;
     }
 
-    exitFullscreen(): Promise<void> {
+    public exitFullscreen(): Promise<void> {
         this.fullscreenElement = null;
         this.dispatch('fullscreenchange');
         return Promise.resolve();
     }
 
-    exitPointerLock(): void {
+    public exitPointerLock(): void {
         this.pointerLockElement = null;
         this.dispatch('pointerlockchange');
     }

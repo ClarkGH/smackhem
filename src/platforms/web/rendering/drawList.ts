@@ -44,37 +44,37 @@ export default class DrawList {
         }
     }
 
-    reset(): void {
+    public reset(): void {
         this.count = 0;
     }
 
-    size(): number {
+    public size(): number {
         return this.count;
     }
 
-    get(index: number): Readonly<DrawCommand> {
+    public get(index: number): Readonly<DrawCommand> {
         return this.commands[index];
     }
 
-    pushMesh(id: string, model: Mat4, color: Vec3, isLightSource: boolean): void {
+    public pushMesh(id: string, model: Mat4, color: Vec3, isLightSource: boolean): void {
         const cmd = this.next('mesh', id);
         cmd.matrix.elements.set(model.elements);
         copyVec3(color, cmd.color);
         cmd.isLightSource = isLightSource;
     }
 
-    pushTexturedQuad(id: string, model: Mat4, normal: Vec3): void {
+    public pushTexturedQuad(id: string, model: Mat4, normal: Vec3): void {
         const cmd = this.next('texturedQuad', id);
         cmd.matrix.elements.set(model.elements);
         copyVec3(normal, cmd.normal);
     }
 
-    pushScreenQuad(id: string, transform: Mat4): void {
+    public pushScreenQuad(id: string, transform: Mat4): void {
         const cmd = this.next('screenQuad', id);
         cmd.matrix.elements.set(transform.elements);
     }
 
-    pushClear(r: number, g: number, b: number, a: number): void {
+    public pushClear(r: number, g: number, b: number, a: number): void {
         const cmd = this.next('clear', '');
         cmd.color.x = r; cmd.color.y = g; cmd.color.z = b;
         cmd.alpha = a;

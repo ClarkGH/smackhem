@@ -19,28 +19,28 @@ export default class StubDisplay implements DisplayService {
         this.caps = caps;
     }
 
-    capabilities(): DisplayCapabilities {
+    public capabilities(): DisplayCapabilities {
         return this.caps;
     }
 
-    setRenderScale(scale: number): void {
+    public setRenderScale(scale: number): void {
         this.renderScale = scale;
     }
 
-    setWindowResolution(resolution: Resolution | null): void {
+    public setWindowResolution(resolution: Resolution | null): void {
         this.windowResolution = resolution;
     }
 
-    setFullscreen(enabled: boolean): void {
+    public setFullscreen(enabled: boolean): void {
         this.fullscreenRequests.push(enabled);
     }
 
-    onFullscreenChange(handler: (enabled: boolean) => void): void {
+    public onFullscreenChange(handler: (enabled: boolean) => void): void {
         this.handlers.push(handler);
     }
 
     // Test-only: the platform reports fullscreen changed (granted, refused, or exited with Escape)
-    reportFullscreen(enabled: boolean): void {
+    public reportFullscreen(enabled: boolean): void {
         this.handlers.forEach((handler) => handler(enabled));
     }
 }

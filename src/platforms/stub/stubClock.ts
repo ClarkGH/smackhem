@@ -13,15 +13,15 @@ export default class StubClock implements Clock {
 
     private frozen: boolean = false;
 
-    getTime(): number {
+    public getTime(): number {
         return this.currentTime;
     }
 
-    getDeltaTime(): number {
+    public getDeltaTime(): number {
         return this.deltaTime;
     }
 
-    update(): void {
+    public update(): void {
         if (!this.frozen) {
             this.deltaTime = this.fixedDeltaTime;
             this.currentTime += this.deltaTime;
@@ -31,37 +31,37 @@ export default class StubClock implements Clock {
     }
 
     // Stub-specific methods for testing
-    setFixedDeltaTime(dt: number): void {
+    public setFixedDeltaTime(dt: number): void {
         this.fixedDeltaTime = dt;
     }
 
-    getFixedDeltaTime(): number {
+    public getFixedDeltaTime(): number {
         return this.fixedDeltaTime;
     }
 
-    step(frames: number = 1): void {
+    public step(frames: number = 1): void {
         for (let i = 0; i < frames; i += 1) {
             this.update();
         }
     }
 
-    setTime(time: number): void {
+    public setTime(time: number): void {
         this.currentTime = time;
     }
 
-    pause(): void {
+    public pause(): void {
         this.frozen = true;
     }
 
-    resume(): void {
+    public resume(): void {
         this.frozen = false;
     }
 
-    isTimeFrozen(): boolean {
+    public isTimeFrozen(): boolean {
         return this.frozen;
     }
 
-    reset(): void {
+    public reset(): void {
         this.currentTime = 0;
         this.deltaTime = 0;
         this.fixedDeltaTime = 1 / 60;

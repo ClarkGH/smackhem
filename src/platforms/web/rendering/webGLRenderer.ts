@@ -658,7 +658,7 @@ ${LIGHT_CARD_GLSL}
         return { id };
     }
 
-    createPlaneMesh(size: number): MeshHandle {
+    public createPlaneMesh(size: number): MeshHandle {
         const key = `plane_${size}`;
         if (this.meshCache.has(key)) {
             return this.meshCache.get(key)!;
@@ -692,7 +692,7 @@ ${LIGHT_CARD_GLSL}
         return mesh;
     }
 
-    createCubeMesh(size: number): MeshHandle {
+    public createCubeMesh(size: number): MeshHandle {
         const key = `cube_${size}`;
 
         if (this.meshCache.has(key)) {
@@ -735,7 +735,7 @@ ${LIGHT_CARD_GLSL}
         return mesh;
     }
 
-    createPyramidMesh(size: number): MeshHandle {
+    public createPyramidMesh(size: number): MeshHandle {
         const key = `pyramid_${size}`;
         if (this.meshCache.has(key)) {
             return this.meshCache.get(key)!;
@@ -768,7 +768,7 @@ ${LIGHT_CARD_GLSL}
         return mesh;
     }
 
-    createPrismMesh(width: number, height: number, depth: number): MeshHandle {
+    public createPrismMesh(width: number, height: number, depth: number): MeshHandle {
         const key = `prism_${width}_${height}_${depth}`;
         if (this.meshCache.has(key)) {
             return this.meshCache.get(key)!;
@@ -810,7 +810,7 @@ ${LIGHT_CARD_GLSL}
         return mesh;
     }
 
-    createSphereMesh(radius: number, segments: number = 16): MeshHandle {
+    public createSphereMesh(radius: number, segments: number = 16): MeshHandle {
         const key = `sphere_${radius}_${segments}`;
         if (this.meshCache.has(key)) {
             return this.meshCache.get(key)!;
@@ -881,7 +881,7 @@ ${LIGHT_CARD_GLSL}
         return mesh;
     }
 
-    beginFrame(): void {
+    public beginFrame(): void {
         // Update viewport in case canvas was resized
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         // This frame's sky, set by setSky just before (scene mode can override with clear())
@@ -890,7 +890,7 @@ ${LIGHT_CARD_GLSL}
         this.drawList.reset();
     }
 
-    drawMesh(mesh: MeshHandle, model: Mat4, color: Vec3, isLightSource: boolean = false): void {
+    public drawMesh(mesh: MeshHandle, model: Mat4, color: Vec3, isLightSource: boolean = false): void {
         this.drawList.pushMesh(mesh.id, model, color, isLightSource);
     }
 
@@ -993,7 +993,7 @@ ${LIGHT_CARD_GLSL}
         this.gl.bindVertexArray(null);
     }
 
-    endFrame(): void {
+    public endFrame(): void {
         const { gl } = this;
         if (this.shadowStrength > 0) {
             this.renderShadowMap();
@@ -1032,11 +1032,11 @@ ${LIGHT_CARD_GLSL}
         // Present frame (WebGL handles this automatically)
     }
 
-    setShadowBias(scale: number): void {
+    public setShadowBias(scale: number): void {
         this.shadowBiasScale = scale;
     }
 
-    setShadowCaster(direction: Vec3, strength: number, focus: Vec3): void {
+    public setShadowCaster(direction: Vec3, strength: number, focus: Vec3): void {
         this.shadowDirection.x = direction.x;
         this.shadowDirection.y = direction.y;
         this.shadowDirection.z = direction.z;
@@ -1056,21 +1056,21 @@ ${LIGHT_CARD_GLSL}
         }
     }
 
-    getWireframeEnabled(): boolean {
+    public getWireframeEnabled(): boolean {
         return this.wireframe;
     }
 
-    setWireframe(enabled: boolean): void {
+    public setWireframe(enabled: boolean): void {
         this.wireframe = enabled;
     }
 
-    setSky(sky: SkyState): void {
+    public setSky(sky: SkyState): void {
         this.skyColor.x = sky.horizon.x;
         this.skyColor.y = sky.horizon.y;
         this.skyColor.z = sky.horizon.z;
     }
 
-    setViewProjection(viewProj: Mat4): void {
+    public setViewProjection(viewProj: Mat4): void {
         // Copy, not keep a reference: core reuses its matrix and could change it mid-frame
         const src = viewProj.elements;
         const dst = this.viewProj.elements;
@@ -1079,11 +1079,11 @@ ${LIGHT_CARD_GLSL}
         }
     }
 
-    setAmbientIntensity(intensity: number): void {
+    public setAmbientIntensity(intensity: number): void {
         this.ambientIntensity = intensity;
     }
 
-    setCelestialLighting(
+    public setCelestialLighting(
         sun: { direction: Vec3; color: Vec3 },
         moon: { direction: Vec3; color: Vec3 },
     ): void {
@@ -1217,7 +1217,7 @@ ${SHADOW_SAMPLING_GLSL}
         this.quadVAO = vao;
     }
 
-    async loadTexture(assetId: string): Promise<TextureHandle> {
+    public async loadTexture(assetId: string): Promise<TextureHandle> {
         // Check cache first
         if (this.textureCache.has(assetId)) {
             return this.textureCache.get(assetId)!;
@@ -1277,7 +1277,7 @@ ${SHADOW_SAMPLING_GLSL}
         return handle;
     }
 
-    drawTexturedQuad(texture: TextureHandle, model: Mat4, size: number, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
+    public drawTexturedQuad(texture: TextureHandle, model: Mat4, size: number, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
         this.drawList.pushTexturedQuad(texture.id, model, normal);
     }
 
@@ -1467,7 +1467,7 @@ ${SHADOW_SAMPLING_GLSL}
         this.screenQuadVAO = vao;
     }
 
-    drawScreenQuad(texture: TextureHandle, transform: Mat4): void {
+    public drawScreenQuad(texture: TextureHandle, transform: Mat4): void {
         this.drawList.pushScreenQuad(texture.id, transform);
     }
 
@@ -1501,7 +1501,7 @@ ${SHADOW_SAMPLING_GLSL}
         gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
-    clear(r: number, g: number, b: number, a: number): void {
+    public clear(r: number, g: number, b: number, a: number): void {
         this.drawList.pushClear(r, g, b, a);
     }
 
@@ -1510,11 +1510,11 @@ ${SHADOW_SAMPLING_GLSL}
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     }
 
-    getViewportWidth(): number {
+    public getViewportWidth(): number {
         return this.canvas.width;
     }
 
-    getViewportHeight(): number {
+    public getViewportHeight(): number {
         return this.canvas.height;
     }
 }

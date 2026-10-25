@@ -27,22 +27,22 @@ export default class WebDisplay implements DisplayService {
         this.resize();
     }
 
-    capabilities(): DisplayCapabilities {
+    public capabilities(): DisplayCapabilities {
         // False inside an iframe that wasn't given fullscreen permission
         return { fullscreen: document.fullscreenEnabled, windowResolution: false };
     }
 
-    setRenderScale(scale: number): void {
+    public setRenderScale(scale: number): void {
         if (scale === this.renderScale) return;
         this.renderScale = scale;
         this.resize();
     }
 
-    setWindowResolution(): void {
+    public setWindowResolution(): void {
         // The page sizes the game on the web, see capabilities()
     }
 
-    setFullscreen(enabled: boolean): void {
+    public setFullscreen(enabled: boolean): void {
         const isFullscreen = this.isFullscreen();
         if (enabled === isFullscreen) return;
 
@@ -54,7 +54,7 @@ export default class WebDisplay implements DisplayService {
         });
     }
 
-    onFullscreenChange(handler: (enabled: boolean) => void): void {
+    public onFullscreenChange(handler: (enabled: boolean) => void): void {
         this.handlers.push(handler);
     }
 

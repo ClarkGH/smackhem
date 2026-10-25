@@ -9,7 +9,7 @@ export default class NullMenuOverlay implements MenuOverlay {
 
     public renderCount = 0;
 
-    render(view: MenuView | null): void {
+    public render(view: MenuView | null): void {
         this.lastView = view;
         this.renderCount += 1;
     }

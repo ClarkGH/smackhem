@@ -12,15 +12,15 @@ export default class WebClock implements Clock {
         this.lastTime = this.currentTime;
     }
 
-    getTime(): number {
+    public getTime(): number {
         return this.currentTime;
     }
 
-    getDeltaTime(): number {
+    public getDeltaTime(): number {
         return this.deltaTime;
     }
 
-    update(): void {
+    public update(): void {
         this.currentTime = performance.now();
         this.deltaTime = (this.currentTime - this.lastTime) / 1000;
         this.lastTime = this.currentTime;

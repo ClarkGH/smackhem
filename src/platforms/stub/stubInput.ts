@@ -16,7 +16,7 @@ export default class StubInput implements Input {
      * cleared once read, so each setIntent press is seen by exactly one frame.
      * Held inputs (move, stick lookRate) stay until changed or reset().
      */
-    getIntent(): PlayerIntent {
+    public getIntent(): PlayerIntent {
         const currentIntent = { ...this.intent };
 
         this.intent.toggleCamera = false;
@@ -32,36 +32,36 @@ export default class StubInput implements Input {
         return currentIntent;
     }
 
-    update(): void {
+    public update(): void {
         // Stub implementation - input is set programmatically
     }
 
     // Stub-specific methods for testing
-    setMove(x: number, y: number): void {
+    public setMove(x: number, y: number): void {
         this.intent.move = { x, y };
     }
 
-    setLook(yaw: number, pitch: number): void {
+    public setLook(yaw: number, pitch: number): void {
         this.intent.look = { yaw, pitch };
     }
 
-    setToggleCamera(value: boolean = true): void {
+    public setToggleCamera(value: boolean = true): void {
         this.intent.toggleCamera = value;
     }
 
-    setToggleDebugHUD(value: boolean = true): void {
+    public setToggleDebugHUD(value: boolean = true): void {
         this.intent.toggleDebugHUD = value;
     }
 
-    setPause(value: boolean = true): void {
+    public setPause(value: boolean = true): void {
         this.intent.pause = value;
     }
 
-    setIntent(intent: Partial<PlayerIntent>): void {
+    public setIntent(intent: Partial<PlayerIntent>): void {
         this.intent = { ...this.intent, ...intent };
     }
 
-    reset(): void {
+    public reset(): void {
         this.intent = {
             move: { x: 0, y: 0 },
             look: { yaw: 0, pitch: 0 },

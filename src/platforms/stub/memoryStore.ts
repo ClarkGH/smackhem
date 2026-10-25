@@ -6,11 +6,11 @@ import type { KeyValueStore } from '../../services/storage';
 export default class MemoryStore implements KeyValueStore {
     private values = new Map<string, string>();
 
-    get(key: string): string | null {
+    public get(key: string): string | null {
         return this.values.get(key) ?? null;
     }
 
-    set(key: string, value: string): void {
+    public set(key: string, value: string): void {
         this.values.set(key, value);
     }
 }

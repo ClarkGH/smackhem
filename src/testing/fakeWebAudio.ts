@@ -8,11 +8,11 @@ import { vi } from 'vitest';
 export class FakeNode {
     public connected = false;
 
-    connect(): void {
+    public connect(): void {
         this.connected = true;
     }
 
-    disconnect(): void {
+    public disconnect(): void {
         this.connected = false;
     }
 }
@@ -32,16 +32,16 @@ export class FakeBufferSource extends FakeNode {
 
     public stopped = false;
 
-    start(_when: number, offset: number): void {
+    public start(_when: number, offset: number): void {
         this.startOffset = offset;
     }
 
-    stop(): void {
+    public stop(): void {
         this.stopped = true;
     }
 
     // Test-only: the sound played to its end
-    end(): void {
+    public end(): void {
         this.onended?.();
     }
 }
@@ -59,27 +59,27 @@ export class FakeAudioContext {
 
     public decodeDuration = 2;
 
-    createGain(): FakeGain {
+    public createGain(): FakeGain {
         const gain = new FakeGain();
         this.gains.push(gain);
         return gain;
     }
 
-    createBufferSource(): FakeBufferSource {
+    public createBufferSource(): FakeBufferSource {
         const source = new FakeBufferSource();
         this.sources.push(source);
         return source;
     }
 
-    createMediaElementSource(): FakeNode {
+    public createMediaElementSource(): FakeNode {
         return new FakeNode();
     }
 
-    async decodeAudioData(): Promise<{ duration: number }> {
+    public async decodeAudioData(): Promise<{ duration: number }> {
         return { duration: this.decodeDuration };
     }
 
-    async resume(): Promise<void> {
+    public async resume(): Promise<void> {
         this.state = 'running';
     }
 }
@@ -107,7 +107,7 @@ export class FakeAudio {
         FakeAudio.created.push(this);
     }
 
-    play(): Promise<void> {
+    public play(): Promise<void> {
         this.playCalls += 1;
         if (!audioPlayback.allowed) {
             const error = new Error('play() needs a user gesture');
@@ -118,26 +118,26 @@ export class FakeAudio {
         return Promise.resolve();
     }
 
-    pause(): void {
+    public pause(): void {
         this.paused = true;
     }
 
-    addEventListener(type: string, listener: () => void): void {
+    public addEventListener(type: string, listener: () => void): void {
         const list = this.listeners.get(type) ?? [];
         list.push(listener);
         this.listeners.set(type, list);
     }
 
-    removeAttribute(name: string): void {
+    public removeAttribute(name: string): void {
         if (name === 'src') this.src = '';
     }
 
-    load(): void {
+    public load(): void {
         // Nothing to reload in a fake
     }
 
     // Test-only: the element fires an event ('ended', 'error')
-    dispatch(type: string): void {
+    public dispatch(type: string): void {
         (this.listeners.get(type) ?? []).forEach((listener) => listener());
     }
 }

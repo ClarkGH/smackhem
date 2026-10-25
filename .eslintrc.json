@@ -48,6 +48,12 @@
     "no-undef": "off",
     "no-use-before-define": "off",
     "@typescript-eslint/no-use-before-define": "error",
+    "@typescript-eslint/explicit-member-accessibility": ["error", {
+      "accessibility": "explicit",
+      "overrides": {
+        "constructors": "no-public"
+      }
+    }],
     "max-classes-per-file": "off",
     "no-console": "off",
     "no-underscore-dangle": "off",

@@ -5,7 +5,7 @@ import type { KeyValueStore } from '../../services/storage';
  * Never throws: private browsing, blocked storage or a full quota just mean nothing is kept.
  */
 export default class LocalStorageStore implements KeyValueStore {
-    get(key: string): string | null {
+    public get(key: string): string | null {
         try {
             return window.localStorage.getItem(key);
         } catch (error) {
@@ -14,7 +14,7 @@ export default class LocalStorageStore implements KeyValueStore {
         }
     }
 
-    set(key: string, value: string): void {
+    public set(key: string, value: string): void {
         try {
             window.localStorage.setItem(key, value);
         } catch (error) {
