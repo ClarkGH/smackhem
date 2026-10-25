@@ -33,7 +33,8 @@ export interface NpcJSON {
 export interface ChunkJSON {
     version: number;
     id: string;
-    bounds: [number, number, number, number, number, number]; // [minX, minY, minZ, maxX, maxY, maxZ]
+    // Deprecated (version 1), bounds are worked out from the chunk's coordinates now. [minX, minY, minZ, maxX, maxY, maxZ]
+    bounds?: [number, number, number, number, number, number];
     meshes: MeshJSON[];
     npcs?: NpcJSON[];
     template?: string; // Phase 2: template reference (future)
@@ -313,22 +314,10 @@ export class ChunkLoader {
         // Batch create all meshes for this chunk
         const { meshes, collisionAABBs } = this.createMeshesFromJSON(chunkJSON.meshes, chunkCenterX, chunkCenterZ, renderer);
 
-        // Debug: Check what meshes were created
-        console.log(`Chunk ${chunkX},${chunkZ}: Created ${meshes.length} meshes from ${chunkJSON.meshes.length} JSON meshes`);
-        meshes.forEach((mesh, i) => {
-            const pos = {
-                x: mesh.transform.elements[12],
-                y: mesh.transform.elements[13],
-                z: mesh.transform.elements[14],
-            };
-            console.log(`  Mesh ${i}: type=${chunkJSON.meshes[i]?.type}, pos=(${pos.x}, ${pos.y}, ${pos.z}), color=(${mesh.color.x}, ${mesh.color.y}, ${mesh.color.z})`);
-        });
         // NPC boxes join the chunk's collision, so the player can't walk through them
         const npcs = this.createNpcsFromJSON(chunkJSON.npcs, chunkCenterX, chunkCenterZ);
         npcs.forEach((npc) => collisionAABBs.push(npc.collisionAABB));
 
-        // Create bounds AABB from JSON bounds array
-        // Create bounds AABB from JSON bounds array
         const bounds = createAABB(
             { x: chunkCenterX - CHUNK_SIZE / 2, y: -1, z: chunkCenterZ - CHUNK_SIZE / 2 },
             { x: chunkCenterX + CHUNK_SIZE / 2, y: 5, z: chunkCenterZ + CHUNK_SIZE / 2 },
