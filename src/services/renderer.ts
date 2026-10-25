@@ -10,11 +10,16 @@ export interface TextureHandle {
     id: string;
 }
 
+// What's drawn behind the world, as plain data (R-3)
+export interface SkyState {
+    horizon: Vec3;
+}
+
 export interface Renderer {
+    setSky?(_sky: SkyState): void;
     beginFrame(): void;
     setViewProjection(_viewProj: Mat4): void;
     setShadowCaster?(_direction: Vec3, _strength: number, _focus: Vec3): void;
-    setShadowDebug?(_showMap: boolean, _bias: number): void;
     setShadowBias?(_scale: number): void;
     drawMesh(_mesh: MeshHandle, _model: Mat4, _color: Vec3, _isLightSource?: boolean): void;
     endFrame(): void;

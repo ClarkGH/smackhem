@@ -1,4 +1,6 @@
-import type { Renderer, MeshHandle, TextureHandle } from '../../../services/renderer';
+import type {
+    Renderer, MeshHandle, SkyState, TextureHandle,
+} from '../../../services/renderer';
 import type { Mat4, Vec3 } from '../../../types/common';
 import { identity } from '../../../core/math/mathHelpers';
 import DrawList from './drawList';
@@ -130,6 +132,9 @@ export default class WebGLRenderer implements Renderer {
     private moonColor: Vec3 = { x: 0, y: 0, z: 0 };
 
     private ambientIntensity: number = 0.3;
+
+    // Copied in by setSky before beginFrame clears to it. Grey until core sets a sky.
+    private readonly skyColor: Vec3 = { x: 160 / 255, y: 160 / 255, z: 160 / 255 };
 
     // Copied in by setViewProjection once per frame, shared by every world draw
     private viewProj: Mat4 = identity();
@@ -874,8 +879,8 @@ ${LIGHT_CARD_GLSL}
     beginFrame(): void {
         // Update viewport in case canvas was resized
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        // Always reset clear color to default gray (scene mode can override with clear())
-        this.gl.clearColor(160 / 255, 160 / 255, 160 / 255, 1);
+        // This frame's sky, set by setSky just before (scene mode can override with clear())
+        this.gl.clearColor(this.skyColor.x, this.skyColor.y, this.skyColor.z, 1);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
         this.drawList.reset();
     }
@@ -1052,6 +1057,12 @@ ${LIGHT_CARD_GLSL}
 
     setWireframe(enabled: boolean): void {
         this.wireframe = enabled;
+    }
+
+    setSky(sky: SkyState): void {
+        this.skyColor.x = sky.horizon.x;
+        this.skyColor.y = sky.horizon.y;
+        this.skyColor.z = sky.horizon.z;
     }
 
     setViewProjection(viewProj: Mat4): void {

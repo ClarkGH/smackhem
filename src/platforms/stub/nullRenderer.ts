@@ -1,4 +1,6 @@
-import type { Renderer, MeshHandle, TextureHandle } from '../../services/renderer';
+import type {
+    Renderer, MeshHandle, SkyState, TextureHandle,
+} from '../../services/renderer';
 import type { Mat4, Vec3 } from '../../types/common';
 
 /**
@@ -34,9 +36,31 @@ export default class NullRenderer implements Renderer {
     // Models drawn since beginFrame, by reference, so tests can tell a model from an MVP
     private readonly meshModels: Mat4[] = [];
 
+    private readonly sky = { x: 0, y: 0, z: 0 };
+
+    // Whether setSky came between the last endFrame and this beginFrame, for the ordering contract.
+    // Reset at endFrame, not beginFrame: otherwise a late setSky in one frame counts for the next.
+    private skySetBetweenFrames = false;
+
+    private skySetBeforeBegin = false;
+
     beginFrame(): void {
         this.frameCount += 1;
         this.meshModels.length = 0;
+        this.skySetBeforeBegin = this.skySetBetweenFrames;
+    }
+
+    setSky(_sky: SkyState): void {
+        this.sky.x = _sky.horizon.x; this.sky.y = _sky.horizon.y; this.sky.z = _sky.horizon.z;
+        this.skySetBetweenFrames = true;
+    }
+
+    getSky(): Vec3 {
+        return { ...this.sky };
+    }
+
+    wasSkySetBeforeBeginFrame(): boolean {
+        return this.skySetBeforeBegin;
     }
 
     private readonly shadowCaster = { direction: { x: 0, y: 1, z: 0 }, strength: 0, focus: { x: 0, y: 0, z: 0 } };
@@ -67,7 +91,7 @@ export default class NullRenderer implements Renderer {
     }
 
     endFrame(): void {
-        // Stub implementation - frame complete
+        this.skySetBetweenFrames = false;
     }
 
     setWireframe(_enabled: boolean): void {

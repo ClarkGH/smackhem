@@ -7,6 +7,7 @@ import {
 import type { GameEvent } from '../events';
 import { createDebugSettings, type DebugSettings } from '../settings/debugSettings';
 import { createScenario, type Scenario } from '../../testing/scenario';
+import { skyColorAt } from '../lighting/skyPalette';
 
 const labels = (scenario: Scenario): string[] => scenario.overlay.lastView?.items.map((item) => item.label) ?? [];
 
@@ -117,6 +118,19 @@ describe('debug menu - scenario (stub platform)', () => {
         expect(valueOf('Shadow Bias')).toBe('x0.25');
         expect(scenario.renderer.getShadowBias()).toBe(0.25);
         expect(settingsChanges).toHaveLength(0);
+    });
+
+    it('sends the palette\'s sky color for the overridden hour, before beginFrame', () => {
+        scenario.click('Debug');
+        // Live -> 00:00 is one step, then one step per hour
+        let stepsTaken = 0;
+        [0, 6, 12, 18].forEach((hour) => {
+            for (; stepsTaken < hour + 1; stepsTaken += 1) step('Time of Day', 1);
+            const expected = { x: 0, y: 0, z: 0 };
+            skyColorAt(hour / 24, expected);
+            expect(scenario.renderer.getSky()).toEqual(expected);
+            expect(scenario.renderer.wasSkySetBeforeBeginFrame()).toBe(true);
+        });
     });
 
     it('stops at 23:00 and steps back to Live', () => {

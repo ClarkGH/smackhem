@@ -1,9 +1,10 @@
-import type { Renderer, TextureHandle } from '../../services/renderer';
+import type { Renderer, SkyState, TextureHandle } from '../../services/renderer';
 import type { Camera } from '../camera';
 import type { GameState } from '../gameState';
 import type { DebugHUD } from '../gameLoop';
 import { World } from '../world';
 import EnvironmentSystem from './environment';
+import { skyColorAt } from './skyPalette';
 import { Vec3, Mat4 } from '../../types/common';
 import { getCameraMatrix, INSTANCE_CHARACTER_SIZE } from '../camera';
 import { SCENE_HEIGHT_PX, SCENE_TILE_SIZE, SCENE_WIDTH_PX } from '../scene';
@@ -25,6 +26,9 @@ export default class RenderSystem {
     private sceneOrthoWidth = 0;
 
     private sceneOrthoHeight = 0;
+
+    // Filled from the palette every frame and handed to the renderer (M-1)
+    private readonly sky: SkyState = { horizon: { x: 0, y: 0, z: 0 } };
 
     constructor(
         private renderer: Renderer,
@@ -105,6 +109,10 @@ export default class RenderSystem {
         // Debug menu switch, true without one
         shadowsEnabled: boolean,
     ): void {
+        // Before beginFrame, which clears to this frame's sky. Every mode, so the renderer
+        // never holds a stale sky (scene_2d's own clear covers it).
+        skyColorAt(this.environmentSystem.timeOfDay, this.sky.horizon);
+        this.renderer.setSky?.(this.sky);
         this.renderer.beginFrame();
         const discreteState = gameState.discrete;
         const interpolatedState = gameState.interpolated;

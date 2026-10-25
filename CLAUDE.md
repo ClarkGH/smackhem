@@ -22,7 +22,7 @@ Breaking one knowingly is Clark's call, never yours. Flag it instead.
 
 - Layers depend downward only: `core/` -> `services/` -> `platforms/`. Core has no WebGL, DOM, input devices, asset paths, or fetch (P-1: core must compile with backends deleted and stubbed).
 - Services are interfaces only: no platform code, no logic.
-- No GPU calls outside the renderer. Game code declares intent; lighting lives in the renderer (R-1..R-3).
+- No GPU calls outside the renderer. Game code declares intent; lighting and sky state live in the renderer (R-1..R-3).
 - Core consumes input intent, never hardware events. Everything must be playable on a controller (I-1, I-2).
 - Fixed timestep only. The engine clock service is the only time source: no `Date.now()` / `performance.now()` (T-1..T-3).
 - World data is pure and serializable. Chunks own their meshes and bounds (W-1, W-2).

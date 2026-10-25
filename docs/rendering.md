@@ -18,6 +18,7 @@
   - [Lighting Parameters](#lighting-parameters)
   - [Renderer Interface Extension](#renderer-interface-extension)
   - [Implementation](#implementation)
+- [Sky](#sky)
 - [Shadows](#shadows)
   - [What Casts and Receives](#what-casts-and-receives)
   - [Choosing the Shadow Caster](#choosing-the-shadow-caster)
@@ -351,6 +352,14 @@ Both the sun and moon are rendered as visible spheres in the sky:
 - All values are computed fresh each frame (no caching needed, pure functions)
 - Celestial meshes (sun sphere) are created once and reused
 - No horizon clamping - sun can go below horizon for debugging
+
+## Sky
+
+The sky's color is **sky state**, not lighting (R-3): core works out what it should be, the renderer draws it. Today it's one color per frame, used as the clear color.
+
+- **Palette** (`core/lighting/skyPalette.ts`): `SKY_KEYS` is a circular table of art-directed colors by time of day. Night holds from 20:00 to 05:00, dawn is at 06:00, day holds from 07:30 to 16:30, then sunset at 18:00 and dusk at 19:00. `skyColorAt` smoothsteps from the last key at or before the time to the next, measuring forward across midnight. A hold is two neighbouring keys with the same color. Dawn and sunset sit where the sun crosses the horizon, which the spec checks against `EnvironmentSystem`.
+- **To the renderer**: `RenderSystem` fills a `SkyState` and calls `setSky` **before** `beginFrame`, every frame and in every mode. `beginFrame` then clears to it, so the color always belongs to the current frame. In `scene_2d` the scene's own `clear()` draws over it.
+- **Tuning**: edit the hex values in `SKY_KEYS`, then check them with the Debug screen's Time of Day. The spec reads expected colors from the table, so color changes never touch a test.
 
 ## Shadows
 

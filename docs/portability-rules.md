@@ -121,22 +121,24 @@ The renderer decides:
 
 Game logic must never adjust lighting values directly.
 
-### RULE R-3: Lighting Lives in the Renderer
+### RULE R-3: Lighting and Sky State Live in the Renderer
 
-Lighting:
+Lighting and sky state are related but separate: lighting shades the world, sky state is what's drawn behind it.
 
-- Is grayscale only (subject to change)
-- Is derived from mesh data
-- Is applied in shaders
+Lighting and sky state:
 
-Lighting must never be (for simplicity and to prevent headaches):
+- Are colored, driven by deterministic time-of-day data computed in core
+- Are declared by core as plain data (directions, colors, strengths, sky state). The renderer decides how: shadow map size and filtering, how the sky is drawn
+- Lighting is applied in shaders, from mesh normals and renderer-owned shadow maps
+
+They must never be (for simplicity and to prevent headaches):
 
 - A gameplay mechanic
 - A world system
-- A camera concern
+- A camera concern (the renderer centering shadow coverage on the camera is a rendering detail, not lighting logic)
 
-**Exception: Deterministic Time-Based Lighting**
-Lighting parameters (direction, color, ambient intensity) may be computed deterministically in core as pure functions of simulation time. These calculations must:
+**Exception: Deterministic Time-Based Lighting and Sky State**
+Lighting parameters (direction, color, ambient intensity, shadow caster) and sky state may be computed deterministically in core as pure functions of simulation time. These calculations must:
 
 - Be based solely on accumulated simulation time (fixed timestep)
 - Not depend on platform-specific timing
