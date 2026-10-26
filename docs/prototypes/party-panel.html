@@ -1,0 +1,1691 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smackhem Party Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: a battle stage (field backdrop, banner on top, party panel at the bottom) beside a control rail; ramp check below.
+   Single dark look on purpose: it's a game HUD, judged over the field, not over the host page. */
+:root {
+  color-scheme: dark;
+  --bg: #0c1018;
+  --surface: #131a26;
+  --surface-2: #1a2333;
+  --line: #2a3548;
+  --fg: #e6ecf5;
+  --muted: #93a1b8;
+  --accent: #7fb2ff;
+  --panel-bg: rgba(8, 12, 20, 0.80);
+  --track: #1a2130;
+  --track-ink: #c9d3e3;
+  --tp: oklch(0.72 0.13 235);
+  --atb: oklch(0.86 0.12 85);
+  --atb-track: #2b3446;
+  --buff: oklch(0.78 0.12 185);
+  --debuff: oklch(0.70 0.18 340);
+  --warn: oklch(0.80 0.16 75);
+  --acting: oklch(0.80 0.10 250);
+  --font-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --scale: 1;
+  --motion: 1;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+header h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.9rem;
+  letter-spacing: 0.01em;
+  margin: 0 0 6px;
+  text-wrap: balance;
+}
+header p { margin: 0; color: var(--muted); max-width: 68ch; }
+header code, .note code { font-family: var(--font-num); font-size: 0.9em; color: var(--fg); }
+.eyebrow {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: var(--accent);
+  margin: 0 0 6px;
+}
+
+.workbench { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+@media (max-width: 860px) { .workbench { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Stage ----------
+   A fixed 960x540 game screen scaled as a whole to fit, like the renderer fitting the viewport.
+   Nothing inside reflows: a narrow window shrinks the screen, it never rearranges the HUD. */
+.screen {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+.stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 960px;
+  height: 540px;
+  transform: scale(var(--fit, 1));
+  transform-origin: 0 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: calc(13px * var(--scale));
+}
+/* The world: ground, grid and scenery drawn from the camera on a canvas */
+.ground { position: absolute; inset: 0; width: 960px; height: 540px; z-index: 0; display: block; }
+
+/* Blob shadows lie on the ground, so they foreshorten with it. The actor's shadow gets the ring */
+.shadows { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.shadow {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.28) 65%, transparent);
+}
+.shadow.actor { box-shadow: 0 0 0 2px var(--acting), 0 0 8px var(--acting); }
+
+/* Billboards stand on their feet (the anchor point) and are sized by the camera. They sit under the HUD, so the HUD can cover them */
+.field-props { position: absolute; inset: 0; z-index: 1; }
+/* A billboard is a card in the world: a 100px box mapped onto its projected corners with a CSS matrix,
+   so it foreshortens, goes paper-thin edge-on, and mirrors when seen from behind */
+.prop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100px;
+  height: 100px;
+  transform-origin: 0 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.prop.dragging { cursor: grabbing; }
+.prop.enemy { border-radius: 50%; background: radial-gradient(circle at 50% 45%, #fff 0 18%, #111 19% 27%, #6b3a2a 28%); }
+.prop.ally svg { width: 100%; height: 100%; display: block; }
+.prop.ko { filter: grayscale(1) brightness(0.6); }
+.prop.covered { outline: 2px dashed oklch(0.72 0.2 25); outline-offset: 4px; }
+
+.banner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-height: calc(2.6em);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(10,16,30,0.92), rgba(10,16,30,0.80));
+  border-bottom: 1px solid #3a4a66;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25em;
+  letter-spacing: 0.04em;
+  color: #f2f6ff;
+  transform: translateY(0);
+  transition: transform calc(180ms * var(--motion)), opacity calc(180ms * var(--motion));
+}
+.banner[hidden] { display: flex !important; transform: translateY(-110%); opacity: 0; }
+
+.spacer { flex: 1; min-height: 120px; }
+
+.panel {
+  position: relative;
+  z-index: 2;
+  align-self: flex-start;
+  margin: 0 12px 12px;
+  padding: 8px;
+  max-width: calc(100% - 24px);
+  background: var(--panel-bg);
+  border: 1px solid #33425c;
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.member {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.35em 0.6em 0.35em 0.5em;
+  border-radius: 4px;
+  border-left: 3px solid transparent;
+}
+.member.acting {
+  background: color-mix(in oklch, var(--acting) 22%, transparent);
+  border-left-color: var(--acting);
+}
+.member.ko .portrait-face { filter: grayscale(1) brightness(0.55); }
+
+/* ATB: a ring around the portrait that fills clockwise, and thickens once full (ready) */
+.portrait {
+  --atb-fill: 0;
+  --ring: 2px;
+  width: calc(3.2em + var(--ring) * 2);
+  height: calc(3.2em + var(--ring) * 2);
+  padding: var(--ring);
+  border-radius: 6px;
+  background: conic-gradient(var(--atb) calc(var(--atb-fill) * 360deg), var(--atb-track) 0);
+  transition: padding calc(120ms * var(--motion)), width calc(120ms * var(--motion)), height calc(120ms * var(--motion));
+}
+.portrait.ready { --ring: 4px; box-shadow: 0 0 0 1px #0008, 0 0 10px color-mix(in oklch, var(--atb) 60%, transparent); }
+.portrait.ready.pulse { animation: ready 1.2s ease-in-out infinite; }
+@keyframes ready { 50% { box-shadow: 0 0 0 1px #0008, 0 0 18px color-mix(in oklch, var(--atb) 85%, transparent); } }
+.portrait-face {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  background: #1d2638;
+  display: grid;
+  place-items: center;
+}
+.portrait-face svg { width: 72%; height: 72%; }
+
+.rows { display: grid; gap: 0.3em; }
+.row1 { display: flex; gap: 0.6em; }
+.stat { display: flex; align-items: center; gap: 0.3em; }
+.tag {
+  font-family: var(--font-display);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  width: 1.9em;
+}
+
+/* Half the mockup's width, but never narrower than "9999/9999" at the current text scale */
+.bar {
+  --fill: 1;
+  position: relative;
+  width: 11ch;
+  height: 1.45em;
+  border-radius: 3px;
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px #ffffff14;
+  overflow: hidden;
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bar .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--fill) * 100%);
+  background: var(--fill-color);
+  transition: width calc(160ms * var(--motion)), background-color calc(160ms * var(--motion));
+}
+/* The number twice: once over the track, once clipped to the fill, each in its own readable ink */
+.bar .num {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.92em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.bar .num.base { color: var(--track-ink); }
+.bar .num.over {
+  color: var(--fill-ink);
+  clip-path: inset(0 calc((1 - var(--fill)) * 100%) 0 0);
+  transition: clip-path calc(160ms * var(--motion));
+}
+
+.row2 { display: flex; gap: 0.3em; min-height: 1.35em; padding-left: 2.2em; }
+.icon {
+  position: relative;
+  width: 1.35em;
+  height: 1.35em;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85em;
+  background: #101724;
+  border: 1.5px solid currentColor;
+}
+.icon.buff { color: var(--buff); }
+.icon.debuff { color: var(--debuff); }
+.icon.warn { color: var(--warn); border-radius: 50%; }
+.icon.ko { color: #c3c9d4; }
+.icon .dir { position: absolute; top: -0.55em; right: -0.4em; font-size: 0.75em; line-height: 1; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+
+/* ---------- Controls ---------- */
+.rail {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px;
+  display: grid;
+  gap: 18px;
+}
+.rail h2, .section h2 {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0;
+  color: var(--muted);
+}
+.group { display: grid; gap: 8px; }
+.field { display: grid; gap: 4px; }
+.field label, .check { font-size: 0.88rem; }
+.field .val { font-family: var(--font-num); color: var(--muted); font-size: 0.82rem; }
+.field-head { display: flex; justify-content: space-between; gap: 8px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+select {
+  background: var(--surface-2);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+.seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.seg button, .btn {
+  background: var(--surface-2);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #08101e; font-weight: 600; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #08101e; font-weight: 600; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.check { display: flex; align-items: center; gap: 8px; }
+.statuses { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Ramp check ---------- */
+.section { display: grid; gap: 12px; }
+.ramp-grid { display: grid; grid-template-columns: 7em minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+.ramp-label { font-size: 0.85rem; color: var(--muted); }
+.ramp { height: 28px; border-radius: 4px; display: flex; overflow: hidden; border: 1px solid var(--line); }
+.ramp span { flex: 1; }
+.ramp-axis { display: flex; justify-content: space-between; font-family: var(--font-num); font-size: 0.78rem; color: var(--muted); }
+.note { color: var(--muted); max-width: 72ch; margin: 0; font-size: 0.92rem; }
+.judge { margin: 0; padding-left: 1.2em; color: var(--muted); display: grid; gap: 4px; max-width: 80ch; }
+.judge b { color: var(--fg); font-weight: 600; }
+footer { color: var(--muted); font-size: 0.85rem; }
+
+/* Command menu: sits in one of a few fixed slots, never follows a character */
+.cmd {
+  position: absolute;
+  z-index: 3;
+  min-width: 8em;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  background: var(--panel-bg);
+  border: 1px solid #33425c;
+  border-radius: 6px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  transition: left calc(160ms * var(--motion)), top calc(160ms * var(--motion));
+}
+.cmd-item { position: relative; padding: 0.25em 0.8em 0.25em 1.5em; border-radius: 3px; color: #dfe7f5; }
+.cmd-item.sel { background: color-mix(in oklch, var(--acting) 35%, transparent); }
+.cmd-item.sel::before { content: "▶"; position: absolute; left: 0.4em; top: 50%; transform: translateY(-50%); font-size: 0.8em; }
+
+/* The open field: between the banner and the HUD band, where characters should stay */
+.safe {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  z-index: 1;
+  border: 2px dashed #ffffffaa;
+  border-radius: 6px;
+  pointer-events: none;
+}
+.safe-label { position: absolute; top: 4px; left: 8px; font-family: var(--font-num); font-size: 11px; color: #fff; text-shadow: 0 1px 2px #000; }
+.rail-note { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+.cvd-target { transition: filter 0s; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- Machado et al. 2009, full severity. feColorMatrix works in linearRGB by default, which these expect -->
+  <filter id="cvd-protan"><feColorMatrix type="matrix" values="0.152286 1.052583 -0.204868 0 0  0.114503 0.786281 0.099216 0 0  -0.003882 -0.048116 1.051998 0 0  0 0 0 1 0"/></filter>
+  <filter id="cvd-deutan"><feColorMatrix type="matrix" values="0.367322 0.860646 -0.227968 0 0  0.280085 0.672501 0.047413 0 0  -0.011820 0.042940 0.968881 0 0  0 0 0 1 0"/></filter>
+  <filter id="cvd-tritan"><feColorMatrix type="matrix" values="1.255528 -0.076749 -0.178779 0 0  -0.078411 0.930809 0.147602 0 0  0.004733 0.691367 0.303900 0 0  0 0 0 1 0"/></filter>
+  <filter id="cvd-gray"><feColorMatrix type="saturate" values="0"/></filter>
+</svg>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Battle spike · prototype</p>
+    <h1>Party panel</h1>
+    <p>A throwaway check of the draft visual direction in <code>docs/battle-spike.md</code>: two rows per member, HP and TP bars at half width with the numbers inside, a status row, an ATB ring around the portrait, and the green to black HP ramp. Drag the sliders, or press Run to watch it fill and drain like a fight. Characters are placeholder shapes.</p>
+    <p>The battle screen is a fixed 16:9 game view that scales to fit, so text scale is relative to the screen, as it would be in the game. The game isn't designed for phones or touch: only the controls around the screen rearrange on a small window.</p>
+  </header>
+
+  <div class="workbench">
+    <div class="screen" id="screen">
+    <div class="stage cvd-target" id="stage" data-backdrop="field" aria-label="Battle stage preview">
+      <canvas class="ground" id="ground" width="1920" height="1080" aria-hidden="true"></canvas>
+      <div class="shadows" id="shadows" aria-hidden="true"></div>
+      <div class="field-props" id="props"></div>
+      <div class="safe" id="safe" hidden><span class="safe-label">Open field: characters stay inside this</span></div>
+      <div class="banner" id="banner" hidden>Attack</div>
+      <div class="spacer"></div>
+      <div class="panel" id="panel" role="list" aria-label="Party"></div>
+      <div class="cmd" id="cmd" hidden aria-label="Commands">
+        <div class="cmd-item sel">Attack</div>
+        <div class="cmd-item">Tech</div>
+        <div class="cmd-item">Item</div>
+        <div class="cmd-item">Defend</div>
+        <div class="cmd-item">Run</div>
+      </div>
+    </div>
+    </div>
+
+    <aside class="rail" aria-label="Controls">
+      <div class="group">
+        <h2>Simulate</h2>
+        <div class="btns">
+          <button class="btn primary" id="run" type="button">Run</button>
+          <button class="btn" id="reset" type="button">Reset</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>Camera</h2>
+        <div class="seg" id="cam-preset" role="group" aria-label="Camera angle">
+          <button type="button" data-v="ours" aria-pressed="true">Ours (15°, 7)</button>
+          <button type="button" data-v="exploration" aria-pressed="false">Exploration</button>
+          <button type="button" data-v="chrono" aria-pressed="false">Chrono Trigger</button>
+          <button type="button" data-v="high" aria-pressed="false">High</button>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="pitch">Look down</label><span class="val" id="pitch-val"></span></div>
+          <input type="range" id="pitch" min="5" max="75" step="1">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="distance">Distance</label><span class="val" id="distance-val"></span></div>
+          <input type="range" id="distance" min="6" max="24" step="0.5">
+        </div>
+        <div class="field">
+          <span class="field-head"><span>Billboards</span></span>
+          <div class="seg" id="billboard" role="group" aria-label="Billboard mode">
+            <button type="button" data-v="upright" aria-pressed="true">Upright (engine today)</button>
+            <button type="button" data-v="facing" aria-pressed="false">Tilted to the camera</button>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="centre" checked> Centre the view in the open field</label>
+        <div class="field">
+          <div class="field-head"><label for="yaw">Turn</label><span class="val" id="yaw-val"></span></div>
+          <input type="range" id="yaw" min="-180" max="180" step="1">
+        </div>
+        <label class="check"><input type="checkbox" id="freeze"> Freeze billboards (stop facing the camera)</label>
+      </div>
+
+      <div class="group">
+        <h2>Idle pan</h2>
+        <div class="btns">
+          <button class="btn" id="idle-play" type="button">Play idle pan</button>
+        </div>
+        <label class="check"><input type="checkbox" id="idle-auto" checked> Play after 8 s with no input while a menu is open</label>
+        <p class="rail-note">Any click or key cuts it short. Reduced motion skips it.</p>
+      </div>
+
+      <div class="group">
+        <h2>Member</h2>
+        <div class="seg" id="member-pick" role="group" aria-label="Member to edit"></div>
+        <div class="field">
+          <div class="field-head"><label for="hp">HP</label><span class="val" id="hp-val"></span></div>
+          <input type="range" id="hp" min="0" step="1">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="tp">TP</label><span class="val" id="tp-val"></span></div>
+          <input type="range" id="tp" min="0" step="1">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="atb">ATB</label><span class="val" id="atb-val"></span></div>
+          <input type="range" id="atb" min="0" max="100" step="1">
+        </div>
+        <label class="check"><input type="checkbox" id="acting"> Acting (their turn)</label>
+        <label class="check"><input type="checkbox" id="big"> Max HP 9999 (widest numbers)</label>
+        <div class="statuses" id="statuses"></div>
+      </div>
+
+      <div class="group">
+        <h2>Layout</h2>
+        <label class="check"><input type="checkbox" id="show-covered" checked> Outline characters the HUD covers</label>
+        <label class="check"><input type="checkbox" id="show-safe"> Show the open field</label>
+        <p class="rail-note" id="layout-readout"></p>
+        <p class="rail-note">Drag characters on the screen to move them.</p>
+      </div>
+
+      <div class="group">
+        <h2>View</h2>
+        <div class="field">
+          <span class="field-head"><span>Text scale</span></span>
+          <div class="seg" id="scale" role="group" aria-label="Text scale">
+            <button type="button" data-v="1" aria-pressed="true">1×</button>
+            <button type="button" data-v="1.5" aria-pressed="false">1.5×</button>
+            <button type="button" data-v="2" aria-pressed="false">2×</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-head"><span>Party size</span></span>
+          <div class="seg" id="size" role="group" aria-label="Party size">
+            <button type="button" data-v="1" aria-pressed="false">1</button>
+            <button type="button" data-v="2" aria-pressed="false">2</button>
+            <button type="button" data-v="3" aria-pressed="false">3</button>
+            <button type="button" data-v="4" aria-pressed="true">4</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="backdrop">Backdrop</label>
+          <select id="backdrop">
+            <option value="field">Field, midday</option>
+            <option value="dusk">Dusk</option>
+            <option value="night">Night</option>
+            <option value="snow">Snow (brightest)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="cvd">Color vision</label>
+          <select id="cvd">
+            <option value="none">Typical</option>
+            <option value="deutan">Deuteranopia (green-blind)</option>
+            <option value="protan">Protanopia (red-blind)</option>
+            <option value="tritan">Tritanopia (blue-blind)</option>
+            <option value="gray">No color</option>
+          </select>
+        </div>
+        <label class="check"><input type="checkbox" id="reduced"> Reduced motion</label>
+      </div>
+    </aside>
+  </div>
+
+  <section class="section cvd-target" id="ramp-section" aria-labelledby="ramp-h">
+    <h2 id="ramp-h">HP ramp check</h2>
+    <div class="ramp-grid">
+      <span class="ramp-label">Color</span>
+      <div class="ramp" id="ramp-color" aria-hidden="true"></div>
+      <span class="ramp-label">Brightness only</span>
+      <div class="ramp" id="ramp-light" aria-hidden="true"></div>
+      <span></span>
+      <div class="ramp-axis"><span>Full HP</span><span>60%</span><span>30%</span><span>0</span></div>
+    </div>
+    <p class="note">The second strip is the same ramp with the color removed. It gets steadily darker from full to zero, so "darker is worse" holds even for a player who can't tell green from red. That's why the middle stop is amber, not bright yellow: bright yellow is lighter than green and would break the order. The color-vision setting above applies here too.</p>
+  </section>
+
+  <section class="section" aria-labelledby="judge-h">
+    <h2 id="judge-h">What to judge</h2>
+    <ul class="judge">
+      <li><b>2× text with Max HP 9999.</b> Does "9999/9999" still fit inside a half-width bar, and does four members' worth of panel leave the field visible?</li>
+      <li><b>Ready vs acting.</b> Run it and watch: a thick ring means ready, the lit row means acting. Can you tell them apart when two members are ready at once?</li>
+      <li><b>Numbers over the fill edge.</b> Drag HP slowly through the middle. The digits change ink where the fill ends; check they stay readable at every value.</li>
+      <li><b>Backdrops and color vision.</b> Snow is the hardest case for the panel edge. Deuteranopia is the hardest for the ramp.</li>
+      <li><b>The status row.</b> It's always there, even empty. Is the extra height worth a layout that never jumps?</li>
+      <li><b>The camera angle.</b> "Ours" is 15° down at 7 units. Exploration is close to the first-person view: the party stands in front of the enemies and hides them. Chrono Trigger looks further down so both sides spread up the screen. With "Upright" billboards (the engine today), looking down squashes them; "Tilted to the camera" keeps them full height.</li>
+      <li><b>The idle pan.</b> Press "Play idle pan", or leave a menu open for 8 seconds. The camera swings round and up while the cards keep their facing: they go paper-thin, show as lines from straight above, then flip back to face you. Click anything to cut it short. "Turn" and "Freeze billboards" let you stop at any point of it.</li>
+      <li><b>Moving in combat.</b> Press Run: attackers run to their target, hit, and run back across the ground. Watch the menu: it only moves if someone ends up under it.</li>
+      <li><b>Nobody gets covered.</b> Any character the HUD covers gets a dashed outline, and "Show the open field" draws where characters should stay. Try 2× text with four members: the panel grows, the open field shrinks, and the battle area would have to shrink with it.</li>
+      <li><b>The menu moves only when it has to.</b> It starts beside the party panel, in the HUD band and off the field. Drag the acting character (the one with the ring) under it and let go: the menu moves once, to the next free slot. It doesn't follow anyone, so it never jitters while characters move.</li>
+      <li><b>Opposites cancel.</b> Give Triangle "Attack down": it cancels the Attack up, and both icons go. Poison and regen are the exception. Square has both: press Run and watch its HP drop and recover on separate ticks.</li>
+    </ul>
+  </section>
+
+  <footer>Prototype for the Smackhem battle spike, built with Claude. Throwaway: it isn't engine code and doesn't follow the engine's rules.</footer>
+</div>
+
+<script>
+(() => {
+  // HP ramp stops in OKLCH: [hp fraction, lightness, chroma, hue]. Lightness only ever falls.
+  const STOPS = [
+    [1.00, 0.80, 0.20, 145],
+    [0.60, 0.74, 0.16, 92],
+    [0.30, 0.60, 0.21, 33],
+    [0.12, 0.42, 0.16, 25],
+    [0.00, 0.16, 0.03, 25],
+  ];
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+
+  const ramp = (f) => {
+    f = clamp01(f);
+    for (let i = 0; i < STOPS.length - 1; i += 1) {
+      const a = STOPS[i];
+      const b = STOPS[i + 1];
+      if (f <= a[0] && f >= b[0]) {
+        const t = (a[0] - f) / (a[0] - b[0]);
+        return { L: lerp(a[1], b[1], t), C: lerp(a[2], b[2], t), H: lerp(a[3], b[3], t) };
+      }
+    }
+    return { L: STOPS[0][1], C: STOPS[0][2], H: STOPS[0][3] };
+  };
+  const css = (c) => `oklch(${c.L.toFixed(3)} ${c.C.toFixed(3)} ${c.H.toFixed(1)})`;
+  // Dark digits on light fills, light digits on dark ones
+  const inkFor = (L) => (L >= 0.62 ? '#0a0d12' : '#f4f6fa');
+
+  // Opposites cancel: applying one to someone who has the other removes both.
+  // Poison and regen have no opposite on purpose, so in the rare case they're both on, each ticks on its own.
+  const STATUS = {
+    atk_up: { letter: 'A', label: 'Attack up', kind: 'buff', opposite: 'atk_down' },
+    def_up: { letter: 'D', label: 'Defense up', kind: 'buff', opposite: 'def_down' },
+    haste: { letter: 'H', label: 'Haste', kind: 'buff', opposite: 'slow' },
+    regen: { letter: 'R', label: 'Regen', kind: 'buff', opposite: null },
+    atk_down: { letter: 'A', label: 'Attack down', kind: 'debuff', opposite: 'atk_up' },
+    def_down: { letter: 'D', label: 'Defense down', kind: 'debuff', opposite: 'def_up' },
+    slow: { letter: 'S', label: 'Slow', kind: 'debuff', opposite: 'haste' },
+    poison: { letter: 'P', label: 'Poison', kind: 'debuff', opposite: null },
+  };
+
+  const SHAPES = {
+    circle: (c) => `<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="${c}"/><circle cx="20" cy="18" r="4" fill="#0b1020"/></svg>`,
+    triangle: (c) => `<svg viewBox="0 0 40 40"><path d="M20 5 L36 34 H4 Z" fill="${c}"/><circle cx="20" cy="23" r="3.5" fill="#0b1020"/></svg>`,
+    square: (c) => `<svg viewBox="0 0 40 40"><rect x="7" y="7" width="26" height="26" rx="3" fill="${c}"/><circle cx="20" cy="19" r="3.5" fill="#0b1020"/></svg>`,
+    diamond: (c) => `<svg viewBox="0 0 40 40"><path d="M20 3 L37 20 L20 37 L3 20 Z" fill="${c}"/><circle cx="20" cy="19" r="3.5" fill="#0b1020"/></svg>`,
+  };
+
+  // Circle's 20 HP is the real sheet; the rest are placeholders
+  const initialParty = () => [
+    { name: 'Circle', shape: 'circle', tint: '#8ab4ff', hp: 20, maxHp: 20, tp: 12, maxTp: 20, atb: 0.45, speed: 0.30, statuses: [] },
+    { name: 'Triangle', shape: 'triangle', tint: '#ffb36b', hp: 31, maxHp: 48, tp: 5, maxTp: 16, atb: 1, speed: 0.22, statuses: ['atk_up'] },
+    { name: 'Square', shape: 'square', tint: '#b98cff', hp: 9, maxHp: 52, tp: 20, maxTp: 24, atb: 0.7, speed: 0.26, statuses: ['regen', 'def_down', 'poison'] },
+    { name: 'Diamond', shape: 'diamond', tint: '#7fe0c8', hp: 0, maxHp: 36, tp: 0, maxTp: 12, atb: 0, speed: 0.20, statuses: [] },
+  ];
+
+  const prefersReduced = (() => {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  })();
+
+  const state = {
+    party: initialParty(),
+    size: 4,
+    selected: 0,
+    acting: 1,
+    readyQueue: [1],
+    actingTimer: 0,
+    enemyTimer: 1.2,
+    poisonTimer: 2,
+    regenTimer: 3,
+    bannerTimer: 0,
+    running: false,
+    reduced: prefersReduced,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage');
+  const screen = $('screen');
+  const fitScreen = () => { stage.style.setProperty('--fit', String(screen.clientWidth / 960)); };
+  try { new ResizeObserver(fitScreen).observe(screen); } catch (e) { window.addEventListener('resize', fitScreen); }
+  fitScreen();
+  const panel = $('panel');
+  const banner = $('banner');
+  const rows = [];
+
+  const fmt = (v, max) => `${v}/${max}`;
+
+  const buildPanel = () => {
+    panel.innerHTML = '';
+    rows.length = 0;
+    for (let i = 0; i < state.size; i += 1) {
+      const m = state.party[i];
+      const el = document.createElement('div');
+      el.className = 'member';
+      el.setAttribute('role', 'listitem');
+      el.innerHTML = `
+        <div class="portrait"><div class="portrait-face">${SHAPES[m.shape](m.tint)}</div></div>
+        <div class="rows">
+          <div class="row1">
+            <div class="stat"><span class="tag">HP</span><div class="bar hp"><div class="fill"></div><span class="num base"></span><span class="num over" aria-hidden="true"></span></div></div>
+            <div class="stat"><span class="tag">TP</span><div class="bar tp"><div class="fill"></div><span class="num base"></span><span class="num over" aria-hidden="true"></span></div></div>
+          </div>
+          <div class="row2"></div>
+        </div>`;
+      panel.appendChild(el);
+      rows.push({
+        el,
+        portrait: el.querySelector('.portrait'),
+        hp: el.querySelector('.bar.hp'),
+        tp: el.querySelector('.bar.tp'),
+        icons: el.querySelector('.row2'),
+        iconKey: null,
+      });
+    }
+  };
+
+  const setBar = (bar, value, max, color, ink) => {
+    const fill = max > 0 ? value / max : 0;
+    bar.style.setProperty('--fill', fill.toFixed(4));
+    bar.style.setProperty('--fill-color', color);
+    bar.style.setProperty('--fill-ink', ink);
+    const text = fmt(value, max);
+    const nums = bar.querySelectorAll('.num');
+    if (nums[0].textContent !== text) {
+      nums[0].textContent = text;
+      nums[1].textContent = text;
+    }
+  };
+
+  const iconHtml = (m) => {
+    const out = [];
+    if (m.hp === 0) out.push('<span class="icon ko" title="Knocked out">KO</span>');
+    else if (m.hp / m.maxHp <= 0.25) out.push('<span class="icon warn" title="Low HP">!</span>');
+    for (let i = 0; i < m.statuses.length; i += 1) {
+      const s = STATUS[m.statuses[i]];
+      const dir = s.kind === 'buff' ? '▲' : '▼';
+      out.push(`<span class="icon ${s.kind}" title="${s.label}">${s.letter}<span class="dir" aria-hidden="true">${dir}</span></span>`);
+    }
+    return out.join('');
+  };
+
+  const render = () => {
+    for (let i = 0; i < rows.length; i += 1) {
+      const m = state.party[i];
+      const r = rows[i];
+      const ready = m.hp > 0 && m.atb >= 1;
+      const hpColor = ramp(m.maxHp > 0 ? m.hp / m.maxHp : 0);
+      setBar(r.hp, m.hp, m.maxHp, css(hpColor), inkFor(hpColor.L));
+      setBar(r.tp, m.tp, m.maxTp, 'var(--tp)', '#0a0d12');
+      r.portrait.style.setProperty('--atb-fill', (m.hp > 0 ? m.atb : 0).toFixed(4));
+      r.portrait.classList.toggle('ready', ready);
+      r.portrait.classList.toggle('pulse', ready && !state.reduced);
+      r.el.classList.toggle('acting', state.acting === i && m.hp > 0);
+      r.el.classList.toggle('ko', m.hp === 0);
+      const status = `${m.name}, HP ${m.hp} of ${m.maxHp}, TP ${m.tp} of ${m.maxTp}, ${ready ? 'ready' : `ATB ${Math.round(m.atb * 100)}%`}${state.acting === i ? ', acting' : ''}`;
+      r.el.setAttribute('aria-label', status);
+      const key = `${m.hp === 0 ? 'ko' : m.hp / m.maxHp <= 0.25 ? 'low' : ''}|${m.statuses.join(',')}`;
+      if (key !== r.iconKey) {
+        r.icons.innerHTML = iconHtml(m);
+        r.iconKey = key;
+      }
+    }
+    // The menu is placed when it opens (a new actor), not every frame
+    const actingMember = state.acting >= 0 && state.acting < state.size ? state.party[state.acting] : null;
+    const menuKey = `${state.acting}|${actingMember ? actingMember.hp > 0 : false}`;
+    if (menuKey !== lastMenuKey) {
+      lastMenuKey = menuKey;
+      placeMenu(true);
+    }
+    for (let i = 0; i < props.length; i += 1) {
+      const p = props[i];
+      const ally = p.kind === 'ally';
+      p.shadow.classList.toggle('actor', ally && p.index === state.acting && state.party[p.index].hp > 0);
+      p.el.classList.toggle('ko', ally && state.party[p.index].hp === 0);
+      // Characters can be mid-run, so they're re-projected every render
+      place(p);
+    }
+    markCovered();
+    syncControls();
+  };
+
+  // ---------- Controls ----------
+  const hp = $('hp');
+  const tp = $('tp');
+  const atb = $('atb');
+  const acting = $('acting');
+  const big = $('big');
+
+  const buildMemberPick = () => {
+    const pick = $('member-pick');
+    pick.innerHTML = '';
+    for (let i = 0; i < state.size; i += 1) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = state.party[i].name;
+      b.setAttribute('aria-pressed', String(i === state.selected));
+      b.addEventListener('click', () => { state.selected = i; buildMemberPick(); render(); });
+      pick.appendChild(b);
+    }
+  };
+
+  const buildStatuses = () => {
+    const box = $('statuses');
+    box.innerHTML = '';
+    Object.keys(STATUS).forEach((id) => {
+      const label = document.createElement('label');
+      label.className = 'check';
+      label.innerHTML = `<input type="checkbox" id="st-${id}" data-id="${id}"> ${STATUS[id].label}`;
+      label.querySelector('input').addEventListener('change', (e) => {
+        const m = state.party[state.selected];
+        m.statuses = e.target.checked ? applyStatus(m.statuses, id) : m.statuses.filter((s) => s !== id);
+        render();
+      });
+      box.appendChild(label);
+    });
+  };
+
+  // Applying a status whose opposite is on cancels both, so neither shows
+  const applyStatus = (list, id) => {
+    const opposite = STATUS[id].opposite;
+    if (opposite && list.indexOf(opposite) !== -1) {
+      showBanner(`${STATUS[id].label} cancels ${STATUS[opposite].label}`, 1.4);
+      return list.filter((s) => s !== opposite);
+    }
+    return list.indexOf(id) === -1 ? list.concat(id) : list;
+  };
+
+  const syncControls = () => {
+    const m = state.party[state.selected];
+    hp.max = String(m.maxHp);
+    tp.max = String(m.maxTp);
+    if (document.activeElement !== hp) hp.value = String(m.hp);
+    if (document.activeElement !== tp) tp.value = String(m.tp);
+    if (document.activeElement !== atb) atb.value = String(Math.round(m.atb * 100));
+    $('hp-val').textContent = fmt(m.hp, m.maxHp);
+    $('tp-val').textContent = fmt(m.tp, m.maxTp);
+    $('atb-val').textContent = m.atb >= 1 ? 'Ready' : `${Math.round(m.atb * 100)}%`;
+    acting.checked = state.acting === state.selected;
+    big.checked = m.maxHp === 9999;
+    Object.keys(STATUS).forEach((id) => {
+      const box = document.getElementById(`st-${id}`);
+      if (box) box.checked = m.statuses.indexOf(id) !== -1;
+    });
+  };
+
+  hp.addEventListener('input', () => { state.party[state.selected].hp = Number(hp.value); render(); });
+  tp.addEventListener('input', () => { state.party[state.selected].tp = Number(tp.value); render(); });
+  atb.addEventListener('input', () => {
+    const m = state.party[state.selected];
+    m.atb = Number(atb.value) / 100;
+    if (m.atb >= 1 && state.readyQueue.indexOf(state.selected) === -1) state.readyQueue.push(state.selected);
+    render();
+  });
+  acting.addEventListener('change', () => { state.acting = acting.checked ? state.selected : -1; render(); });
+  big.addEventListener('change', () => {
+    const m = state.party[state.selected];
+    const ratio = m.maxHp > 0 ? m.hp / m.maxHp : 1;
+    m.maxHp = big.checked ? 9999 : (initialParty()[state.selected].maxHp);
+    m.hp = Math.round(ratio * m.maxHp);
+    render();
+  });
+
+  const segment = (id, onPick) => {
+    const group = $(id);
+    group.querySelectorAll('button').forEach((b) => {
+      b.addEventListener('click', () => {
+        group.querySelectorAll('button').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+        onPick(b.dataset.v);
+      });
+    });
+  };
+  // The panel changes size with text scale and party size, so the menu is re-placed after either
+  segment('scale', (v) => {
+    stage.style.setProperty('--scale', v);
+    relayout();
+    placeMenu(true);
+    render();
+  });
+  segment('size', (v) => {
+    state.size = Number(v);
+    if (state.selected >= state.size) state.selected = 0;
+    if (state.acting >= state.size) state.acting = -1;
+    state.readyQueue = state.readyQueue.filter((i) => i < state.size);
+    buildPanel();
+    buildProps();
+    buildMemberPick();
+    render();
+    relayout();
+    placeMenu(true);
+  });
+
+  $('backdrop').addEventListener('change', (e) => { stage.dataset.backdrop = e.target.value; drawGround(); });
+  $('cvd').addEventListener('change', (e) => {
+    const f = e.target.value === 'none' ? '' : `url(#cvd-${e.target.value})`;
+    document.querySelectorAll('.cvd-target').forEach((el) => { el.style.filter = f; });
+  });
+
+  const reduced = $('reduced');
+  reduced.checked = state.reduced;
+  const applyMotion = () => { document.documentElement.style.setProperty('--motion', state.reduced ? '0' : '1'); };
+  reduced.addEventListener('change', () => { state.reduced = reduced.checked; applyMotion(); render(); });
+  applyMotion();
+
+  // ---------- Simulation: a fake fight, just enough to see the panel move ----------
+  let bannerHide = 0;
+  const showBanner = (text, seconds) => {
+    banner.textContent = text;
+    banner.hidden = false;
+    state.bannerTimer = seconds;
+    // Paused, nothing counts the banner down, so hide it on a timer instead
+    clearTimeout(bannerHide);
+    if (!state.running) bannerHide = setTimeout(() => { if (!state.running) banner.hidden = true; }, seconds * 1000);
+  };
+
+  const alive = () => {
+    const out = [];
+    for (let i = 0; i < state.size; i += 1) if (state.party[i].hp > 0) out.push(i);
+    return out;
+  };
+
+  const ACTIONS = ['Attack', 'Attack', 'Tech: Spin', 'Attack', 'Tech: Bounce'];
+  let actionIndex = 0;
+
+  const step = (dt) => {
+    for (let i = 0; i < state.size; i += 1) {
+      const m = state.party[i];
+      if (m.hp === 0 || m.atb >= 1) continue;
+      let speed = m.speed;
+      if (m.statuses.indexOf('haste') !== -1) speed *= 1.5;
+      if (m.statuses.indexOf('slow') !== -1) speed *= 0.5;
+      m.atb = Math.min(1, m.atb + dt * speed);
+      if (m.atb >= 1) state.readyQueue.push(i);
+    }
+
+    stepMoves(dt);
+
+    if (state.actingTimer > 0) {
+      state.actingTimer -= dt;
+      if (state.actingTimer <= 0 && state.acting !== -1) {
+        const m = state.party[state.acting];
+        m.atb = 0;
+        m.tp = Math.min(m.maxTp, m.tp + 2);
+        state.acting = -1;
+      }
+    } else {
+      while (state.readyQueue.length > 0) {
+        const next = state.readyQueue.shift();
+        if (next < state.size && state.party[next].hp > 0 && state.party[next].atb >= 1) {
+          state.acting = next;
+          state.actingTimer = 1.1;
+          showBanner(ACTIONS[actionIndex % ACTIONS.length], 0.9);
+          actionIndex += 1;
+          // Chrono Trigger style: run up to an enemy, hit, run back
+          const enemy = Math.floor(Math.random() * ENEMIES.length);
+          startMove('ally', next, positions.enemy[enemy], 1.1, null);
+          break;
+        }
+      }
+    }
+
+    state.enemyTimer -= dt;
+    if (state.enemyTimer <= 0) {
+      state.enemyTimer = 1.4 + Math.random() * 0.8;
+      const targets = alive();
+      if (targets.length > 0) {
+        const ti = targets[Math.floor(Math.random() * targets.length)];
+        const t = state.party[ti];
+        const attacker = Math.floor(Math.random() * ENEMIES.length);
+        // The goatee runs over, and the damage lands when it arrives
+        startMove('enemy', attacker, positions.ally[ti], 0.9, () => {
+          const dmg = Math.max(1, Math.ceil(t.maxHp * (0.04 + Math.random() * 0.12)));
+          t.hp = Math.max(0, t.hp - dmg);
+          if (t.hp === 0) { t.atb = 0; }
+        });
+        if (state.bannerTimer <= 0) showBanner(`${ENEMIES[attacker][2]} uses Scratch`, 0.8);
+      }
+    }
+
+    // Poison and regen tick on their own clocks, so a member with both visibly drops, then recovers.
+    // On a shared tick poison goes first, and regen can't lift a KO (an open question in the spike).
+    state.poisonTimer -= dt;
+    state.regenTimer -= dt;
+    const poisonTick = state.poisonTimer <= 0;
+    const regenTick = state.regenTimer <= 0;
+    if (poisonTick) state.poisonTimer = 2;
+    if (regenTick) state.regenTimer = 3;
+    if (poisonTick || regenTick) {
+      for (let i = 0; i < state.size; i += 1) {
+        const m = state.party[i];
+        if (poisonTick && m.hp > 0 && m.statuses.indexOf('poison') !== -1) {
+          m.hp = Math.max(0, m.hp - Math.ceil(m.maxHp * 0.04));
+          if (m.hp === 0) m.atb = 0;
+        }
+        if (regenTick && m.hp > 0 && m.statuses.indexOf('regen') !== -1) {
+          m.hp = Math.min(m.maxHp, m.hp + Math.ceil(m.maxHp * 0.03));
+        }
+      }
+    }
+
+    if (state.bannerTimer > 0) {
+      state.bannerTimer -= dt;
+      if (state.bannerTimer <= 0) banner.hidden = true;
+    }
+
+    if (alive().length === 0) {
+      setRunning(false);
+      showBanner('The party has fallen', 3);
+    }
+  };
+
+  let last = 0;
+  const STEP = 1 / 60;
+  let acc = 0;
+  const frame = (t) => {
+    if (!state.running) return;
+    const dt = last ? Math.min(0.25, (t - last) / 1000) : 0;
+    last = t;
+    acc += dt;
+    while (acc >= STEP) { step(STEP); acc -= STEP; }
+    render();
+    requestAnimationFrame(frame);
+  };
+
+  const runBtn = $('run');
+  const setRunning = (on) => {
+    state.running = on;
+    runBtn.textContent = on ? 'Pause' : 'Run';
+    if (on) { last = 0; acc = 0; requestAnimationFrame(frame); }
+  };
+  runBtn.addEventListener('click', () => setRunning(!state.running));
+
+  $('reset').addEventListener('click', () => {
+    setRunning(false);
+    state.party = initialParty();
+    state.acting = 1;
+    state.readyQueue = [1];
+    state.actingTimer = 0;
+    state.enemyTimer = 1.2;
+    state.poisonTimer = 2;
+    state.regenTimer = 3;
+    state.bannerTimer = 0;
+    banner.hidden = true;
+    positions = null;
+    moves.length = 0;
+    buildPanel();
+    buildProps();
+    buildMemberPick();
+    render();
+    relayout();
+    placeMenu(true);
+  });
+
+  // ---------- Moves: characters run to their target and back across the ground ----------
+  const moves = [];
+  const ease = (t) => t * t * (3 - 2 * t);
+  const startMove = (kind, index, target, duration, onHit) => {
+    const pos = positions[kind][index];
+    for (let i = 0; i < moves.length; i += 1) if (moves[i].pos === pos) return;
+    // Stop just short of the target, on the attacker's side of it
+    const dx = pos.x - target.x;
+    const dz = pos.z - target.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const to = { x: target.x + (dx / d) * 0.9, z: target.z + (dz / d) * 0.9 };
+    moves.push({ pos, home: { x: pos.x, z: pos.z }, to, t: 0, duration, onHit, hit: false });
+  };
+  const stepMoves = (dt) => {
+    for (let i = moves.length - 1; i >= 0; i -= 1) {
+      const m = moves[i];
+      m.t += dt;
+      const u = Math.min(1, m.t / m.duration);
+      let k;
+      if (u < 0.35) k = ease(u / 0.35);
+      else if (u < 0.6) k = 1;
+      else k = 1 - ease((u - 0.6) / 0.4);
+      m.pos.x = m.home.x + (m.to.x - m.home.x) * k;
+      m.pos.z = m.home.z + (m.to.z - m.home.z) * k;
+      if (u >= 0.45 && !m.hit) {
+        m.hit = true;
+        if (m.onHit) m.onHit();
+      }
+      if (u >= 1) {
+        m.pos.x = m.home.x;
+        m.pos.z = m.home.z;
+        moves.splice(i, 1);
+      }
+    }
+  };
+
+  // ---------- Field layout: characters, the command menu, and what the HUD covers ----------
+  // Everything here is in the screen's own 960x540 units, before it's scaled to fit
+  const SCREEN_W = 960;
+  const SCREEN_H = 540;
+  const GAP = 12;
+  const propsEl = $('props');
+  const shadowsEl = $('shadows');
+  const ground = $('ground');
+  const cmd = $('cmd');
+  const safe = $('safe');
+  const readout = $('layout-readout');
+  const showCovered = $('show-covered');
+  const showSafe = $('show-safe');
+  const props = [];
+  // World units on the ground (x right, z away from the camera). Sizes match the NPC billboards (1 unit)
+  const ENEMIES = [[-3, 2.4, 'Goatee A'], [0, 3.2, 'Goatee B'], [3, 2.2, 'Goatee C']];
+  const ALLIES = [[-3.6, -1.6], [-1.2, -2.2], [1.2, -1.8], [3.6, -2.3]];
+  const SIZE = { ally: 1, enemy: 0.85 };
+  // Where characters may stand: the battle area, a rectangle on the ground
+  const AREA = { x0: -5.5, x1: 5.5, z0: -2.8, z1: 4.5 };
+  // Kept across rebuilds, so a drag survives changing the party size
+  let positions = null;
+  let lastMenuKey = '';
+  let slot = null;
+
+  // Which way a card faces right now. Like the engine, it turns toward the camera (upright, or tilted back
+  // to the camera's up). Frozen, it keeps the facing it had; releasing blends back, so it visibly flips round.
+  const liveFacing = (p) => {
+    const dx = cam.pos.x - p.pos.x;
+    const dz = cam.pos.z - p.pos.z;
+    const n = Math.hypot(dx, dz) || 1;
+    const up = cam.billboard === 'facing' ? { x: cam.u.x, y: cam.u.y, z: cam.u.z } : { x: 0, y: 1, z: 0 };
+    return { x: dx / n, z: dz / n, up };
+  };
+  const facingOf = (p) => {
+    const live = liveFacing(p);
+    if (!p.frozen) return live;
+    const f = p.frozen;
+    const t = idle.release;
+    if (t <= 0) return f;
+    const mix = (a, b) => a + (b - a) * t;
+    let x = mix(f.x, live.x);
+    let z = mix(f.z, live.z);
+    const n = Math.hypot(x, z) || 1;
+    x /= n;
+    z /= n;
+    const ux = mix(f.up.x, live.up.x);
+    const uy = mix(f.up.y, live.up.y);
+    const uz = mix(f.up.z, live.up.z);
+    const m = Math.hypot(ux, uy, uz) || 1;
+    return { x, z, up: { x: ux / m, y: uy / m, z: uz / m } };
+  };
+
+  // Projects a character's card (standing on its feet) and its blob shadow onto the screen
+  const place = (p) => {
+    const size = SIZE[p.kind];
+    const face = facingOf(p);
+    // The card's right, as seen from the side it faces
+    const rx = -face.z;
+    const rz = face.x;
+    const hw = size / 2;
+    const corner = (side, up) => project(
+      p.pos.x + rx * hw * side + face.up.x * size * up,
+      face.up.y * size * up,
+      p.pos.z + rz * hw * side + face.up.z * size * up,
+    );
+    const feet = project(p.pos.x, 0, p.pos.z);
+    const TL = corner(-1, 1);
+    const TR = corner(1, 1);
+    const BL = corner(-1, 0);
+    const BR = corner(1, 0);
+    const visible = Boolean(feet && TL && TR && BL && BR);
+    p.el.hidden = !visible;
+    p.shadow.hidden = !feet;
+    if (!visible) {
+      p.screen = null;
+      return;
+    }
+    // Map the 100px box onto the card's corners. Edge-on it goes thin; from behind it mirrors
+    const S = 100;
+    p.el.style.transform = `matrix(${(TR.x - TL.x) / S}, ${(TR.y - TL.y) / S}, ${(BL.x - TL.x) / S}, ${(BL.y - TL.y) / S}, ${TL.x}, ${TL.y})`;
+    const xs = [TL.x, TR.x, BL.x, BR.x];
+    const ys = [TL.y, TR.y, BL.y, BR.y];
+    const x0 = Math.min(...xs);
+    const y0 = Math.min(...ys);
+    p.screen = { x: feet.x, y: feet.y, box: { x: x0, y: y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0 } };
+    // Nearer characters draw over farther ones
+    p.el.style.zIndex = String(1000 - Math.round(feet.depth * 10));
+
+    // The shadow lies on the ground, measured along the camera's right and forward so it stays an even ellipse
+    const r = size * 0.42;
+    const fl = Math.hypot(cam.f.x, cam.f.z) || 1;
+    const fx = cam.f.x / fl;
+    const fz = cam.f.z / fl;
+    const left = project(p.pos.x - cam.r.x * r, 0, p.pos.z - cam.r.z * r);
+    const right = project(p.pos.x + cam.r.x * r, 0, p.pos.z + cam.r.z * r);
+    const near = project(p.pos.x - fx * r, 0, p.pos.z - fz * r);
+    const far = project(p.pos.x + fx * r, 0, p.pos.z + fz * r);
+    if (left && right && near && far) {
+      p.shadow.style.left = `${(left.x + right.x) / 2}px`;
+      p.shadow.style.top = `${(near.y + far.y) / 2}px`;
+      p.shadow.style.width = `${Math.hypot(right.x - left.x, right.y - left.y)}px`;
+      p.shadow.style.height = `${Math.max(2, Math.abs(near.y - far.y))}px`;
+    }
+  };
+
+  const elRect = (el) => ({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+  // The card's bounding box on screen
+  const propRect = (p) => (p.screen ? p.screen.box : { x: -1e4, y: -1e4, w: 0, h: 0 });
+  const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
+    * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+  const hudRects = () => {
+    const out = [elRect(panel)];
+    if (!cmd.hidden) out.push(elRect(cmd));
+    if (!banner.hidden) out.push(elRect(banner));
+    return out;
+  };
+
+  const actorProp = () => {
+    for (let i = 0; i < props.length; i += 1) {
+      if (props[i].kind === 'ally' && props[i].index === state.acting) return props[i];
+    }
+    return null;
+  };
+
+  const markCovered = () => {
+    const hud = hudRects();
+    const covered = [];
+    for (let i = 0; i < props.length; i += 1) {
+      const r = propRect(props[i]);
+      let hit = false;
+      for (let j = 0; j < hud.length; j += 1) if (overlap(r, hud[j]) > 0) hit = true;
+      props[i].el.classList.toggle('covered', hit && showCovered.checked);
+      if (hit) covered.push(props[i].name);
+    }
+    const top = banner.offsetHeight;
+    safe.style.top = `${top}px`;
+    safe.style.height = `${Math.max(0, panel.offsetTop - 6 - top)}px`;
+    safe.hidden = !showSafe.checked;
+    const menu = cmd.hidden ? 'Menu closed' : `Menu: ${slot ? slot.name : ''}`;
+    readout.textContent = `${menu}. ${covered.length ? `Covered: ${covered.join(', ')}` : 'Nobody is covered'}. ${areaStatus()}`;
+  };
+
+  // Fixed slots, in order of preference. Beside the panel keeps the menu in the HUD band, off the field.
+  // force: pick again from scratch. Otherwise the menu stays put unless it now covers the actor.
+  const placeMenu = (force) => {
+    const m = state.acting >= 0 && state.acting < state.size ? state.party[state.acting] : null;
+    cmd.hidden = !(m && m.hp > 0);
+    if (cmd.hidden) {
+      slot = null;
+      markCovered();
+      return;
+    }
+    const actor = actorProp();
+    const w = cmd.offsetWidth;
+    const h = cmd.offsetHeight;
+    const pr = elRect(panel);
+    const bottomY = SCREEN_H - GAP - h;
+    const underBanner = banner.offsetHeight + GAP;
+    const slots = [
+      { name: 'beside the party panel', x: pr.x + pr.w + GAP, y: bottomY },
+      { name: 'bottom right', x: SCREEN_W - GAP - w, y: bottomY },
+      { name: 'top right, under the banner', x: SCREEN_W - GAP - w, y: underBanner },
+      { name: 'top left, under the banner', x: GAP, y: underBanner },
+    ].filter((s) => s.x + w <= SCREEN_W - GAP + 0.5);
+    const rectOf = (s) => ({ x: s.x, y: s.y, w, h });
+    const coversActor = (s) => actor !== null && overlap(rectOf(s), propRect(actor)) > 0;
+
+    let next = null;
+    if (!force && slot) {
+      for (let i = 0; i < slots.length; i += 1) if (slots[i].name === slot.name && !coversActor(slots[i])) next = slots[i];
+    }
+    if (!next) {
+      // Covering the actor costs far more than covering anyone else; earlier slots win ties
+      let best = Infinity;
+      for (let i = 0; i < slots.length; i += 1) {
+        let cost = i;
+        for (let j = 0; j < props.length; j += 1) {
+          const o = overlap(rectOf(slots[i]), propRect(props[j]));
+          cost += props[j] === actor ? o * 1000 : o * 10;
+        }
+        if (cost < best) {
+          best = cost;
+          next = slots[i];
+        }
+      }
+    }
+    slot = next;
+    cmd.style.left = `${slot.x}px`;
+    cmd.style.top = `${slot.y}px`;
+    markCovered();
+  };
+
+  const addProp = (kind, index, name, pos) => {
+    const shadow = document.createElement('div');
+    shadow.className = 'shadow';
+    shadowsEl.appendChild(shadow);
+    const el = document.createElement('div');
+    el.className = `prop ${kind}`;
+    el.title = `${name}: drag to move`;
+    if (kind === 'ally') {
+      el.innerHTML = SHAPES[state.party[index].shape](state.party[index].tint);
+      // Let the sprite squash with an upright billboard instead of keeping its aspect
+      el.firstElementChild.setAttribute('preserveAspectRatio', 'none');
+    }
+    propsEl.appendChild(el);
+    const p = { el, shadow, kind, index, name, pos, screen: null, frozen: null };
+    props.push(p);
+    place(p);
+
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      el.classList.add('dragging');
+      // Keep the grab point under the pointer, rather than snapping the feet to it
+      const r0 = stage.getBoundingClientRect();
+      const fit0 = r0.width / SCREEN_W;
+      const grabX = p.screen ? p.screen.x - (e.clientX - r0.left) / fit0 : 0;
+      const grabY = p.screen ? p.screen.y - (e.clientY - r0.top) / fit0 : 0;
+      const move = (ev) => {
+        const r = stage.getBoundingClientRect();
+        const fit = r.width / SCREEN_W;
+        // Where the feet meet the ground, kept inside the battle area
+        const hit = pickGround((ev.clientX - r.left) / fit + grabX, (ev.clientY - r.top) / fit + grabY);
+        if (!hit) return;
+        pos.x = Math.min(AREA.x1, Math.max(AREA.x0, hit.x));
+        pos.z = Math.min(AREA.z1, Math.max(AREA.z0, hit.z));
+        place(p);
+        markCovered();
+      };
+      const up = () => {
+        el.removeEventListener('pointermove', move);
+        el.removeEventListener('pointerup', up);
+        el.removeEventListener('pointercancel', up);
+        el.classList.remove('dragging');
+        // A character finished moving: the menu only moves if it now covers the actor
+        placeMenu(false);
+      };
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+    });
+  };
+
+  const buildProps = () => {
+    if (!positions) {
+      positions = {
+        enemy: ENEMIES.map((e) => ({ x: e[0], z: e[1] })),
+        ally: ALLIES.map((a) => ({ x: a[0], z: a[1] })),
+      };
+    }
+    propsEl.innerHTML = '';
+    shadowsEl.innerHTML = '';
+    props.length = 0;
+    for (let i = 0; i < ENEMIES.length; i += 1) addProp('enemy', i, ENEMIES[i][2], positions.enemy[i]);
+    for (let i = 0; i < state.size; i += 1) addProp('ally', i, state.party[i].name, positions.ally[i]);
+  };
+
+  // ---------- Camera and ground ----------
+  // An orbit camera looking down at the battle area, with the engine's 60° vertical field of view.
+  // A low pitch is close to exploration; a high one looks down on the fight like Chrono Trigger.
+  // "Ours" is Clark's pick for battles. In the engine these are tunable constants, since debugging will move them
+  const PRESETS = {
+    ours: { pitch: 15, distance: 7 },
+    exploration: { pitch: 8, distance: 11.5 },
+    chrono: { pitch: 40, distance: 11 },
+    high: { pitch: 62, distance: 12 },
+  };
+  const FOV = Math.PI / 3;
+  const NEAR = 0.3;
+  const TARGET = { x: 0, y: 0, z: 0.5 };
+  const cam = {
+    pitch: PRESETS.ours.pitch,
+    distance: PRESETS.ours.distance,
+    yaw: 0,
+    billboard: 'upright',
+    centre: true,
+    focal: (SCREEN_H / 2) / Math.tan(FOV / 2),
+    cx: SCREEN_W / 2,
+    cy: SCREEN_H / 2,
+    pos: { x: 0, y: 0, z: 0 },
+    r: { x: 1, y: 0, z: 0 },
+    f: { x: 0, y: 0, z: 1 },
+    u: { x: 0, y: 1, z: 0 },
+  };
+
+  // An orbit round TARGET: pitch looks down, yaw turns round the vertical axis
+  const updateCamera = () => {
+    const a = (cam.pitch * Math.PI) / 180;
+    const b = (cam.yaw * Math.PI) / 180;
+    const s = Math.sin(a);
+    const c = Math.cos(a);
+    const sb = Math.sin(b);
+    const cb = Math.cos(b);
+    cam.r = { x: cb, y: 0, z: -sb };
+    cam.f = { x: sb * c, y: -s, z: cb * c };
+    cam.u = { x: sb * s, y: c, z: cb * s };
+    cam.pos = { x: TARGET.x - cam.distance * c * sb, y: TARGET.y + cam.distance * s, z: TARGET.z - cam.distance * c * cb };
+    // Off-centre projection: the view's centre sits in the middle of the open field, not the middle of the screen
+    cam.cy = cam.centre ? (banner.offsetHeight + panel.offsetTop) / 2 : SCREEN_H / 2;
+  };
+
+  const toView = (x, y, z) => {
+    const rx = x - cam.pos.x;
+    const ry = y - cam.pos.y;
+    const rz = z - cam.pos.z;
+    return {
+      x: rx * cam.r.x + rz * cam.r.z,
+      y: rx * cam.u.x + ry * cam.u.y + rz * cam.u.z,
+      z: rx * cam.f.x + ry * cam.f.y + rz * cam.f.z,
+    };
+  };
+  const toScreen = (v) => ({ x: cam.cx + (v.x / v.z) * cam.focal, y: cam.cy - (v.y / v.z) * cam.focal, depth: v.z });
+  // null when the point is behind the camera
+  const project = (x, y, z) => {
+    const v = toView(x, y, z);
+    return v.z < NEAR ? null : toScreen(v);
+  };
+  // Where a screen point's ray meets the ground, or null above the horizon
+  const pickGround = (sx, sy) => {
+    const dx = (sx - cam.cx) / cam.focal;
+    const dy = -(sy - cam.cy) / cam.focal;
+    const wx = cam.r.x * dx + cam.u.x * dy + cam.f.x;
+    const wy = cam.u.y * dy + cam.f.y;
+    const wz = cam.r.z * dx + cam.u.z * dy + cam.f.z;
+    if (wy >= -1e-4) return null;
+    const t = -cam.pos.y / wy;
+    return { x: cam.pos.x + wx * t, z: cam.pos.z + wz * t };
+  };
+
+  const areaCorners = () => [[AREA.x0, AREA.z0], [AREA.x1, AREA.z0], [AREA.x1, AREA.z1], [AREA.x0, AREA.z1]];
+  const areaStatus = () => {
+    let lowest = -Infinity;
+    areaCorners().forEach(([x, z]) => {
+      const pt = project(x, 0, z);
+      lowest = Math.max(lowest, pt ? pt.y : Infinity);
+    });
+    return lowest <= panel.offsetTop ? 'The battle area fits above the HUD.' : 'The battle area runs under the HUD.';
+  };
+
+  const PALETTES = {
+    field: { skyTop: '#6fa8dc', skyLow: '#d4e9f6', ground: '#6f9b40', grid: '#62893a', area: 'rgba(255,255,255,0.10)', areaLine: 'rgba(255,255,255,0.6)', rock: [150, 150, 136] },
+    dusk: { skyTop: '#2b1f4a', skyLow: '#f19a5b', ground: '#4d3d2a', grid: '#433423', area: 'rgba(255,220,180,0.10)', areaLine: 'rgba(255,220,180,0.55)', rock: [120, 92, 92] },
+    night: { skyTop: '#04060f', skyLow: '#1a2850', ground: '#16261c', grid: '#1e3326', area: 'rgba(180,200,255,0.08)', areaLine: 'rgba(180,200,255,0.5)', rock: [66, 74, 92] },
+    snow: { skyTop: '#c4d6e7', skyLow: '#f4f8fb', ground: '#f1f4f7', grid: '#dde4ea', area: 'rgba(60,90,130,0.07)', areaLine: 'rgba(60,90,130,0.5)', rock: [176, 186, 200] },
+  };
+
+  // A few flat-shaded rocks and blocks out in the world, like the engine's geometry
+  const SCENERY = [
+    { type: 'pyramid', x: -11, z: 13, s: 3 },
+    { type: 'pyramid', x: 8, z: 17, s: 4 },
+    { type: 'cube', x: 12, z: 8, s: 2 },
+    { type: 'cube', x: -14, z: 5, s: 2.5 },
+    { type: 'pyramid', x: 1, z: 26, s: 7 },
+    { type: 'cube', x: -4, z: 20, s: 1.8 },
+  ];
+  const LIGHT = (() => {
+    const l = { x: -0.45, y: 0.8, z: -0.4 };
+    const n = Math.hypot(l.x, l.y, l.z);
+    return { x: l.x / n, y: l.y / n, z: l.z / n };
+  })();
+
+  const faceNormal = (a, b, c) => {
+    const ux = b.x - a.x; const uy = b.y - a.y; const uz = b.z - a.z;
+    const vx = c.x - a.x; const vy = c.y - a.y; const vz = c.z - a.z;
+    const nx = uy * vz - uz * vy; const ny = uz * vx - ux * vz; const nz = ux * vy - uy * vx;
+    const n = Math.hypot(nx, ny, nz) || 1;
+    return { x: nx / n, y: ny / n, z: nz / n };
+  };
+
+  const sceneryFaces = (o) => {
+    const h = o.s / 2;
+    const P = (x, y, z) => ({ x: o.x + x, y, z: o.z + z });
+    if (o.type === 'pyramid') {
+      const apex = P(0, o.s, 0);
+      const b = [P(-h, 0, -h), P(h, 0, -h), P(h, 0, h), P(-h, 0, h)];
+      return [[b[0], b[1], apex], [b[1], b[2], apex], [b[2], b[3], apex], [b[3], b[0], apex]];
+    }
+    const lo = [P(-h, 0, -h), P(h, 0, -h), P(h, 0, h), P(-h, 0, h)];
+    const hi = [P(-h, o.s, -h), P(h, o.s, -h), P(h, o.s, h), P(-h, o.s, h)];
+    return [
+      [lo[0], lo[1], hi[1], hi[0]], [lo[1], lo[2], hi[2], hi[1]], [lo[2], lo[3], hi[3], hi[2]],
+      [lo[3], lo[0], hi[0], hi[3]], [hi[0], hi[1], hi[2], hi[3]],
+    ];
+  };
+
+  const ctx = ground.getContext('2d');
+
+  // A ground line clipped at the near plane, so lines passing behind the camera still draw
+  const groundLine = (ax, az, bx, bz) => {
+    let va = toView(ax, 0, az);
+    let vb = toView(bx, 0, bz);
+    if (va.z < NEAR && vb.z < NEAR) return;
+    if (va.z < NEAR || vb.z < NEAR) {
+      const t = (NEAR - va.z) / (vb.z - va.z);
+      const m = { x: va.x + (vb.x - va.x) * t, y: va.y + (vb.y - va.y) * t, z: NEAR };
+      if (va.z < NEAR) va = m; else vb = m;
+    }
+    const pa = toScreen(va);
+    const pb = toScreen(vb);
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+  };
+
+  const drawGround = () => {
+    const pal = PALETTES[stage.dataset.backdrop] || PALETTES.field;
+    ctx.setTransform(ground.width / SCREEN_W, 0, 0, ground.height / SCREEN_H, 0, 0);
+
+    // Sky above the horizon, ground below it. Looking down far enough, there's no sky at all
+    const a = (cam.pitch * Math.PI) / 180;
+    const horizon = cam.cy - Math.tan(a) * cam.focal;
+    const sky = ctx.createLinearGradient(0, horizon - 260, 0, horizon);
+    sky.addColorStop(0, pal.skyTop);
+    sky.addColorStop(1, pal.skyLow);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+    ctx.fillStyle = pal.ground;
+    ctx.fillRect(0, Math.max(0, horizon), SCREEN_W, SCREEN_H);
+
+    // A one-unit grid, so the angle reads
+    ctx.strokeStyle = pal.grid;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = -24; x <= 24; x += 1) groundLine(x, -16, x, 40);
+    for (let z = -16; z <= 40; z += 1) groundLine(-24, z, 24, z);
+    ctx.stroke();
+
+    // Haze toward the horizon, when it's on screen
+    if (horizon > 0) {
+      const haze = ctx.createLinearGradient(0, horizon, 0, horizon + 90);
+      haze.addColorStop(0, pal.skyLow);
+      haze.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = haze;
+      ctx.fillRect(0, horizon, SCREEN_W, 90);
+    }
+
+    // The battle area
+    const corners = areaCorners().map(([x, z]) => project(x, 0, z));
+    if (corners.every(Boolean)) {
+      ctx.beginPath();
+      corners.forEach((pt, i) => (i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+      ctx.closePath();
+      ctx.fillStyle = pal.area;
+      ctx.fill();
+      ctx.setLineDash([8, 6]);
+      ctx.strokeStyle = pal.areaLine;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Scenery, far faces first, back faces skipped
+    const faces = [];
+    SCENERY.forEach((o) => {
+      sceneryFaces(o).forEach((verts) => {
+        const n = faceNormal(verts[0], verts[1], verts[2]);
+        let cx = 0; let cy = 0; let cz = 0;
+        verts.forEach((v) => { cx += v.x; cy += v.y; cz += v.z; });
+        cx /= verts.length; cy /= verts.length; cz /= verts.length;
+        if (n.x * (cam.pos.x - cx) + n.y * (cam.pos.y - cy) + n.z * (cam.pos.z - cz) <= 0) return;
+        const pts = verts.map((v) => project(v.x, v.y, v.z));
+        if (!pts.every(Boolean)) return;
+        const light = 0.45 + 0.55 * Math.max(0, n.x * LIGHT.x + n.y * LIGHT.y + n.z * LIGHT.z);
+        faces.push({ pts, light, depth: toView(cx, cy, cz).z });
+      });
+    });
+    faces.sort((p, q) => q.depth - p.depth);
+    faces.forEach((f) => {
+      ctx.beginPath();
+      f.pts.forEach((pt, i) => (i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+      ctx.closePath();
+      ctx.fillStyle = `rgb(${pal.rock.map((ch) => Math.round(ch * f.light)).join(',')})`;
+      ctx.fill();
+    });
+  };
+
+  // Anything that moves the camera or resizes the HUD re-projects the whole field
+  const relayout = () => {
+    updateCamera();
+    drawGround();
+    for (let i = 0; i < props.length; i += 1) place(props[i]);
+    placeMenu(false);
+  };
+
+  const pitchIn = $('pitch');
+  const distIn = $('distance');
+  const yawIn = $('yaw');
+  const freezeIn = $('freeze');
+  const syncCam = () => {
+    pitchIn.value = String(cam.pitch);
+    distIn.value = String(cam.distance);
+    yawIn.value = String(cam.yaw);
+    $('pitch-val').textContent = `${cam.pitch}°`;
+    $('distance-val').textContent = `${cam.distance} units`;
+    $('yaw-val').textContent = `${cam.yaw}°`;
+  };
+  yawIn.addEventListener('input', () => { cam.yaw = Number(yawIn.value); syncCam(); relayout(); });
+  freezeIn.addEventListener('change', () => {
+    idle.release = 0;
+    for (let i = 0; i < props.length; i += 1) props[i].frozen = freezeIn.checked ? liveFacing(props[i]) : null;
+    relayout();
+  });
+  const clearPreset = () => {
+    $('cam-preset').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+  };
+  pitchIn.addEventListener('input', () => { cam.pitch = Number(pitchIn.value); clearPreset(); syncCam(); relayout(); });
+  distIn.addEventListener('input', () => { cam.distance = Number(distIn.value); clearPreset(); syncCam(); relayout(); });
+  segment('cam-preset', (v) => {
+    cam.pitch = PRESETS[v].pitch;
+    cam.distance = PRESETS[v].distance;
+    syncCam();
+    relayout();
+  });
+  segment('billboard', (v) => { cam.billboard = v; relayout(); });
+  $('centre').addEventListener('change', (e) => { cam.centre = e.target.checked; relayout(); });
+  syncCam();
+
+  // ---------- Idle pan: the comedy beat ----------
+  // The camera swings round and up to look straight down while the cards keep the facing they had,
+  // so they go paper-thin, then show as lines from above, and flip back to face you at the end.
+  const IDLE_AFTER_MS = 8000;
+  const TOP_PITCH = 84;
+  const RELEASE_SECONDS = 0.35;
+  // t in seconds; yaw is added to the resting camera; top blends pitch from resting to TOP_PITCH
+  const IDLE_KEYS = [
+    { t: 0, yaw: 0, top: 0 },
+    { t: 1.4, yaw: 75, top: 0.1 },
+    { t: 3.0, yaw: 95, top: 1 },
+    { t: 4.3, yaw: 95, top: 1 },
+    { t: 5.8, yaw: 0, top: 0 },
+  ];
+  const idle = { playing: false, releasing: false, t: 0, release: 1, base: null, lastInput: 0, last: 0 };
+
+  const finishRelease = () => {
+    idle.releasing = false;
+    idle.release = 1;
+    freezeIn.checked = false;
+    for (let i = 0; i < props.length; i += 1) props[i].frozen = null;
+  };
+
+  const idleFrame = (ts) => {
+    if (!idle.playing && !idle.releasing) return;
+    const dt = idle.last ? Math.min(0.1, (ts - idle.last) / 1000) : 0;
+    idle.last = ts;
+    if (idle.playing) {
+      idle.t += dt;
+      const end = IDLE_KEYS[IDLE_KEYS.length - 1];
+      let i = 0;
+      while (i < IDLE_KEYS.length - 2 && idle.t > IDLE_KEYS[i + 1].t) i += 1;
+      const a = IDLE_KEYS[i];
+      const b = IDLE_KEYS[i + 1];
+      const k = ease(Math.min(1, Math.max(0, (idle.t - a.t) / (b.t - a.t))));
+      cam.yaw = idle.base.yaw + a.yaw + (b.yaw - a.yaw) * k;
+      const top = a.top + (b.top - a.top) * k;
+      cam.pitch = idle.base.pitch + (TOP_PITCH - idle.base.pitch) * top;
+      if (idle.t >= end.t) {
+        // Back where it started; now the cards flip round to face the camera again
+        cam.yaw = idle.base.yaw;
+        cam.pitch = idle.base.pitch;
+        idle.playing = false;
+        idle.releasing = true;
+        idle.release = 0;
+      }
+    } else {
+      idle.release = Math.min(1, idle.release + dt / RELEASE_SECONDS);
+      if (idle.release >= 1) finishRelease();
+    }
+    relayout();
+    requestAnimationFrame(idleFrame);
+  };
+
+  const startIdle = () => {
+    if (state.reduced || idle.playing) return;
+    idle.playing = true;
+    idle.releasing = false;
+    idle.t = 0;
+    idle.last = 0;
+    idle.release = 0;
+    idle.base = { yaw: cam.yaw, pitch: cam.pitch };
+    for (let i = 0; i < props.length; i += 1) props[i].frozen = liveFacing(props[i]);
+    requestAnimationFrame(idleFrame);
+  };
+
+  // Input cuts it short: the camera snaps back and the cards face you at once
+  const cancelIdle = () => {
+    if (!idle.playing && !idle.releasing) return;
+    if (idle.base) {
+      cam.yaw = idle.base.yaw;
+      cam.pitch = idle.base.pitch;
+    }
+    idle.playing = false;
+    finishRelease();
+    relayout();
+  };
+
+  const noteInput = () => {
+    idle.lastInput = performance.now();
+    cancelIdle();
+  };
+  ['pointerdown', 'keydown', 'wheel'].forEach((type) => document.addEventListener(type, noteInput, true));
+  idle.lastInput = performance.now();
+  $('idle-play').addEventListener('click', startIdle);
+  // Waiting on the player: a menu is open, the fight isn't running, and nothing has been pressed for a while
+  setInterval(() => {
+    if (!$('idle-auto').checked || idle.playing || idle.releasing || state.running || cmd.hidden) return;
+    if (performance.now() - idle.lastInput >= IDLE_AFTER_MS) startIdle();
+  }, 500);
+
+  showCovered.addEventListener('change', markCovered);
+  showSafe.addEventListener('change', markCovered);
+
+  // ---------- Ramp strips ----------
+  const rampColor = $('ramp-color');
+  const rampLight = $('ramp-light');
+  for (let i = 0; i <= 60; i += 1) {
+    const c = ramp(1 - i / 60);
+    const a = document.createElement('span');
+    a.style.background = css(c);
+    rampColor.appendChild(a);
+    const b = document.createElement('span');
+    b.style.background = `oklch(${c.L.toFixed(3)} 0 0)`;
+    rampLight.appendChild(b);
+  }
+
+  buildPanel();
+  updateCamera();
+  buildProps();
+  buildMemberPick();
+  buildStatuses();
+  render();
+  relayout();
+  // Web fonts change the panel's size once they load
+  if (document.fonts) document.fonts.ready.then(() => { relayout(); placeMenu(true); render(); });
+})();
+</script>
+</body>
+</html>
