@@ -26,7 +26,7 @@ Chunk coordinates are offset by 10000 to ensure all filenames are non-negative. 
 
 #### Version 2: Inline Chunk Format (Current)
 
-The loader expects version 2 (`EXPECTED_SCHEMA_VERSION` in `src/services/chunkLoader.ts`). A file with another version still loads, but logs a "version mismatch" warning, so an out-of-date file shows up in the console rather than failing silently.
+The loader expects version 2 (`EXPECTED_SCHEMA_VERSION` in `src/core/chunkLoader.ts`). A file with another version still loads, but logs a "version mismatch" warning, so an out-of-date file shows up in the console rather than failing silently.
 
 **Version history:**
 

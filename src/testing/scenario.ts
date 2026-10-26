@@ -1,4 +1,3 @@
-import { vi } from 'vitest';
 import { TypeSafeEventBus } from '../core/events';
 import { createGameState, type GameMode, type GameState } from '../core/gameState';
 import { FIXED_DT, GameLoop } from '../core/gameLoop';
@@ -12,7 +11,7 @@ import NullPromptOverlay from '../platforms/stub/nullPromptOverlay';
 import StubInput from '../platforms/stub/stubInput';
 import type { DisplayCapabilities } from '../services/display';
 import type { PlayerIntent } from '../services/input';
-import { ChunkLoader, type MeshJSON, type NpcJSON } from '../services/chunkLoader';
+import { ChunkLoader, type MeshJSON, type NpcJSON } from '../core/chunkLoader';
 
 export { FIXED_DT };
 
@@ -60,9 +59,6 @@ export interface ScenarioOptions {
 }
 
 export const createScenario = (options: ScenarioOptions = {}): Scenario => {
-    // GameLoop logs every mode change
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-
     const input = new StubInput();
     const gameState = createGameState(options.mode);
     const eventBus = new TypeSafeEventBus();

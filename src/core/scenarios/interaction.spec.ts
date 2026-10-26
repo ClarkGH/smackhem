@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { NpcJSON } from '../../services/chunkLoader';
+import type { NpcJSON } from '../chunkLoader';
 import { createDebugSettings } from '../settings/debugSettings';
 import { createScenario, type Scenario } from '../../testing/scenario';
 

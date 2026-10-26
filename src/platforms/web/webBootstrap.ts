@@ -26,6 +26,10 @@ export const createChunkUpdater = () => {
     // Track chunks currently being loaded to avoid duplicate requests
     const pendingChunkLoads = new Set<string>();
 
+    // The latest update's chunks. Loads and unloads finish out of order, so both check
+    // this rather than their own update's list, which may be out of date by then.
+    let wantedChunks = new Set<string>();
+
     return async (
         world: World,
         playerPosition: Vec3,
@@ -45,6 +49,7 @@ export const createChunkUpdater = () => {
         chunksToLoad.forEach((chunk) => {
             shouldBeLoaded.add(World.getChunkID(chunk.x, chunk.z));
         });
+        wantedChunks = shouldBeLoaded;
 
         // Load missing chunks (parallel loading for performance)
         const loadPromises: Promise<void>[] = [];
@@ -64,8 +69,8 @@ export const createChunkUpdater = () => {
             const loadPromise = assetLoader
                 .loadChunk(chunkId, chunk.x, chunk.z, renderer)
                 .then((newChunk) => {
-                    // Add chunk to world when loaded
-                    world.addChunk(newChunk);
+                    // Dropped if the player has moved on since it was asked for
+                    if (wantedChunks.has(chunkId)) world.addChunk(newChunk);
                     pendingChunkLoads.delete(chunkId);
                 })
                 .catch((error) => {
@@ -79,18 +84,16 @@ export const createChunkUpdater = () => {
         // Wait for all chunks to load (non-blocking in game loop, but tracks completion)
         await Promise.all(loadPromises);
 
-        // Unload chunks outside radius
+        // Unload chunks outside the latest update's radius
         const chunksToUnload: string[] = [];
         Array.from(world.activeChunks.keys()).forEach((chunkId) => {
-            if (!shouldBeLoaded.has(chunkId)) {
+            if (!wantedChunks.has(chunkId)) {
                 chunksToUnload.push(chunkId);
             }
         });
 
         chunksToUnload.forEach((chunkId) => {
             world.removeChunk(chunkId);
-            // Clean up pending load if chunk is being unloaded before it finishes loading
-            pendingChunkLoads.delete(chunkId);
         });
     };
 };

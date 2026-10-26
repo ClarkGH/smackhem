@@ -45,9 +45,7 @@ export default class Instance3DSystem {
         private camera: Camera,
         private eventBus: TypeSafeEventBus,
         private settings: Settings,
-    ) {
-        console.log('2D Instance System Instantiated');
-    }
+    ) {}
 
     private isInstanceTransitionPositionBlocked(position: Vec3): boolean {
         updatePlayerAABB(

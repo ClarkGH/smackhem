@@ -9,12 +9,14 @@ import type { Settings } from './settings/settings';
 export const SCENE_TILE_SIZE = 32; // logical units per tile
 const SCENE_GRID_WIDTH = 25; // 800 / 32
 const SCENE_GRID_HEIGHT = 18.75; // 600 / 32
+// Whole rows in the grid. The last one is partly off screen, but still a full row of tiles.
+const SCENE_GRID_ROWS = Math.ceil(SCENE_GRID_HEIGHT); // 19
 export const SCENE_WIDTH_PX = SCENE_GRID_WIDTH * SCENE_TILE_SIZE; // 800 logical units
 export const SCENE_HEIGHT_PX = Math.round(SCENE_GRID_HEIGHT * SCENE_TILE_SIZE); // 600 logical units
 const SCENE_TRANSITION_DURATION = 1.0; // seconds
 
 interface Scene {
-    collisionGrid: Uint8Array; // Currently a rounded 469 bytes, tile-based (0 = walkable, 1 = solid)
+    collisionGrid: Uint8Array; // 25 x 19 = 475 bytes, tile-based (0 = walkable, 1 = solid)
 }
 
 export class Scene2DSystem {
@@ -56,7 +58,7 @@ export class Scene2DSystem {
             const gridX = Math.floor(newPxX / SCENE_TILE_SIZE);
             const gridY = Math.floor(newPxY / SCENE_TILE_SIZE);
 
-            if (gridX >= 0 && gridX < SCENE_GRID_WIDTH && gridY >= 0 && gridY < SCENE_GRID_HEIGHT) {
+            if (gridX >= 0 && gridX < SCENE_GRID_WIDTH && gridY >= 0 && gridY < SCENE_GRID_ROWS) {
                 const gridIndex = gridY * SCENE_GRID_WIDTH + gridX;
                 const isWalkable = this.scene.collisionGrid[gridIndex] === 0;
 
@@ -120,7 +122,7 @@ export class Scene2DSystem {
     }
 
     private createScene = (): Scene => {
-        const gridSize = Math.round(SCENE_GRID_WIDTH * SCENE_GRID_HEIGHT);
+        const gridSize = SCENE_GRID_WIDTH * SCENE_GRID_ROWS;
         const collisionGrid = new Uint8Array(gridSize);
         // All tiles are walkable (0) by default
 

@@ -58,7 +58,6 @@ describe('createGame on the stub platform', () => {
     };
 
     beforeEach(async () => {
-        vi.spyOn(console, 'log').mockImplementation(() => {});
         platform = await createStubPlatform();
         stub = platform as unknown as StubServices;
         stub.clock.setFixedDeltaTime(1 / 60);

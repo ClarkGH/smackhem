@@ -62,26 +62,39 @@ This pattern:
 src/
 ├─ core/
 │  ├─ camera.ts               # 3D camera math and logic
+│  ├─ camera.spec.ts          # Flat move directions and the camera matrix, filled in place
+│  ├─ chunkLoader.ts          # Chunk JSON parsing and mesh creation
+│  ├─ chunkLoader.spec.ts     # Mesh placement and collision per shape, schema version, NPCs
 │  ├─ collision.ts            # Collision logic
+│  ├─ combat.ts               # Combat rules: HP, attacks, battle outcome (pure)
+│  ├─ combat.spec.ts          # Sheets, HP clamping, damage and battle outcomes
+│  ├─ combatSheets.ts         # Player and enemy sheets and attacks, fixed templates
 │  ├─ events.ts               # Eventing pub/sub systems
 │  ├─ gameLoop.ts             # Game loop logic
 │  ├─ gameState.ts            # Game State logic
 │  ├─ input.ts                # Player input logic
 │  ├─ instance.ts             # Instance systems
+│  ├─ interaction.ts          # What Interact reaches (nearest in range and in front), opens NPC speech
+│  ├─ overheadOverlays.ts     # Places the speech bubble and interact prompt over NPCs' heads
 │  ├─ party.ts                # Party logic
 │  ├─ scene.ts                # Scene system
 │  ├─ world.ts                # World and chunking logic
+│  ├─ world.spec.ts           # Boundary walls between chunks, cached mesh/NPC/collision lists
 │  ├─ audio/
 │  │  ├─ audioSystem.ts       # Owns sound handles, turns audio events into AudioService calls
 │  │  ├─ audioSystem.spec.ts  # Tests for audio event handling (stub audio)
 │  │  ├─ modeAudio.ts         # Game mode changes -> audio requests (ambience, mode sound)
 │  │  └─ modeAudio.spec.ts    # Scenario tests for mode-driven audio (stub platform)
 │  ├─ lighting/
+│  │  ├─ clouds.ts            # Cloud cycle timing, shared with the sky shader
+│  │  ├─ clouds.spec.ts       # Cloud time wraps with no jump, whole noise periods per cycle
 │  │  ├─ environment.ts       # Day/night cycle: sun, moon, ambient, and which body casts shadows
 │  │  ├─ environment.spec.ts  # Shadow caster choice and its dawn/dusk crossfade
 │  │  ├─ renderSystem.ts      # Declares the frame to the renderer: camera, lighting, draws
 │  │  ├─ skyPalette.ts        # TimeOfDayPalette keys: sky, light colors, ambient, stars (holds, wrap), pure
-│  │  └─ skyPalette.spec.ts   # Holds, wrap, continuity, dawn/sunset on the sun's horizon crossings
+│  │  ├─ skyPalette.spec.ts   # Holds, wrap, continuity, dawn/sunset on the sun's horizon crossings
+│  │  ├─ stars.ts             # Star twinkle timing, shared with the sky shader
+│  │  └─ stars.spec.ts        # Star time wraps with no jump, whole twinkle slots per cycle
 │  ├─ menu/
 │  │  ├─ menu.ts              # Menu screen type
 │  │  ├─ menuSystem.ts        # Start-up, pause and Debug menus: screens, navigation, values
@@ -94,9 +107,14 @@ src/
 │  │  └─ debugSettings.ts     # Debug screen values (wireframe, shadows, bias, time), never saved
 │  ├─ scenarios/              # Scenario specs that cross systems (stub platform)
 │  │  ├─ debugMenu.spec.ts    # Debug screen: wireframe, shadows, bias and time reach the renderer
+│  │  ├─ frameCap.spec.ts     # Catch-up after a stall is capped at a quarter second
+│  │  ├─ interaction.spec.ts  # NPC speech: facing, reach, opening, closing, the world waiting
 │  │  ├─ look.spec.ts         # Look timing: mouse once per frame, stick per tick
 │  │  ├─ modeChange.spec.ts   # Game mode changes
-│  │  └─ pause.spec.ts        # Pause, resume and quit-to-menu
+│  │  ├─ npc.spec.ts          # NPC collision, and its billboard's texture and placement
+│  │  ├─ pause.spec.ts        # Pause, resume and quit-to-menu
+│  │  ├─ scene.spec.ts        # 2D scene movement, the whole grid walkable
+│  │  └─ timeOfDay.spec.ts    # Day clock: advances per tick, wraps, stands still when frozen
 │  └─ math/                   # Shared engine math logic
 │     ├─ aabb.ts              # Axis aligned bounding box
 │     ├─ mathHelpers.ts       # Matrix/vector/etc math helper methods
@@ -106,16 +124,18 @@ src/
 │  ├─ input.ts                # Abstract Input service
 │  ├─ clock.ts                # Time service
 │  ├─ assetLoader.ts          # Asset loading service
-│  ├─ chunkLoader.ts          # Chunk JSON parsing and mesh creation
 │  ├─ audio.ts                # Abstract Audio service interface
 │  ├─ display.ts              # Display service: render scale, window size, fullscreen
 │  ├─ menuOverlay.ts          # Menu overlay interface and the MenuView it draws
+│  ├─ promptOverlay.ts        # Interact prompt interface and the PromptView it draws
+│  ├─ speechOverlay.ts        # Speech bubble interface and the SpeechView it draws
 │  ├─ save.ts                 # Save data and save service (seam only, not implemented)
 │  ├─ storage.ts              # Key-value storage service (settings, later saves)
 │  └─ platform.ts             # Platform services interface
 ├─ platforms/
 │  ├─ web/
 │  │  ├─ webBootstrap.ts      # Bootstraps the webGL game engine
+│  │  ├─ webBootstrap.spec.ts # Chunk streaming when loads finish out of order
 │  │  ├─ webClock.ts          # Web platform clock implementation
 │  │  ├─ webAssetLoader.ts    # Web asset loader (chunks)
 │  │  ├─ webDisplay.ts        # Canvas fills its container, render scale, fullscreen on the container
@@ -139,6 +159,9 @@ src/
 │  │  │  ├─ webMenuOverlay.spec.ts # Drawing, mouse hit areas against drawn text, scrolling (fake DOM)
 │  │  │  ├─ menuHitTest.ts    # Mouse position to menu item, and menu scrolling (pure math)
 │  │  │  └─ menuHitTest.spec.ts # Hit-test, CSS-scaling and scrolling tests
+│  │  ├─ overlays/
+│  │  │  ├─ webPromptOverlay.ts # Interact key hint over the target, label follows the last device
+│  │  │  └─ webSpeechOverlay.ts # Speech bubble, a placed div over the canvas
 │  │  └─ audio/
 │  │     ├─ webAudioService.ts # Web audio playback and mixing service
 │  │     └─ webAudioService.spec.ts # Playback, loading, autoplay retry, and the AudioService contract
@@ -146,6 +169,8 @@ src/
 │  │  ├─ nullRenderer.ts      # Stub renderer for testing/validation
 │  │  ├─ nullRenderer.spec.ts # Tests for stub renderer
 │  │  ├─ nullMenuOverlay.ts   # Stub menu overlay, keeps the last view for tests
+│  │  ├─ nullPromptOverlay.ts # Stub interact prompt, keeps a copy of the last view
+│  │  ├─ nullSpeechOverlay.ts # Stub speech bubble, keeps a copy of the last view and counts renders
 │  │  ├─ memoryStore.ts       # Stub key-value storage, in memory
 │  │  ├─ stubDisplay.ts       # Stub display, records requests, tests play the platform's side
 │  │  ├─ stubBootstrap.ts     # Stub platform bootstrap
@@ -162,6 +187,7 @@ src/
 ├─ index.html                 # HTML entry point for web platform
 ├─ game.ts                    # createGame(platform): wires settings, display, audio, chunks, GameLoop
 ├─ game.spec.ts               # Boot smoke test: createGame on the stub platform, a whole session
+├─ projectStructure.spec.ts   # Fails when this tree and src/ disagree (see Testing)
 └─ main.ts                    # Entry point: picks the platform, runs game.frame() every animation frame
 ```
 
@@ -185,7 +211,8 @@ Chunk files use offset-based naming to prevent negative coordinates in filenames
 
 ```text
 scripts/
-└─ audio-aliases.sh           # FFMPEG trim and compression scripts
+├─ audio-aliases.sh           # FFMPEG trim and compression scripts
+└─ mutate.sh                  # Mutation check: break a line on purpose, see if a spec notices
 ```
 
 ## Root Level Configuration
@@ -194,10 +221,16 @@ Root level configuration:
 
 - `package.json` - Project dependencies and scripts
 - `pnpm-lock.yaml` - Dependency lock file
+- `pnpm-workspace.yaml` - pnpm settings: which dependencies may run install scripts
 - `tsconfig.json` - TypeScript configuration
 - `vite.config.mts` - Vite build configuration
+- `vitest.config.ts` - Test configuration: mocks and stubbed globals restored after every test
+- `.eslintrc.json` - Lint rules: airbnb-base with TS-aware overrides
+- `.claude/` - Claude Code settings: hooks run the gates (typecheck after edits, tests and lint before stopping), docs edits ask first
 - `LICENSE` - Project license
 - `README.md` - Project documentation
+- `CLAUDE.md` - Rules for Claude working in this repo
+- `DESIGN.md` - Entry point to the design docs
 - `docs/` - Project documentation directory
 
 ## Testing
@@ -211,6 +244,7 @@ Specs sit next to the code they test (`*.spec.ts`). `pnpm test` runs them all, `
 - **Web platform tests:** browser APIs are replaced by small fakes (`fakeDom.ts`, `fakeWebAudio.ts`) that only implement what our code calls. No DOM library.
 - **Boot smoke test** (`src/game.spec.ts`): the same wiring `main.ts` runs, on the stub platform, through a whole session.
 - **Clean state:** `vitest.config.ts` restores spies, mocks and stubbed globals after every test.
+- **This doc is a gate** (`src/projectStructure.spec.ts`): every file in `src/` must appear in the tree above, and every file in the tree must exist. Adding, moving or deleting a file turns `pnpm test` red until the tree matches. It checks names only, so keep the descriptions honest by hand. The private platform folders are skipped.
 
 ## Future Structure
 

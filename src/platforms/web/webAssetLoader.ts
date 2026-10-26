@@ -1,6 +1,6 @@
 import type { AssetLoader } from '../../services/assetLoader';
 import type { MapData } from '../../types/common';
-import { ChunkLoader } from '../../services/chunkLoader';
+import { ChunkLoader } from '../../core/chunkLoader';
 import type { Renderer } from '../../services/renderer';
 import type { Chunk } from '../../core/world';
 

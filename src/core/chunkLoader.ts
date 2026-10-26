@@ -1,9 +1,9 @@
-import type { Renderer } from './renderer';
-import type { Chunk, Npc, StaticMesh } from '../core/world';
+import type { Renderer } from '../services/renderer';
+import type { Chunk, Npc, StaticMesh } from './world';
 import type { Vec3 } from '../types/common';
-import { AABB, createAABB } from '../core/math/aabb';
-import { createTranslationMatrix } from '../core/math/mathHelpers';
-import { CHUNK_SIZE } from '../core/world';
+import { AABB, createAABB } from './math/aabb';
+import { createTranslationMatrix } from './math/mathHelpers';
+import { CHUNK_SIZE } from './world';
 
 /**
  * JSON representation of a mesh (from file)

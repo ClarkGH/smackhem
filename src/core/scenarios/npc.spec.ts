@@ -4,7 +4,7 @@ import {
     expect,
     vi,
 } from 'vitest';
-import type { NpcJSON } from '../../services/chunkLoader';
+import type { NpcJSON } from '../chunkLoader';
 import { createScenario, type Scenario } from '../../testing/scenario';
 
 // One unit ahead of where the player can stand, straight down the starting view (-z)

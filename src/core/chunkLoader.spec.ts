@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 import { ChunkLoader } from './chunkLoader';
 import NullRenderer from '../platforms/stub/nullRenderer';
-import { CHUNK_SIZE } from '../core/world';
+import { CHUNK_SIZE } from './world';
 
 // One mesh of each solid shape, base at pos[1], in chunk (1, 2)
 const SHAPES = [

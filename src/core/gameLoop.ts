@@ -220,10 +220,6 @@ export class GameLoop {
         );
         this.overheadOverlays = new OverheadOverlays(this.world, this.renderSystem, speechOverlay, promptOverlay);
 
-        this.eventBus.subscribe('game_mode_changed', (event) => {
-            console.log(`event - ${event.type}\n`, `curr mode: ${event.currentMode}\n`, `prev mode: ${event.previousMode}`);
-        });
-
         this.eventBus.subscribe('quit_to_main_menu_requested', () => this.quitToMainMenu());
         this.eventBus.subscribe('scene_2d_requested', () => this.scene2DSystem.enter(this.gameState));
 

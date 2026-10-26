@@ -34,7 +34,7 @@ It's been over 5 years of studying 3D. I can now say I've "put a pin" on quatern
 │  ├─ main.ts        # entrypoint
 │  ├─ core/          # engine core systems (camera, collision, gameLoop, world, etc.)
 │  ├─ platforms/     # platform specific code (web, stub, cpu)
-│  ├─ services/      # services (renderer, input, clock, assetLoader, chunkLoader)
+│  ├─ services/      # services (renderer, input, clock, assetLoader)
 │  └─ types/         # common types
 ├─ /public           # static assets
 │  ├─ chunks/        # chunk JSON files (offset-based naming: 10000_10000.json)
