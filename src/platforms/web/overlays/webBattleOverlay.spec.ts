@@ -34,10 +34,10 @@ const view = (extra: Partial<BattleView> = {}): BattleView => ({
 
 type TextElement = FakeElement & { textContent: string };
 
-// The visible rows of a panel, as text
-const shownText = (panel: FakeElement): string[] => panel.children
+// The visible rows of a panel, as [mark, label]: the mark sits in its own fixed-width slot
+const shownText = (panel: FakeElement): string[][] => panel.children
     .filter((row) => row.style.display !== 'none')
-    .map((row) => (row as TextElement).textContent);
+    .map((row) => row.children.map((span) => (span as TextElement).textContent ?? ''));
 
 describe('WebBattleOverlay', () => {
     let overlay: WebBattleOverlay;
@@ -79,8 +79,8 @@ describe('WebBattleOverlay', () => {
             })],
         }));
 
-        expect(shownText(party)).toEqual(['▶ Circle  HP 20/20  ■■■■■■■■']);
-        expect(shownText(enemies)).toEqual(['▼ Evil Circle']);
+        expect(shownText(party)).toEqual([['▶', 'Circle  HP 20/20  ■■■■■■■■']]);
+        expect(shownText(enemies)).toEqual([['▼', 'Evil Circle']]);
     });
 
     it('greys out and strikes through a defeated enemy', () => {
@@ -96,7 +96,7 @@ describe('WebBattleOverlay', () => {
     it('shows the command list with the selected row marked, and hides it while nobody is choosing', () => {
         overlay.render(view());
         expect(commands.style.display).toBe('block');
-        expect(shownText(commands)).toEqual(['▶ Attack']);
+        expect(shownText(commands)).toEqual([['▶', 'Attack']]);
 
         overlay.render(view({ commands: null }));
         expect(commands.style.display).toBe('none');
@@ -109,15 +109,15 @@ describe('WebBattleOverlay', () => {
         overlay.render(view({ party: [combatant({ hp: 18 })] }));
 
         expect(party.children[0]).toBe(row);
-        expect(shownText(party)).toEqual(['  Circle  HP 18/20  ■■■■■■■■']);
+        expect(shownText(party)).toEqual([['', 'Circle  HP 18/20  ■■■■■■■■']]);
     });
 
     it('draws the party\'s ATB gauge as eight blocks, full only when the gauge is', () => {
         overlay.render(view({ party: [combatant({ atb: 0.5 })] }));
-        expect(shownText(party)).toEqual(['  Circle  HP 20/20  ■■■■□□□□']);
+        expect(shownText(party)).toEqual([['', 'Circle  HP 20/20  ■■■■□□□□']]);
 
         overlay.render(view({ party: [combatant({ atb: 0.99 })] }));
-        expect(shownText(party)).toEqual(['  Circle  HP 20/20  ■■■■■■■□']);
+        expect(shownText(party)).toEqual([['', 'Circle  HP 20/20  ■■■■■■■□']]);
     });
 
     it('fades a command that can\'t be chosen', () => {

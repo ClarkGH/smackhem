@@ -40,6 +40,12 @@ describe('WebMenuOverlay', () => {
 
     const drawn = (): DrawnText[] => overlayCanvas.ctx.drawn;
 
+    // The label drawn on the same line as the selection mark, which is drawn on its own
+    const selectedLabel = (): string | undefined => {
+        const mark = drawn().find((d) => d.text === '>');
+        return drawn().find((d) => d !== mark && d.y === mark?.y)?.text;
+    };
+
     // Where a character of a drawn line is, in page coordinates (the overlay isn't scaled here).
     // Uses its last occurrence: '>' is both the selection marker and the value arrow.
     const charPosition = (line: string, char: string): { clientX: number; clientY: number } => {
@@ -89,8 +95,18 @@ describe('WebMenuOverlay', () => {
         const texts = drawn().map((d) => d.text);
 
         expect(texts).toContain('Settings');
-        expect(texts).toContain('> Master Volume   < 100% >');
-        expect(texts).toContain('  Back');
+        expect(texts).toContain('Master Volume   < 100% >');
+        expect(texts).toContain('Back');
+        expect(selectedLabel()).toBe('Master Volume   < 100% >');
+    });
+
+    // A proportional font can't line labels up with spaces, so the mark gets a slot of its own
+    it('starts every label at the same x, selected or not', () => {
+        overlay.render(settingsView);
+        const xOf = (label: string) => drawn().find((d) => d.text.startsWith(label))?.x;
+
+        expect(xOf('Master Volume')).toBe(xOf('Back'));
+        expect(drawn().find((d) => d.text === '>')!.x).toBeLessThan(xOf('Back')!);
     });
 
     describe('mouse', () => {
@@ -154,17 +170,17 @@ describe('WebMenuOverlay', () => {
             overlay.render(longView(0));
             const texts = drawn().map((d) => d.text);
 
-            expect(texts).toContain('> Item 0');
-            expect(texts).not.toContain('  Item 29');
-            expect(texts).toContain('  ...');
+            expect(selectedLabel()).toBe('Item 0');
+            expect(texts).not.toContain('Item 29');
+            expect(texts).toContain('...');
         });
 
         it('scrolls to keep the selection on screen', () => {
             overlay.render(longView(29));
             const texts = drawn().map((d) => d.text);
 
-            expect(texts).toContain('> Item 29');
-            expect(texts).not.toContain('  Item 0');
+            expect(selectedLabel()).toBe('Item 29');
+            expect(texts).not.toContain('Item 0');
         });
 
         it('hidden rows cannot be clicked', () => {

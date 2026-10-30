@@ -169,6 +169,7 @@ src/
 │  │  ├─ localStorageStore.ts # Key-value storage on localStorage, never throws
 │  │  ├─ localStorageStore.spec.ts # Blocked storage, and the KeyValueStore contract
 │  │  ├─ debugHUD.ts          # Debug HUD overlay
+│  │  ├─ uiText.ts            # The UI's sans-serif font, and rows with a fixed slot for the selection mark
 │  │  ├─ rendering/
 │  │  │  ├─ webGLRenderer.ts  # WebGL2 renderer: shaders, shadow map, depth and lit passes
 │  │  │  ├─ webGLRenderer.spec.ts # Setup and a frame's draws, counted on a fake GL context

@@ -6,8 +6,10 @@ import {
     toBufferCoords,
     type MenuItemRects,
 } from './menuHitTest';
+import { UI_FONT_FAMILY } from '../uiText';
 
 const BASE_FONT_SIZE = 24;
+const SELECTED_MARK = '>';
 
 type MenuPointer = NonNullable<PlayerIntent['menuPointer']>;
 
@@ -156,15 +158,17 @@ export default class WebMenuOverlay implements MenuOverlay {
         const lastVisible = this.firstVisible + visibleRows - 1;
 
         ctx.textBaseline = 'top';
-        ctx.font = `bold ${Math.round(fontSize * 1.5)}px monospace`;
+        ctx.font = `bold ${Math.round(fontSize * 1.5)}px ${UI_FONT_FAMILY}`;
         ctx.fillStyle = 'white';
         ctx.fillText(view.title, x, y);
         y += lineHeight * 2;
 
-        ctx.font = `${fontSize}px monospace`;
+        ctx.font = `${fontSize}px ${UI_FONT_FAMILY}`;
+        // Labels start after a fixed slot for the selection mark, so they don't move when it comes and goes
+        const labelX = x + Math.ceil(ctx.measureText(`${SELECTED_MARK} `).width);
         if (this.firstVisible > 0) {
             ctx.fillStyle = '#bbbbbb';
-            ctx.fillText('  ...', x, y - lineHeight * 0.75);
+            ctx.fillText('...', labelX, y - lineHeight * 0.75);
         }
 
         // Hidden rows get an empty rect, so indexes still match the view's items
@@ -181,8 +185,7 @@ export default class WebMenuOverlay implements MenuOverlay {
             }
             const item = view.items[i];
             const isSelected = i === view.selected;
-            const label = `${isSelected ? '> ' : '  '}${item.label}`;
-            let text = label;
+            let text = item.label;
 
             // The whole line is a target, not just the text
             const itemRects: MenuItemRects = {
@@ -192,12 +195,12 @@ export default class WebMenuOverlay implements MenuOverlay {
             };
 
             if (item.value !== undefined) {
-                const beforeValue = `${label}   `;
+                const beforeValue = `${item.label}   `;
                 if (item.adjustable) {
                     const valuePart = `< ${item.value} >`;
                     const arrowWidth = ctx.measureText('<').width;
-                    const leftX = x + ctx.measureText(beforeValue).width;
-                    const rightX = x + ctx.measureText(`${beforeValue}< ${item.value} `).width;
+                    const leftX = labelX + ctx.measureText(beforeValue).width;
+                    const rightX = labelX + ctx.measureText(`${beforeValue}< ${item.value} `).width;
                     itemRects.decrease = {
                         x: leftX - arrowPadding, y: y - rowPadding, width: arrowWidth + arrowPadding * 2, height: lineHeight,
                     };
@@ -215,13 +218,14 @@ export default class WebMenuOverlay implements MenuOverlay {
             } else {
                 ctx.fillStyle = isSelected ? 'white' : '#bbbbbb';
             }
-            ctx.fillText(text, x, y);
+            if (isSelected) ctx.fillText(SELECTED_MARK, x, y);
+            ctx.fillText(text, labelX, y);
             rects.push(itemRects);
             y += lineHeight;
         }
         if (lastVisible < view.items.length - 1) {
             ctx.fillStyle = '#bbbbbb';
-            ctx.fillText('  ...', x, y);
+            ctx.fillText('...', labelX, y);
         }
         this.itemRects = rects;
     }

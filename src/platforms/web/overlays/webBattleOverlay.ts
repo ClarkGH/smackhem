@@ -1,13 +1,15 @@
 import type { BattleOverlay, BattleView, CombatantView } from '../../../services/battleOverlay';
+import { UI_FONT_FAMILY, createMarkedRow, setMarkedRow } from '../uiText';
 
 // The base text size at 1x, scaled by the view's textScale
 const BASE_FONT_PX = 16;
 
-// Shapes, so acting, targeted and selected never rely on color alone (battle.md, The battle screen)
-const ACTING_MARK = '▶ ';
-const TARGET_MARK = '▼ ';
-const SELECTED_MARK = '▶ ';
-const NO_MARK = '  ';
+// Shapes, so acting, targeted and selected never rely on color alone (battle.md, The battle screen).
+// Each sits in its row's fixed mark slot, so names don't move when one comes or goes.
+const ACTING_MARK = '▶';
+const TARGET_MARK = '▼';
+const SELECTED_MARK = '▶';
+const NO_MARK = '';
 
 // The ATB gauge as blocks, rounded down so it only shows full when it is (a stand-in for the portrait border)
 const GAUGE_BLOCKS = 8;
@@ -17,13 +19,12 @@ const gaugeText = (atb: number | null): string => {
     return `  ${'■'.repeat(filled)}${'□'.repeat(GAUGE_BLOCKS - filled)}`;
 };
 
-const partyText = (c: CombatantView): string => `${c.isActing ? ACTING_MARK : NO_MARK}${c.name}  HP ${c.hp ?? '?'}/${c.maxHp ?? '?'}${gaugeText(c.atb)}`;
+const partyText = (c: CombatantView): string => `${c.name}  HP ${c.hp ?? '?'}/${c.maxHp ?? '?'}${gaugeText(c.atb)}`;
 
-const enemyText = (c: CombatantView): string => {
-    let mark = NO_MARK;
-    if (c.isTargeted) mark = TARGET_MARK;
-    else if (c.isActing) mark = ACTING_MARK;
-    return `${mark}${c.name}`;
+const enemyMark = (c: CombatantView): string => {
+    if (c.isTargeted) return TARGET_MARK;
+    if (c.isActing) return ACTING_MARK;
+    return NO_MARK;
 };
 
 // A styled div added to parent
@@ -44,7 +45,7 @@ const setText = (element: HTMLElement, text: string): void => {
 const rowAt = (list: HTMLDivElement, i: number): HTMLDivElement => {
     let row = list.children[i] as HTMLDivElement | undefined;
     if (!row) {
-        row = document.createElement('div');
+        row = createMarkedRow();
         list.appendChild(row);
     }
     row.style.display = 'block';
@@ -82,7 +83,14 @@ export default class WebBattleOverlay implements BattleOverlay {
         }
 
         this.root = panel(container, {
-            position: 'absolute', inset: '0', display: 'none', pointerEvents: 'none', fontFamily: 'monospace', color: '#fff',
+            position: 'absolute',
+            inset: '0',
+            display: 'none',
+            pointerEvents: 'none',
+            fontFamily: UI_FONT_FAMILY,
+            // Every digit the same width, so HP doesn't shift the line as it changes
+            fontVariantNumeric: 'tabular-nums',
+            color: '#fff',
         });
         this.banner = panel(this.root, {
             position: 'absolute', top: '0', left: '0', right: '0', padding: '6px 12px', background: 'rgba(0, 0, 0, 0.7)', textAlign: 'center',
@@ -113,7 +121,7 @@ export default class WebBattleOverlay implements BattleOverlay {
         const { enemyList, partyList, commandList } = this;
         view.enemies.forEach((enemy, i) => {
             const row = rowAt(enemyList, i);
-            setText(row, enemyText(enemy));
+            setMarkedRow(row, enemyMark(enemy), enemy.name);
             row.style.textDecoration = enemy.isDefeated ? 'line-through' : 'none';
             row.style.opacity = enemy.isDefeated ? '0.5' : '1';
         });
@@ -121,7 +129,7 @@ export default class WebBattleOverlay implements BattleOverlay {
 
         view.party.forEach((member, i) => {
             const row = rowAt(partyList, i);
-            setText(row, partyText(member));
+            setMarkedRow(row, member.isActing ? ACTING_MARK : NO_MARK, partyText(member));
             row.style.opacity = member.isDefeated ? '0.5' : '1';
         });
         hideRowsFrom(partyList, view.party.length);
@@ -130,7 +138,7 @@ export default class WebBattleOverlay implements BattleOverlay {
         if (commands) {
             commands.items.forEach((item, i) => {
                 const row = rowAt(commandList, i);
-                setText(row, `${i === commands.selected ? SELECTED_MARK : NO_MARK}${item.label}`);
+                setMarkedRow(row, i === commands.selected ? SELECTED_MARK : NO_MARK, item.label);
                 // Shown but can't be chosen, like Run in a fight you can't leave
                 row.style.opacity = item.disabled ? '0.4' : '1';
             });

@@ -1,5 +1,6 @@
 import type { PromptOverlay, PromptView } from '../../../services/promptOverlay';
 import type { InputDevice } from '../input/webInput';
+import { UI_FONT_FAMILY } from '../uiText';
 
 // The Interact button on each device, see docs/controls.md
 const INTERACT_LABEL: Record<InputDevice, string> = { keyboard: 'E', gamepad: 'Ⓐ' };
@@ -25,7 +26,7 @@ export default class WebPromptOverlay implements PromptOverlay {
             color: '#fff',
             border: '1px solid #fff',
             borderRadius: '6px',
-            font: '14px monospace',
+            font: `14px ${UI_FONT_FAMILY}`,
             pointerEvents: 'none',
             transform: 'translate(-50%, -100%)',
         });

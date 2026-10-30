@@ -20,9 +20,10 @@ describe('WebSpeechOverlay', () => {
     let bubble: FakeElement;
     // The option list, and its rows
     let optionList: FakeElement;
-    const rowText = (): string[] => optionList.children
+    // Each visible row as [mark, label]: the mark sits in its own fixed-width slot
+    const rowText = (): string[][] => optionList.children
         .filter((row) => row.style.display !== 'none')
-        .map((row) => (row as unknown as { textContent: string }).textContent);
+        .map((row) => row.children.map((span) => (span as unknown as { textContent?: string }).textContent ?? ''));
 
     beforeEach(() => {
         installFakeDom();
@@ -44,7 +45,7 @@ describe('WebSpeechOverlay', () => {
         overlay.render(view({ options: YES_NO, selected: 0 }));
 
         expect(optionList.style.display).toBe('block');
-        expect(rowText()).toEqual(['▶ Yes', '  No']);
+        expect(rowText()).toEqual([['▶', 'Yes'], ['', 'No']]);
         expect(optionList.children[0].style.fontWeight).toBe('bold');
     });
 
@@ -54,7 +55,7 @@ describe('WebSpeechOverlay', () => {
 
         overlay.render(view({ options: YES_NO, selected: 1 }));
 
-        expect(rowText()).toEqual(['  Yes', '▶ No']);
+        expect(rowText()).toEqual([['', 'Yes'], ['▶', 'No']]);
         expect(optionList.children).toEqual(rows);
     });
 

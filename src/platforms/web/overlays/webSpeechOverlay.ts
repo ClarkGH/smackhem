@@ -1,8 +1,8 @@
 import type { SpeechOverlay, SpeechView } from '../../../services/speechOverlay';
+import { UI_FONT_FAMILY, createMarkedRow, setMarkedRow } from '../uiText';
 
 // Marks the selected option by shape as well as weight, so it never relies on looks alone
-const SELECTED_MARK = '▶ ';
-const UNSELECTED_MARK = '  ';
+const SELECTED_MARK = '▶';
 
 /**
  * Web speech bubble: one absolutely placed div over the canvas, inside the same container.
@@ -39,7 +39,7 @@ export default class WebSpeechOverlay implements SpeechOverlay {
             color: '#000',
             border: '2px solid #000',
             borderRadius: '12px',
-            font: '16px monospace',
+            font: `16px ${UI_FONT_FAMILY}`,
             pointerEvents: 'none',
             // Centered over the anchor, sitting on top of it
             transform: 'translate(-50%, -100%)',
@@ -84,7 +84,7 @@ export default class WebSpeechOverlay implements SpeechOverlay {
         for (let i = 0; i < count; i += 1) {
             const row = this.rows[i] ?? this.addRow();
             const isSelected = i === selected;
-            row.textContent = `${isSelected ? SELECTED_MARK : UNSELECTED_MARK}${options![i]}`;
+            setMarkedRow(row, isSelected ? SELECTED_MARK : '', options![i]);
             row.style.fontWeight = isSelected ? 'bold' : 'normal';
             row.style.display = 'block';
         }
@@ -95,9 +95,8 @@ export default class WebSpeechOverlay implements SpeechOverlay {
     }
 
     private addRow(): HTMLDivElement {
-        const row = document.createElement('div');
-        // Keeps the unselected mark's spaces, so the options line up under each other
-        row.style.whiteSpace = 'pre';
+        // The mark's fixed slot keeps the options lined up under each other
+        const row = createMarkedRow();
         this.optionList.appendChild(row);
         this.rows.push(row);
         return row;
