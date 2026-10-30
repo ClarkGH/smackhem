@@ -68,7 +68,8 @@ export default class EnvironmentSystem {
 
     private readonly moonDirectionForPosition: Vec3 = { x: 0, y: 0, z: 0 };
 
-    constructor(private cameraFar: number) {} // I assure you, this is useful
+    // A parameter property, the empty body is enough to store it as this.cameraFar
+    constructor(private cameraFar: number) {}
 
     // One circle, tilted south by the latitude: due east at 06:00, highest at noon, due west at
     // 18:00, lowest (to the north, under the floor) at midnight. Already unit length.

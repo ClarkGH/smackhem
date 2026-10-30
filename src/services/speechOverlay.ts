@@ -6,6 +6,8 @@ export interface SpeechView {
     // Anchor over the NPC's head, 0..1 across the viewport, y down
     x: number;
     y: number;
+    // Null for a plain line. Selected indexes options.
+    choice: { options: readonly string[]; selected: number } | null;
 }
 
 /**

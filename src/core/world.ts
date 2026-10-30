@@ -23,6 +23,9 @@ export interface Npc {
     size: number;
     collisionAABB: AABB;
     line: string;
+    encounterId?: string;
+    // What starts its fight, always set once loaded: talk (the Yes/No question) or touch
+    startsFightOn: 'talk' | 'touch';
 }
 
 export interface Chunk {
@@ -37,7 +40,7 @@ export interface Chunk {
 export class World {
     private readonly chunks: Map<ChunkID, Chunk> = new Map();
 
-    // Read-only, so only addChunk and removeChunk change the world and the lists below never go stale
+    // Read-only, so only addChunk, removeChunk and setHiddenNpcs change the world and the lists below never go stale
     public readonly activeChunks: ReadonlyMap<ChunkID, Chunk> = this.chunks;
 
     // Built from the chunks whenever one is added or removed, never per tick (M-1, M-2)
@@ -49,17 +52,29 @@ export class World {
 
     private readonly collidableAABBs: AABB[] = [];
 
+    // Filled only by setHiddenNpcs
+    private readonly hiddenNpcIds: Set<string> = new Set();
+
     public static getChunkID(x: number, z: number): ChunkID {
         return `${x},${z}`;
     }
 
     public addChunk(chunk: Chunk) {
+        this.warnOnDuplicateNpcIds(chunk);
         this.chunks.set(chunk.id, chunk);
         this.rebuild();
     }
 
     public removeChunk(chunkId: ChunkID) {
         if (!this.chunks.delete(chunkId)) return;
+        this.rebuild();
+    }
+
+    // NPCs left out of the visible and collidable lists, by id. Replaces the whole set and rebuilds.
+    // World doesn't know why (beaten now, event flags later), it just leaves them out.
+    public setHiddenNpcs(ids: readonly string[]): void {
+        this.hiddenNpcIds.clear();
+        for (let i = 0; i < ids.length; i += 1) this.hiddenNpcIds.add(ids[i]);
         this.rebuild();
     }
 
@@ -117,8 +132,33 @@ export class World {
         return this.boundaryWalls;
     }
 
-    // Refills every list from the chunks. Runs on chunk add and remove, so its allocations
-    // happen at the allocation boundary (M-2), not per tick. Indexed loops, no spread (M-3).
+    // Placement ids are unique across every chunk (data-formats.md), and saves depend on it:
+    // two placements sharing one would be hidden together when either is beaten
+    private warnOnDuplicateNpcIds(chunk: Chunk): void {
+        this.chunks.forEach((loaded) => {
+            // The same chunk loading again replaces itself, it doesn't duplicate
+            if (loaded.id === chunk.id) return;
+            for (let i = 0; i < chunk.npcs.length; i += 1) {
+                for (let j = 0; j < loaded.npcs.length; j += 1) {
+                    if (chunk.npcs[i].id === loaded.npcs[j].id) {
+                        console.warn(`Duplicate NPC id "${chunk.npcs[i].id}" in chunk ${chunk.id}, already in chunk ${loaded.id}`);
+                    }
+                }
+            }
+        });
+    }
+
+    // Whether a chunk collision box belongs to one of its hidden NPCs (the loader adds NPC boxes to the chunk's)
+    private isHiddenNpcBox(chunk: Chunk, box: AABB): boolean {
+        for (let i = 0; i < chunk.npcs.length; i += 1) {
+            if (chunk.npcs[i].collisionAABB === box) return this.hiddenNpcIds.has(chunk.npcs[i].id);
+        }
+        return false;
+    }
+
+    // Refills every list from the chunks, leaving out hidden NPCs and their boxes. Runs on chunk add and remove
+    // and on setHiddenNpcs, so its allocations happen at the allocation boundary (M-2), not per tick.
+    // Indexed loops, no spread (M-3).
     private rebuild(): void {
         this.visibleMeshes.length = 0;
         this.visibleNpcs.length = 0;
@@ -126,8 +166,13 @@ export class World {
 
         this.chunks.forEach((chunk) => {
             for (let i = 0; i < chunk.meshes.length; i += 1) this.visibleMeshes.push(chunk.meshes[i]);
-            for (let i = 0; i < chunk.npcs.length; i += 1) this.visibleNpcs.push(chunk.npcs[i]);
-            for (let i = 0; i < chunk.collisionAABBs.length; i += 1) this.collidableAABBs.push(chunk.collisionAABBs[i]);
+            for (let i = 0; i < chunk.npcs.length; i += 1) {
+                if (!this.hiddenNpcIds.has(chunk.npcs[i].id)) this.visibleNpcs.push(chunk.npcs[i]);
+            }
+            for (let i = 0; i < chunk.collisionAABBs.length; i += 1) {
+                const box = chunk.collisionAABBs[i];
+                if (!this.isHiddenNpcBox(chunk, box)) this.collidableAABBs.push(box);
+            }
         });
 
         // Every chunk's walls, since adding or removing one changes its neighbours' walls too

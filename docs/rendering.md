@@ -451,8 +451,8 @@ A billboard faces the camera, but casts from a card that faces the light (so its
 ### Known Limits
 
 - **Shadows dim both bodies' diffuse light**, not just the caster's: the renderer only gets a direction, not which body. The crossfade keeps the other body dim whenever shadows are strong. Local lights (sconces, lanterns) will need this per light.
-- **Billboard models are assumed upright**: anchor in the translation, size from the first column. True of every current `drawTexturedQuad`.
-- **Sprites have almost no shadow at noon**: a flat card seen from straight above casts a line. If characters need grounding then, a small blob shadow under them is the usual addition.
+- **Billboard models are read for anchor and size only**: anchor in the translation, size from the first column. True of every current `drawTexturedQuad`, upright or tilted (the Debug screen's Tilt Billboards leans them back to face the camera, see [battle.md](battle.md#drawing-the-fight)).
+- **Sprites have almost no shadow at noon**: a flat card seen from straight above casts a line. Combatants can get a blob shadow under them, behind a Debug toggle and off by default: it's an ordinary lit mesh, not a blended shadow, so it reads as a dark puck until the renderer can blend it.
 - **One map**: if shadows far from the camera look blocky, cascaded shadow maps (several maps at increasing distance) are the usual upgrade.
 
 ## 2D Sprite Rendering (Instance Characters)
@@ -466,13 +466,13 @@ interface Renderer {
     // ... existing methods ...
     loadTexture(_assetId: string): Promise<TextureHandle>;
     // model: the billboard's own transform; the renderer applies the view-projection
-    drawTexturedQuad(_texture: TextureHandle, _model: Mat4, _size: number, _normal?: Vec3): void;
+    drawTexturedQuad(_texture: TextureHandle, _model: Mat4, _normal?: Vec3): void;
 }
 ```
 
 ### Implementation Details
 
-- **Texture Loading**: Assets are requested by logical ID (e.g., `'circle-sleep00'`), not file paths (compliant with RULE A-1)
+- **Texture Loading**: Assets are requested by logical ID (e.g., `'circle_sleep_1'`), not file paths (compliant with RULE A-1)
 - **Texture Format**: RGBA images with alpha channel for transparency
 - **Alpha Blending**: Enabled for sprite rendering (`SRC_ALPHA, ONE_MINUS_SRC_ALPHA`)
 - **Billboard Calculation**: Sprites are oriented to face the camera while remaining vertical (calculated on CPU)
@@ -518,6 +518,7 @@ No GPU calls should appear outside the renderer layer. All WebGL/GPU operations 
 - **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
 - **[Controls](controls.md)** - Keyboard, mouse and controller bindings
 - **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure

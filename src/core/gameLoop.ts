@@ -1,7 +1,8 @@
 import type { Renderer, TextureHandle } from '../services/renderer';
-import type { Input, PlayerIntent } from '../services/input';
+import type { Input, PlayerIntent, Step } from '../services/input';
 import type { MenuOverlay } from '../services/menuOverlay';
 import type { SpeechOverlay } from '../services/speechOverlay';
+import type { BattleOverlay } from '../services/battleOverlay';
 import type { PromptOverlay } from '../services/promptOverlay';
 import type { DisplayCapabilities } from '../services/display';
 import type { TypeSafeEventBus } from './events';
@@ -31,11 +32,17 @@ import { createGameState, GameState } from './gameState';
 import Instance3DSystem from './instance';
 import MenuSystem from './menu/menuSystem';
 import { createDefaultSettings, type Settings } from './settings/settings';
-import { QUARTERS_PER_DAY, type DebugSettings } from './settings/debugSettings';
+import {
+    QUARTERS_PER_DAY,
+    createDebugSettings,
+    type DebugSettings,
+} from './settings/debugSettings';
+import { battleCameraInto } from './battle/battleField';
 import EnvironmentSystem, { DAY_LENGTH_SECONDS } from './lighting/environment';
 import RenderSystem from './lighting/renderSystem';
 import InteractionSystem, { type Interactor } from './interaction';
 import OverheadOverlays from './overheadOverlays';
+import BattleSystem from './battle/battleSystem';
 
 // Simulation step, 60 ticks per second. Exported so tests step the loop exactly.
 export const FIXED_DT = 1 / 60;
@@ -80,6 +87,8 @@ export interface GameLoopOptions {
     speechOverlay?: SpeechOverlay;
     // The interact prompt over the target, nothing shown when left out
     promptOverlay?: PromptOverlay;
+    // The battle screen, nothing shown when left out
+    battleOverlay?: BattleOverlay;
     // Shared with the menu and main.ts, defaults when left out
     settings?: Settings;
     // What the platform's display can do, nothing when left out
@@ -108,6 +117,8 @@ export class GameLoop {
 
     private interactionSystem: InteractionSystem;
 
+    private battleSystem: BattleSystem;
+
     private partyMemberTexture1: TextureHandle | null = null;
 
     // Core objects
@@ -128,11 +139,19 @@ export class GameLoop {
 
     private menuOverlay?: MenuOverlay;
 
+    private battleOverlay?: BattleOverlay;
+
+    // Whether the battle screen is up, so hiding it is sent once, not every frame after
+    private battleShown = false;
+
     // Shared, changed in place by the menu
     private settings: Settings;
 
     // Shared, changed in place by the Debug screen
     private debugSettings?: DebugSettings;
+
+    // What rendering and the battle layout read: the Debug screen's settings, or the defaults without one (D-1)
+    private readonly debugOrDefaults: Readonly<DebugSettings>;
 
     // Constants
     private readonly WALL_DEBUG_COLOR: Vec3 = { x: 1, y: 0, z: 0 }; // Color of the wall debug mesh
@@ -142,6 +161,18 @@ export class GameLoop {
 
     // Mouse look waiting for the next tick, so a frame that runs no tick doesn't drop it
     private readonly pendingLook = { yaw: 0, pitch: 0 };
+
+    // Presses waiting for the next tick, for the same reason. Copied, not referenced:
+    // the input service could reuse its objects next frame. The instance and HUD toggles act per frame, so aren't here.
+    private readonly pendingPresses = {
+        interact: false,
+        back: false,
+        menu: false,
+        hasNavigate: false,
+        navigate: { x: 0 as Step, y: 0 as Step },
+        hasPointer: false,
+        pointer: { index: 0, clicked: false, step: undefined as -1 | 1 | undefined },
+    };
 
     // Camera as it was before the latest tick
     private readonly previousCamera = {
@@ -178,6 +209,7 @@ export class GameLoop {
         menuOverlay,
         speechOverlay,
         promptOverlay,
+        battleOverlay,
         settings,
         displayCapabilities,
         debugSettings,
@@ -191,9 +223,11 @@ export class GameLoop {
         this.settings = settings ?? createDefaultSettings();
         this.scene2DSystem = new Scene2DSystem(this.eventBus, this.settings);
         this.debugSettings = debugSettings;
+        this.debugOrDefaults = debugSettings ?? createDebugSettings();
         this.menuSystem = new MenuSystem(this.eventBus, this.settings, displayCapabilities, debugSettings);
         this.debugHUD = debugHUD;
         this.menuOverlay = menuOverlay;
+        this.battleOverlay = battleOverlay;
 
         // Core objects
         this.camera = createCamera();
@@ -201,6 +235,7 @@ export class GameLoop {
         this.instance3DSystem = new Instance3DSystem(this.collisionContext, this.world, this.camera, this.eventBus, this.settings);
         this.environmentSystem = new EnvironmentSystem(this.camera.far);
         this.interactionSystem = new InteractionSystem(this.world);
+        this.battleSystem = new BattleSystem(this.eventBus, this.world, this.settings, this.debugOrDefaults.battleLayout);
 
         // Seed camera
         this.camera.position = { ...this.gameState.interpolated.cameraPosition };
@@ -222,6 +257,9 @@ export class GameLoop {
 
         this.eventBus.subscribe('quit_to_main_menu_requested', () => this.quitToMainMenu());
         this.eventBus.subscribe('scene_2d_requested', () => this.scene2DSystem.enter(this.gameState));
+        this.eventBus.subscribe('choice_made', (event) => this.battleSystem.answer(event));
+        this.eventBus.subscribe('battle_requested', (event) => this.battleSystem.start(this.gameState, event));
+        this.eventBus.subscribe('game_over_requested', () => this.enterGameOver());
 
         // Load party textures asynchronously
         this.loadPartyTextures();
@@ -230,7 +268,7 @@ export class GameLoop {
     // TODO: Load 4 different shapes that match from a list of choices.
     private async loadPartyTextures(): Promise<void> {
         try {
-            this.partyMemberTexture1 = await this.renderer.loadTexture('circle-sleep00');
+            this.partyMemberTexture1 = await this.renderer.loadTexture('circle_sleep_1');
         } catch (error) {
             console.error('Failed to load circle texture:', error);
         }
@@ -253,8 +291,9 @@ export class GameLoop {
         this.pendingLook.yaw = 0;
         this.pendingLook.pitch = 0;
 
-        // The menu button pauses play. Nothing else runs this tick.
-        if (intent.menu && discreteState.gameMode !== 'main_menu' && !discreteState.isPaused) {
+        // The menu button pauses play. Nothing else runs this tick. The title and game over screens can't be paused.
+        const onMenuMode = discreteState.gameMode === 'main_menu' || discreteState.gameMode === 'game_over';
+        if (intent.menu && !onMenuMode && !discreteState.isPaused) {
             discreteState.isPaused = true;
             this.menuSystem.openPause();
             return;
@@ -262,7 +301,7 @@ export class GameLoop {
 
         // The menu owns the tick, so confirming New Game can't also reach the scene's interact.
         // Paused, the simulation stops: no movement, transitions or day/night.
-        if (discreteState.gameMode === 'main_menu' || discreteState.isPaused) {
+        if (onMenuMode || discreteState.isPaused) {
             this.menuSystem.update(this.gameState, intent);
             return;
         }
@@ -270,10 +309,16 @@ export class GameLoop {
         // Set again below by whichever interactor runs this tick, so it's never stale (no prompt while talking)
         discreteState.interactTarget = null;
 
-        // A conversation is modal: the world waits (no time, moving or looking) until Interact or Back closes it.
+        // A fight owns the tick, and the world waits (no time, moving or looking) until it ends
+        if (discreteState.gameMode === 'battle_25djrpg') {
+            this.battleSystem.update(this.gameState, intent, dt);
+            return;
+        }
+
+        // A conversation is modal: the world waits (no time, moving or looking) until it closes.
         // Returning here also means the closing press can't open a new one.
         if (discreteState.activeSpeech) {
-            if (intent.interact || intent.back) discreteState.activeSpeech = null;
+            this.updateSpeech(intent);
             return;
         }
 
@@ -303,9 +348,10 @@ export class GameLoop {
             this.interactor.position.z = circle.z;
             this.interactor.facing = null;
             this.interactionSystem.update(this.gameState, intent, this.interactor);
+            this.checkContact();
         }
 
-        if (discreteState.gameMode === 'instance_3d' || discreteState.isTimeFrozen) return;
+        if (discreteState.gameMode === 'instance_3d' || discreteState.instanceIsOpen) return;
 
         // Normal 3D simulation updates
         interpolatedState.simulationTime += dt;
@@ -358,7 +404,56 @@ export class GameLoop {
         this.interactor.position.y = this.camera.position.y;
         this.interactor.position.z = this.camera.position.z;
         this.interactor.facing = this.camera.yaw;
-        if (startedInMode === 'world_3d') this.interactionSystem.update(this.gameState, intent, this.interactor);
+        if (startedInMode === 'world_3d') {
+            this.interactionSystem.update(this.gameState, intent, this.interactor);
+            this.checkContact();
+        }
+    }
+
+    // Stepping into a touch NPC starts its fight. Not if this tick's Interact just opened a conversation instead.
+    private checkContact(): void {
+        if (this.gameState.discrete.activeSpeech) return;
+        const touched = this.interactionSystem.findNewContact(this.interactor);
+        if (touched) this.battleSystem.touched(touched);
+    }
+
+    /**
+     * A plain line closes on Interact or Back.
+     * A choice moves with up/down and closes once an option is picked: Interact picks the selected one,
+     * Back picks the last (the refusal) whatever is selected. Either way, one press is one pick.
+     */
+    private updateSpeech(intent: PlayerIntent): void {
+        const discreteState = this.gameState.discrete;
+        const speech = discreteState.activeSpeech;
+        if (!speech) return;
+
+        const { choice } = speech;
+        if (!choice) {
+            if (intent.interact || intent.back) discreteState.activeSpeech = null;
+            return;
+        }
+
+        // Back wins over Interact on the same tick, as in the menus
+        let picked = -1;
+        if (intent.back) {
+            picked = choice.options.length - 1;
+        } else if (intent.interact) {
+            picked = choice.selected;
+        }
+        if (picked >= 0) {
+            discreteState.activeSpeech = null;
+            // Listeners decide what an answer means, e.g. BattleSystem.answer starts a hostile NPC's fight
+            this.eventBus.publish({ type: 'choice_made', npcId: speech.npcId, optionIndex: picked });
+            return;
+        }
+
+        if (intent.navigate && intent.navigate.y !== 0) {
+            // +1 is up, towards the start of the list. Wraps like the menus.
+            const count = choice.options.length;
+            const step = intent.navigate.y > 0 ? -1 : 1;
+            // Writes shared state on purpose
+            choice.selected = (choice.selected + step + count) % count;
+        }
     }
 
     public update(deltaTime: number): void {
@@ -367,6 +462,7 @@ export class GameLoop {
         const intentSnapshot = this.input.getIntent();
         this.pendingLook.yaw += intentSnapshot.look.yaw;
         this.pendingLook.pitch += intentSnapshot.look.pitch;
+        this.holdPresses(intentSnapshot);
 
         if (intentSnapshot.toggleDebugHUD) {
             if (this.debugHUD) {
@@ -377,9 +473,11 @@ export class GameLoop {
             }
         }
 
-        // The instance toggle, not the pause menu, and not while paused or talking
-        if (intentSnapshot.pause && !this.gameState.discrete.isPaused && !this.gameState.discrete.activeSpeech) {
-            if (this.gameState.discrete.isTimeFrozen) {
+        // The instance toggle, not the pause menu, and not while paused, talking, fighting or on game over
+        const { discrete } = this.gameState;
+        const fightingOrOver = discrete.gameMode === 'battle_25djrpg' || discrete.gameMode === 'game_over';
+        if (intentSnapshot.pause && !discrete.isPaused && !discrete.activeSpeech && !fightingOrOver) {
+            if (this.gameState.discrete.instanceIsOpen) {
                 this.instance3DSystem.unPropagateInstance(this.gameState);
             } else {
                 this.instance3DSystem.propagateInstance(this.gameState);
@@ -397,11 +495,64 @@ export class GameLoop {
             intentSnapshot.back = false;
             intentSnapshot.menu = false;
             intentSnapshot.menuPointer = undefined;
+            this.clearPendingPresses();
 
             this.accumulator -= FIXED_DT;
         }
 
         this.eventBus.flush();
+    }
+
+    // Adds this frame's presses to any still waiting, and puts them all on the intent for the next tick
+    private holdPresses(intent: PlayerIntent): void {
+        const pending = this.pendingPresses;
+        if (intent.interact) pending.interact = true;
+        if (intent.back) pending.back = true;
+        if (intent.menu) pending.menu = true;
+
+        // The latest step, but not the empty one the web input sends every frame
+        const step = intent.navigate;
+        if (step && (step.x !== 0 || step.y !== 0)) {
+            pending.hasNavigate = true;
+            pending.navigate.x = step.x;
+            pending.navigate.y = step.y;
+        }
+
+        // A click or step isn't replaced by a later hover, as in WebInputService.pointMenu
+        const pointer = intent.menuPointer;
+        const held = pending.pointer;
+        const heldIsPress = pending.hasPointer && (held.clicked || held.step !== undefined);
+        if (pointer && !(heldIsPress && !pointer.clicked && !pointer.step)) {
+            pending.hasPointer = true;
+            held.index = pointer.index;
+            held.clicked = pointer.clicked;
+            held.step = pointer.step;
+        }
+
+        intent.interact = pending.interact;
+        intent.back = pending.back;
+        intent.menu = pending.menu;
+        intent.navigate = pending.hasNavigate ? pending.navigate : undefined;
+        intent.menuPointer = pending.hasPointer ? held : undefined;
+    }
+
+    // Once a tick has had them
+    private clearPendingPresses(): void {
+        const pending = this.pendingPresses;
+        pending.interact = false;
+        pending.back = false;
+        pending.menu = false;
+        pending.hasNavigate = false;
+        pending.hasPointer = false;
+    }
+
+    // A lost fight ends here. The Game Over screen owns the tick until Return to Title quits the run.
+    private enterGameOver(): void {
+        const previousMode = this.gameState.discrete.gameMode;
+        // Writes shared state on purpose
+        this.gameState.discrete.gameMode = 'game_over';
+        this.menuSystem.openGameOver();
+        this.eventBus.publish({ type: 'game_mode_changed', previousMode, currentMode: 'game_over' });
     }
 
     /**
@@ -414,6 +565,8 @@ export class GameLoop {
         this.gameState.timeOfDay = fresh.timeOfDay;
         this.gameState.discrete = fresh.discrete;
         this.gameState.interpolated = fresh.interpolated;
+        // A new run hasn't beaten anyone yet
+        this.world.setHiddenNpcs(fresh.discrete.defeatedNpcIds);
 
         this.camera.position = { ...fresh.interpolated.cameraPosition };
         this.camera.yaw = fresh.interpolated.cameraYaw;
@@ -424,6 +577,7 @@ export class GameLoop {
         this.pendingLook.pitch = 0;
 
         this.menuSystem.reset();
+        this.interactionSystem.reset();
         this.eventBus.publish({ type: 'game_mode_changed', previousMode, currentMode: 'main_menu' });
     }
 
@@ -442,9 +596,17 @@ export class GameLoop {
      * Rendering trails the simulation by up to one tick (about 16ms), the usual cost of this approach.
      */
     public getRenderCamera(): Readonly<Camera> {
+        const render = this.renderCamera;
+        // A fight is framed by the battle camera. The exploration camera is never moved, so it's back as it was after.
+        const { battle } = this.gameState.discrete;
+        if (battle) {
+            const debug = this.debugOrDefaults;
+            battleCameraInto(battle, debug.battleCameraPitchDeg, debug.battleCameraDistance, render);
+            return render;
+        }
+
         const alpha = this.accumulator / FIXED_DT;
         const prev = this.previousCamera;
-        const render = this.renderCamera;
         render.position.x = prev.x + (this.camera.position.x - prev.x) * alpha;
         render.position.y = prev.y + (this.camera.position.y - prev.y) * alpha;
         render.position.z = prev.z + (this.camera.position.z - prev.z) * alpha;
@@ -469,7 +631,8 @@ export class GameLoop {
 
         if (this.menuOverlay && this.menuSystem.consumeViewChanged()) {
             const { gameMode, isPaused } = this.gameState.discrete;
-            this.menuOverlay.render(gameMode === 'main_menu' || isPaused ? this.menuSystem.getView() : null);
+            const menuShown = gameMode === 'main_menu' || gameMode === 'game_over' || isPaused;
+            this.menuOverlay.render(menuShown ? this.menuSystem.getView() : null);
         }
 
         this.renderSystem.render(
@@ -479,10 +642,24 @@ export class GameLoop {
             this.debugHUD,
             this.WALL_DEBUG_COLOR,
             this.wallDebugTransform,
-            debug ? debug.shadows : true,
+            this.debugOrDefaults,
         );
 
         this.overheadOverlays.render(this.gameState);
+        this.renderBattleScreen();
+    }
+
+    // Every frame of a fight, and hidden once under the pause menu or when the fight is over
+    private renderBattleScreen(): void {
+        if (!this.battleOverlay) return;
+        const { battle, isPaused } = this.gameState.discrete;
+        if (battle && !isPaused) {
+            this.battleOverlay.render(this.battleSystem.getView(battle, this.settings.menuTextScale));
+            this.battleShown = true;
+        } else if (this.battleShown) {
+            this.battleOverlay.render(null);
+            this.battleShown = false;
+        }
     }
 
     // TODO: Do we even need this if it lives in state? Should it live in state?

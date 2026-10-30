@@ -5,19 +5,15 @@ import StubAudioService from './stubAudioService';
 import NullMenuOverlay from './nullMenuOverlay';
 import NullSpeechOverlay from './nullSpeechOverlay';
 import NullPromptOverlay from './nullPromptOverlay';
+import NullBattleOverlay from './nullBattleOverlay';
 import MemoryStore from './memoryStore';
 import StubDisplay from './stubDisplay';
 import type { PlatformServices } from '../../services/platform';
 import type { Renderer } from '../../services/renderer';
-import {
-    World,
-    type Chunk,
-    CHUNK_SIZE,
-    CHUNK_LOAD_RADIUS,
-} from '../../core/world';
+import { World, type Chunk, CHUNK_SIZE } from '../../core/world';
 import { createAABB } from '../../core/math/aabb';
 import { createTranslationMatrix } from '../../core/math/mathHelpers';
-import type { Vec3 } from '../../types/common';
+import { createChunkStreamer, type ChunkUpdater } from '../../core/chunkStreamer';
 
 // Simple seeded random number generator for deterministic chunk generation (stub version)
 // Uses same algorithm as web platform for consistency
@@ -110,52 +106,10 @@ export const createChunk = (chunkX: number, chunkZ: number, renderer: Renderer):
     };
 };
 
-/**
- * Chunk loading around a position (stub version), same logic as the web platform.
- * A factory to match the web platform's, which keeps per-game load state.
- * createGame only calls it when the player enters another chunk.
- */
-export const createChunkUpdater = () => async (
-    world: World,
-    playerPosition: Vec3,
-    renderer: Renderer,
-    _assetLoader?: any,
-): Promise<void> => {
-    const currentChunk = World.getChunkCoords(playerPosition);
-
-    const chunksToLoad = World.getChunksInRadius(
-        currentChunk.x,
-        currentChunk.z,
-        CHUNK_LOAD_RADIUS,
-    );
-
-    // Create set of chunk IDs that should be loaded
-    const shouldBeLoaded = new Set<string>();
-    chunksToLoad.forEach((chunk) => {
-        shouldBeLoaded.add(World.getChunkID(chunk.x, chunk.z));
-    });
-
-    // Load missing chunks
-    chunksToLoad.forEach((chunk) => {
-        const chunkId = World.getChunkID(chunk.x, chunk.z);
-        if (!world.activeChunks.has(chunkId)) {
-            const newChunk = createChunk(chunk.x, chunk.z, renderer);
-            world.addChunk(newChunk);
-        }
-    });
-
-    // Unload chunks outside radius
-    const chunksToUnload: string[] = [];
-    Array.from(world.activeChunks.keys()).forEach((chunkId) => {
-        if (!shouldBeLoaded.has(chunkId)) {
-            chunksToUnload.push(chunkId);
-        }
-    });
-
-    chunksToUnload.forEach((chunkId) => {
-        world.removeChunk(chunkId);
-    });
-};
+// Generated chunks, through core's streamer like the web's. A factory, so each game tracks its own loads.
+export const createChunkUpdater = (): ChunkUpdater => createChunkStreamer(
+    async (chunkX, chunkZ, renderer) => createChunk(chunkX, chunkZ, renderer),
+);
 
 const createStubPlatform = async (): Promise<PlatformServices> => ({
     renderer: new NullRenderer(),
@@ -165,6 +119,7 @@ const createStubPlatform = async (): Promise<PlatformServices> => ({
     menu: new NullMenuOverlay(),
     speech: new NullSpeechOverlay(),
     prompt: new NullPromptOverlay(),
+    battle: new NullBattleOverlay(),
     storage: new MemoryStore(),
     display: new StubDisplay(),
     getAspectRatio: () => 16 / 9,

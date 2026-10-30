@@ -6,6 +6,7 @@ import type { MenuOverlay } from './menuOverlay';
 import type { KeyValueStore } from './storage';
 import type { DisplayService } from './display';
 import type { SpeechOverlay } from './speechOverlay';
+import type { BattleOverlay } from './battleOverlay';
 import { PromptOverlay } from './promptOverlay';
 
 /**
@@ -20,6 +21,7 @@ export interface PlatformServices {
     menu: MenuOverlay;
     prompt: PromptOverlay;
     speech: SpeechOverlay;
+    battle: BattleOverlay;
     storage: KeyValueStore;
     display: DisplayService;
     getAspectRatio: () => number;

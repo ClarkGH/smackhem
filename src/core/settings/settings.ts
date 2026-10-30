@@ -1,6 +1,11 @@
 import type { AudioCategory } from '../../services/audio';
 import type { Resolution } from '../../services/display';
 
+// Active: battle gauges keep filling while you choose. Wait: they stop while a command menu is open.
+export type BattleMode = 'active' | 'wait';
+
+export const BATTLE_MODES: readonly BattleMode[] = ['wait', 'active'];
+
 export interface Settings {
     volume: Record<AudioCategory, number>;
     // Mouse moves are a distance, sticks are a turn rate, so each device gets its own pair
@@ -15,6 +20,8 @@ export interface Settings {
     windowResolution: Resolution | null;
     // Mirrors the platform, not persisted: browsers can't enter fullscreen without a gesture
     fullscreen: boolean;
+    // Chrono Trigger's Active/Wait (battle.md, ATB). Wait is the gentler default.
+    battleMode: BattleMode;
 }
 
 export const RENDER_SCALES: readonly number[] = [0.5, 0.75, 1];
@@ -42,6 +49,7 @@ export const createDefaultSettings = (): Settings => ({
     renderScale: 1,
     windowResolution: null,
     fullscreen: false,
+    battleMode: 'wait',
 });
 
 export const SETTINGS_STORAGE_KEY = 'smackhem.settings';
@@ -72,9 +80,9 @@ const readBoolean = (source: Record<string, unknown>, key: string, fallback: boo
 };
 
 // Only values from a fixed list are accepted
-const readChoice = (source: Record<string, unknown>, key: string, fallback: number, choices: readonly number[]): number => {
+const readChoice = <T extends number | string>(source: Record<string, unknown>, key: string, fallback: T, choices: readonly T[]): T => {
     const value = source[key];
-    return typeof value === 'number' && choices.includes(value) ? value : fallback;
+    return (choices as readonly unknown[]).includes(value) ? value as T : fallback;
 };
 
 /**
@@ -107,6 +115,7 @@ export const parseSettings = (json: string | null): Settings => {
     settings.reducedMotion = readBoolean(data, 'reducedMotion', settings.reducedMotion);
     settings.menuTextScale = readChoice(data, 'menuTextScale', settings.menuTextScale, MENU_TEXT_SCALES);
     settings.renderScale = readChoice(data, 'renderScale', settings.renderScale, RENDER_SCALES);
+    settings.battleMode = readChoice(data, 'battleMode', settings.battleMode, BATTLE_MODES);
 
     const { windowResolution } = data;
     if (isRecord(windowResolution)) {

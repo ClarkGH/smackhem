@@ -22,7 +22,8 @@ interface Scene {
 export class Scene2DSystem {
     public scene: Scene;
 
-    constructor(private eventBus: TypeSafeEventBus, private settings: Settings) { // I assure you, these variables are in use
+    // Parameter properties: each becomes a private field, e.g. this.settings
+    constructor(private eventBus: TypeSafeEventBus, private settings: Settings) {
         this.scene = this.createScene();
     }
 
@@ -41,11 +42,10 @@ export class Scene2DSystem {
             if (interpolatedState.sceneTransitionProgress >= 1.0) {
                 interpolatedState.sceneTransitionProgress = 1.0;
                 discreteState.sceneIsTransitioning = false;
-                discreteState.sceneIsActive = true;
             }
         }
 
-        if (discreteState.gameMode !== 'scene_2d' || discreteState.isTimeFrozen || discreteState.sceneIsTransitioning) return;
+        if (discreteState.gameMode !== 'scene_2d' || discreteState.instanceIsOpen || discreteState.sceneIsTransitioning) return;
 
         const { x: moveX, y: moveY } = intent.move;
 
@@ -65,8 +65,6 @@ export class Scene2DSystem {
                 if (isWalkable) {
                     interpolatedState.sceneCharacterPositionPx.x = newPxX;
                     interpolatedState.sceneCharacterPositionPx.y = newPxY;
-                    discreteState.sceneCharacterPositionGrid.x = gridX;
-                    discreteState.sceneCharacterPositionGrid.y = gridY;
                 }
             }
 
@@ -86,8 +84,6 @@ export class Scene2DSystem {
             yaw: interpolatedState.cameraYaw,
             pitch: interpolatedState.cameraPitch,
         };
-        discreteState.targetPitch = 0;
-        discreteState.isTransitioningPitch = true;
         const previousMode = discreteState.gameMode;
         discreteState.gameMode = 'scene_2d';
 
@@ -96,7 +92,6 @@ export class Scene2DSystem {
         discreteState.sceneIsTransitioning = true;
         discreteState.sceneTransitionDirection = 1;
         interpolatedState.sceneTransitionProgress = 0.0;
-        discreteState.sceneIsActive = false;
     }
 
     public exit(gameState: GameState): void {
@@ -108,10 +103,8 @@ export class Scene2DSystem {
         discreteState.gameMode = 'world_3d';
         this.publishModeChange(previousMode, 'world_3d');
 
-        discreteState.sceneIsActive = false;
         discreteState.sceneIsTransitioning = false;
         interpolatedState.sceneTransitionProgress = 0.0;
-        discreteState.isTransitioningPitch = false;
 
         if (discreteState.savedCameraState) {
             interpolatedState.cameraPosition = { ...discreteState.savedCameraState.position };

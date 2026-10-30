@@ -23,11 +23,12 @@ const chunkAt = (x: number, z: number, options: { hasContent?: boolean; npc?: Np
 
 const npcAt = (id: string, x: number, z: number): Npc => ({
     id,
-    textureId: 'npc-lmao',
+    textureId: 'lmao_idle_1',
     position: { x, y: 0, z },
     size: 1,
     collisionAABB: createAABB({ x: x - 0.5, y: 0, z: z - 0.5 }, { x: x + 0.5, y: 1, z: z + 0.5 }),
     line: 'Hi',
+    startsFightOn: 'talk',
 });
 
 // A wall standing on the line x = 5, between chunks (0, 0) and (1, 0)
@@ -69,7 +70,7 @@ describe('World', () => {
     describe('cached lists', () => {
         it('collides with chunk boxes, NPC boxes and walls', () => {
             const world = new World();
-            const npc = npcAt('npc_01', 2, 2);
+            const npc = npcAt('npc_lmao_1', 2, 2);
             const chunk = chunkAt(0, 0, { npc });
             chunk.collisionAABBs.push(npc.collisionAABB);
             world.addChunk(chunk);

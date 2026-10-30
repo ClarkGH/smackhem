@@ -1,17 +1,27 @@
-import { ATTACKS, ENEMY_SHEETS, PLAYER_SHEETS } from './combatSheets';
+import { ATTACKS, ENEMY_SHEETS, PARTY_MEMBER_SHEETS } from './combatSheets';
 
-export type PlayerSheetId = 'circle';
-export type EnemySheetId = 'goatee_circle';
-export type AttackId = 'circle_basic' | 'goatee_basic';
+export type PartyMemberSheetId = 'circle';
+export type EnemySheetId = 'evil_circle' | 'debug_boss';
+export type AttackId = 'circle_basic' | 'evil_circle_basic';
+export type EncounterId = 'npc_evil_circle_1' | 'debug_crowd' | 'debug_boss' | 'debug_cornered';
+
+export interface EncounterDef {
+    id: EncounterId;
+    enemies: EnemySheetId[];
+    // Whether Run is offered. False for fights you can't walk away from (most bosses)
+    canRun: boolean;
+}
 
 export interface AttackDef {
     id: AttackId;
     power: number; // integer, >= 0. Flat damage for now
 }
 
-export interface PlayerSheet {
+export interface PartyMemberSheet {
     kind: 'player';
-    id: PlayerSheetId;
+    id: PartyMemberSheetId;
+    name: string;
+    spriteId: string; // asset ID of their battle billboard (A-1)
     maxHp: number; // integer, >= 1
     basicAttackId: AttackId;
 }
@@ -19,13 +29,17 @@ export interface PlayerSheet {
 export interface EnemySheet {
     kind: 'enemy';
     id: EnemySheetId;
+    name: string;
+    spriteId: string; // asset ID of their battle billboard (A-1)
     maxHp: number; // integer, >= 1
     basicAttackId: AttackId;
+    // Keeps its damage between fights, like FF6's Deathgaze (battle.md, Ending a fight). Most don't.
+    keepsDamage: boolean;
 }
 
 export interface PartyMember {
     kind: 'player';
-    sheetId: PlayerSheetId;
+    sheetId: PartyMemberSheetId;
     hp: number; // integer, 0..maxHp. Change only via setHp
 }
 
@@ -35,9 +49,10 @@ export interface Enemy {
     hp: number; // integer, 0..maxHp. Change only via setHp
 }
 
-export type BattleOutcome = 'ongoing' | 'won' | 'lost' | 'mutual_defeat';
+// fled is chosen (Run), never decided by HP, so getBattleOutcome never returns it. It isn't a loss either.
+export type BattleOutcome = 'ongoing' | 'won' | 'lost' | 'mutual_defeat' | 'fled';
 
-export const createPartyMember = (sheet: PlayerSheet): PartyMember => ({
+export const createPartyMember = (sheet: PartyMemberSheet): PartyMember => ({
     kind: 'player',
     sheetId: sheet.id,
     hp: sheet.maxHp,
@@ -50,11 +65,15 @@ export const createEnemy = (sheet: EnemySheet): Enemy => ({
 });
 
 // maxHp is read from the sheet, never copied onto the runtime object
-const getSheet = (c: PartyMember | Enemy): PlayerSheet | EnemySheet => (
-    c.kind === 'player' ? PLAYER_SHEETS[c.sheetId] : ENEMY_SHEETS[c.sheetId]
+const getSheet = (c: PartyMember | Enemy): PartyMemberSheet | EnemySheet => (
+    c.kind === 'player' ? PARTY_MEMBER_SHEETS[c.sheetId] : ENEMY_SHEETS[c.sheetId]
 );
 
 export const getMaxHp = (c: PartyMember | Enemy): number => getSheet(c).maxHp;
+
+export const getName = (c: PartyMember | Enemy): string => getSheet(c).name;
+
+export const getSpriteId = (c: PartyMember | Enemy): string => getSheet(c).spriteId;
 
 export const getBasicAttack = (c: PartyMember | Enemy): AttackDef => ATTACKS[getSheet(c).basicAttackId];
 

@@ -11,6 +11,7 @@ import StubAudioService, { type StubPlaybackHandle } from '../../platforms/stub/
 import type { PlayerIntent } from '../../services/input';
 import { createScenario, type Scenario } from '../../testing/scenario';
 import { createDebugSettings } from '../settings/debugSettings';
+import { HOSTILE, loseFight, startFight } from '../../testing/battleScenario';
 
 describe('mode-driven audio - scenario (stub platform)', () => {
     let scenario: Scenario;
@@ -111,6 +112,18 @@ describe('mode-driven audio - scenario (stub platform)', () => {
         scenario.tick();
 
         expect(scenario.gameState.discrete.gameMode).toBe('main_menu');
+        expect(voicesOf(AMBIENT_SOUND)[0].stopped).toBe(true);
+    });
+
+    it('stops the ambience on Game Over, a menu like the main menu', () => {
+        startNewGame();
+        scenario.addChunk({ npcs: [HOSTILE] });
+        startFight(scenario);
+        loseFight(scenario);
+        // Loss -> game_over_requested -> mode change -> stop request
+        scenario.tick(3);
+
+        expect(scenario.gameState.discrete.gameMode).toBe('game_over');
         expect(voicesOf(AMBIENT_SOUND)[0].stopped).toBe(true);
     });
 });

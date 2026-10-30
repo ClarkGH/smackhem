@@ -2,6 +2,7 @@ import {
     describe, it, expect, vi,
 } from 'vitest';
 import { ChunkLoader } from './chunkLoader';
+import type { ChunkSource } from '../services/chunkSource';
 import NullRenderer from '../platforms/stub/nullRenderer';
 import { CHUNK_SIZE } from './world';
 
@@ -84,7 +85,7 @@ describe('ChunkLoader schema version', () => {
 
 describe('ChunkLoader NPCs', () => {
     const NPC = {
-        id: 'npc_01', sprite: 'npc-lmao', pos: [1.5, 0.5, -2], size: 1, line: 'Hello',
+        id: 'npc_lmao_1', sprite: 'lmao_idle_1', pos: [1.5, 0.5, -2], size: 1, line: 'Hello',
     };
 
     const loadNpcs = (npcs?: object[]) => {
@@ -98,8 +99,8 @@ describe('ChunkLoader NPCs', () => {
         const [npc] = loadNpcs([NPC]).npcs;
 
         expect(npc).toMatchObject({
-            id: 'npc_01',
-            textureId: 'npc-lmao',
+            id: 'npc_lmao_1',
+            textureId: 'lmao_idle_1',
             size: 1,
             line: 'Hello',
             position: { x: 1 * CHUNK_SIZE + 1.5, y: 0.5, z: 2 * CHUNK_SIZE - 2 },
@@ -120,7 +121,7 @@ describe('ChunkLoader NPCs', () => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         // Built by hand, JSON.stringify would write Infinity as null
         const json = `{ "version": 2, "id": "1,2", "meshes": [], "npcs": [
-            { "id": "huge", "sprite": "npc-lmao", "pos": [0, 0, 0], "size": 1e999, "line": "Hi" }
+            { "id": "huge", "sprite": "lmao_idle_1", "pos": [0, 0, 0], "size": 1e999, "line": "Hi" }
         ] }`;
 
         const chunk = new ChunkLoader().loadChunkFromJSON(json, 1, 2, new NullRenderer());
@@ -141,8 +142,114 @@ describe('ChunkLoader NPCs', () => {
             NPC,
         ]);
 
-        expect(chunk.npcs.map((npc) => npc.id)).toEqual(['npc_01']);
+        expect(chunk.npcs.map((npc) => npc.id)).toEqual(['npc_lmao_1']);
         expect(chunk.collisionAABBs).toHaveLength(1);
         expect(warn.mock.calls.filter(([message]) => String(message).startsWith('Skipping NPC'))).toHaveLength(2);
+    });
+
+    it('keeps a hostile NPC\'s encounterId, and leaves a plain NPC without one', () => {
+        const chunk = loadNpcs([{ ...NPC, id: 'npc_evil_circle_1', encounterId: 'npc_evil_circle_1' }, NPC]);
+
+        expect(chunk.npcs[0].encounterId).toBe('npc_evil_circle_1');
+        expect(chunk.npcs[1].encounterId).toBeUndefined();
+    });
+
+    it('starts a fight on talk unless the NPC says touch', () => {
+        const chunk = loadNpcs([
+            NPC,
+            {
+                ...NPC, id: 'npc_toucher_1', encounterId: 'npc_toucher_1', startsFightOn: 'touch',
+            },
+        ]);
+
+        expect(chunk.npcs.map((npc) => npc.startsFightOn)).toEqual(['talk', 'touch']);
+    });
+
+    it('skips an NPC with an unknown trigger, or a touch trigger and nothing to fight', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const chunk = loadNpcs([
+            {
+                ...NPC, id: 'bad_trigger', encounterId: 'x', startsFightOn: 'wave',
+            },
+            { ...NPC, id: 'touch_nothing', startsFightOn: 'touch' },
+            NPC,
+        ]);
+
+        expect(chunk.npcs.map((npc) => npc.id)).toEqual(['npc_lmao_1']);
+        expect(warn.mock.calls.filter(([message]) => String(message).startsWith('Skipping NPC'))).toHaveLength(2);
+    });
+
+    it('skips an NPC whose encounterId is not a string', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const chunk = loadNpcs([{ ...NPC, id: 'bad', encounterId: 7 }, NPC]);
+
+        expect(chunk.npcs.map((npc) => npc.id)).toEqual(['npc_lmao_1']);
+        expect(warn.mock.calls.filter(([message]) => String(message).startsWith('Skipping NPC'))).toHaveLength(1);
+    });
+});
+
+// A platform's chunk files: this text for every chunk, null for none, or a failure, counting the fetches
+const sourceOf = (answer: () => Promise<string | null>) => {
+    const fetched: string[] = [];
+    const source: ChunkSource = {
+        fetchChunkJSON: (chunkX, chunkZ) => {
+            fetched.push(`${chunkX},${chunkZ}`);
+            return answer();
+        },
+    };
+    return { source, fetched };
+};
+
+describe('ChunkLoader.loadChunk', () => {
+    it('loads the file at the chunk\'s coordinates, whatever id the file itself has', async () => {
+        // A template copied to another spot keeps its old id
+        const { source } = sourceOf(async () => JSON.stringify({ version: 2, id: '0,0', meshes: [SHAPES[0]] }));
+
+        const chunk = await new ChunkLoader().loadChunk(source, 1, 2, new NullRenderer());
+
+        expect(chunk.id).toBe('1,2');
+        expect(chunk.hasContent).toBe(true);
+    });
+
+    it('stands an empty floor in when there\'s no file', async () => {
+        const { source } = sourceOf(async () => null);
+
+        const chunk = await new ChunkLoader().loadChunk(source, -1, 3, new NullRenderer());
+
+        expect(chunk.id).toBe('-1,3');
+        expect(chunk.hasContent).toBe(false);
+        expect(chunk.meshes).toHaveLength(1);
+    });
+
+    it('stands an empty floor in, and says so, when the file can\'t be read', async () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { source } = sourceOf(async () => { throw new TypeError('Failed to fetch'); });
+
+        const chunk = await new ChunkLoader().loadChunk(source, 1, 2, new NullRenderer());
+
+        expect(chunk.hasContent).toBe(false);
+        expect(error).toHaveBeenCalledTimes(1);
+    });
+
+    it('stands an empty floor in when the file isn\'t valid JSON', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { source } = sourceOf(async () => '<!doctype html>');
+
+        const chunk = await new ChunkLoader().loadChunk(source, 1, 2, new NullRenderer());
+
+        expect(chunk.hasContent).toBe(false);
+    });
+
+    it('asks for each chunk once, and hands back the same one after, stand-ins too', async () => {
+        const { source, fetched } = sourceOf(async () => null);
+        const loader = new ChunkLoader();
+        const renderer = new NullRenderer();
+
+        const first = await loader.loadChunk(source, 0, 0, renderer);
+        const again = await loader.loadChunk(source, 0, 0, renderer);
+        await loader.loadChunk(source, 0, 1, renderer);
+
+        expect(again).toBe(first);
+        expect(fetched).toEqual(['0,0', '0,1']);
     });
 });

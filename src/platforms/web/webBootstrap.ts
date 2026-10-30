@@ -1,104 +1,30 @@
-import type { Renderer } from '../../services/renderer';
 import type { PlatformServices } from '../../services/platform';
-import {
-    World,
-    CHUNK_LOAD_RADIUS,
-} from '../../core/world';
 import { WebInputService } from './input/webInputService';
-import type { Vec3 } from '../../types/common';
-import WebAssetLoader from './webAssetLoader';
+import type { ChunkSource } from '../../services/chunkSource';
+import { ChunkLoader } from '../../core/chunkLoader';
+import { createChunkStreamer, type ChunkUpdater } from '../../core/chunkStreamer';
+import WebChunkSource from './webChunkSource';
 import WebGLRenderer from './rendering/webGLRenderer';
 import WebClock from './webClock';
 import WebAudioService from './audio/webAudioService';
 import WebMenuOverlay from './menu/webMenuOverlay';
 import WebSpeechOverlay from './overlays/webSpeechOverlay';
 import WebPromptOverlay from './overlays/webPromptOverlay';
+import WebBattleOverlay from './overlays/webBattleOverlay';
 import LocalStorageStore from './localStorageStore';
 import WebDisplay from './webDisplay';
 
 // PlatformServices interface moved to src/services/platform.ts
 // This export is kept for backward compatibility but should use the shared type
 
-// Chunk loading around a position, async from JSON files.
-// A factory, so each game tracks its own pending loads.
-// createGame only calls it when the player enters another chunk.
-export const createChunkUpdater = () => {
-    // Track chunks currently being loaded to avoid duplicate requests
-    const pendingChunkLoads = new Set<string>();
-
-    // The latest update's chunks. Loads and unloads finish out of order, so both check
-    // this rather than their own update's list, which may be out of date by then.
-    let wantedChunks = new Set<string>();
-
-    return async (
-        world: World,
-        playerPosition: Vec3,
-        renderer: Renderer,
-        assetLoader: WebAssetLoader,
-    ): Promise<void> => {
-        const currentChunk = World.getChunkCoords(playerPosition);
-
-        const chunksToLoad = World.getChunksInRadius(
-            currentChunk.x,
-            currentChunk.z,
-            CHUNK_LOAD_RADIUS,
-        );
-
-        // Create set of chunk IDs that should be loaded
-        const shouldBeLoaded = new Set<string>();
-        chunksToLoad.forEach((chunk) => {
-            shouldBeLoaded.add(World.getChunkID(chunk.x, chunk.z));
-        });
-        wantedChunks = shouldBeLoaded;
-
-        // Load missing chunks (parallel loading for performance)
-        const loadPromises: Promise<void>[] = [];
-
-        chunksToLoad.forEach((chunk) => {
-            const chunkId = World.getChunkID(chunk.x, chunk.z);
-
-            // Skip if already loaded or currently loading
-            if (world.activeChunks.has(chunkId) || pendingChunkLoads.has(chunkId)) {
-                return;
-            }
-
-            // Mark as loading
-            pendingChunkLoads.add(chunkId);
-
-            // Load chunk asynchronously
-            const loadPromise = assetLoader
-                .loadChunk(chunkId, chunk.x, chunk.z, renderer)
-                .then((newChunk) => {
-                    // Dropped if the player has moved on since it was asked for
-                    if (wantedChunks.has(chunkId)) world.addChunk(newChunk);
-                    pendingChunkLoads.delete(chunkId);
-                })
-                .catch((error) => {
-                    console.error(`Failed to load chunk ${chunkId}:`, error);
-                    pendingChunkLoads.delete(chunkId);
-                });
-
-            loadPromises.push(loadPromise);
-        });
-
-        // Wait for all chunks to load (non-blocking in game loop, but tracks completion)
-        await Promise.all(loadPromises);
-
-        // Unload chunks outside the latest update's radius
-        const chunksToUnload: string[] = [];
-        Array.from(world.activeChunks.keys()).forEach((chunkId) => {
-            if (!wantedChunks.has(chunkId)) {
-                chunksToUnload.push(chunkId);
-            }
-        });
-
-        chunksToUnload.forEach((chunkId) => {
-            world.removeChunk(chunkId);
-        });
-    };
+// Chunks from JSON files, through core's ChunkLoader and streamer.
+// A factory, so each game keeps its own loaded chunks.
+export const createChunkUpdater = (source: ChunkSource): ChunkUpdater => {
+    const chunkLoader = new ChunkLoader();
+    return createChunkStreamer((chunkX, chunkZ, renderer) => chunkLoader.loadChunk(source, chunkX, chunkZ, renderer));
 };
 
-export const createWebPlatform = async (): Promise<PlatformServices & { canvas: HTMLCanvasElement; assetLoader: WebAssetLoader }> => {
+export const createWebPlatform = async (): Promise<PlatformServices & { canvas: HTMLCanvasElement; chunkSource: ChunkSource }> => {
     // DOM setup: the canvas fills #app, which fills the page (or an itch.io iframe).
     // The menu and debug overlays sit on top of it inside the same container.
     let container = document.getElementById('app');
@@ -119,7 +45,7 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
     const renderer = new WebGLRenderer(canvas);
     const input = new WebInputService(canvas);
     const clock = new WebClock();
-    const assetLoader = new WebAssetLoader('/chunks/');
+    const chunkSource = new WebChunkSource('/chunks/');
     const audio = new WebAudioService('/assets/audio/');
     const menu = new WebMenuOverlay(canvas, {
         pointer: (pointer) => input.pointMenu(pointer),
@@ -128,6 +54,7 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
     });
     const speech = new WebSpeechOverlay(container);
     const prompt = new WebPromptOverlay(container, () => input.getLastDevice());
+    const battle = new WebBattleOverlay(container);
 
     // Browsers block audio until a user gesture, unlock on the first one
     const unlockAudio = () => {
@@ -146,10 +73,11 @@ export const createWebPlatform = async (): Promise<PlatformServices & { canvas: 
         menu,
         speech,
         prompt,
+        battle,
         storage: new LocalStorageStore(),
         display,
         canvas,
-        assetLoader,
+        chunkSource,
         getAspectRatio: () => canvas.width / canvas.height,
     };
 };

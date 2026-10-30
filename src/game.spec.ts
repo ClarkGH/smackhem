@@ -6,7 +6,8 @@ import {
     vi,
     type Mock,
 } from 'vitest';
-import { createGame, type ChunkUpdater, type Game } from './game';
+import { createGame, type Game } from './game';
+import type { ChunkUpdater } from './core/chunkStreamer';
 import { SETTINGS_STORAGE_KEY } from './core/settings/settings';
 import createStubPlatform, { createChunkUpdater } from './platforms/stub/stubBootstrap';
 import type StubInput from './platforms/stub/stubInput';

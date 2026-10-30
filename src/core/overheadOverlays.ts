@@ -37,7 +37,12 @@ class ShownOverlay<V> {
  */
 export default class OverheadOverlays {
     // Filled in place every frame they show (M-1)
-    private readonly speechView: SpeechView = { text: '', x: 0, y: 0 };
+    private readonly speechView: SpeechView = {
+        text: '', x: 0, y: 0, choice: null,
+    };
+
+    // The view's own copy, so the overlay never holds GameState's object
+    private readonly choiceView: { options: readonly string[]; selected: number } = { options: [], selected: 0 };
 
     private readonly promptView: PromptView = { x: 0, y: 0 };
 
@@ -64,6 +69,12 @@ export default class OverheadOverlays {
         let speechVisible = false;
         if (activeSpeech) {
             this.speechView.text = activeSpeech.line;
+            const { choice } = activeSpeech;
+            if (choice) {
+                this.choiceView.options = choice.options;
+                this.choiceView.selected = choice.selected;
+            }
+            this.speechView.choice = choice ? this.choiceView : null;
             speechVisible = this.projectOverHead(gameState, activeSpeech.npcId, this.speechView);
         }
         this.speech.update(speechVisible ? this.speechView : null);

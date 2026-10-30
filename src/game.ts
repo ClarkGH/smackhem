@@ -16,23 +16,11 @@ import { createCamera } from './core/camera';
 import type { DebugSettings } from './core/settings/debugSettings';
 import type { AudioCategory } from './services/audio';
 import type { PlatformServices } from './services/platform';
-import type { Renderer } from './services/renderer';
-import type { Vec3 } from './types/common';
-
-// Loads and unloads world chunks around a position, provided by each platform.
-// Only called when the player enters another chunk, see createGame.
-export type ChunkUpdater = (
-    world: World,
-    playerPosition: Vec3,
-    renderer: Renderer,
-    assetLoader?: any,
-) => Promise<void>;
+import type { ChunkUpdater } from './core/chunkStreamer';
 
 export interface GameSetup {
     platform: PlatformServices;
     updateChunks: ChunkUpdater;
-    // Web only, where chunks come from JSON files
-    assetLoader?: unknown;
     debugHUD?: DebugHUD;
     // Adds the pause menu's Debug screen
     debugSettings?: DebugSettings;
@@ -55,7 +43,6 @@ export interface Game {
 export const createGame = async ({
     platform,
     updateChunks,
-    assetLoader,
     debugHUD,
     debugSettings,
 }: GameSetup): Promise<Game> => {
@@ -93,7 +80,7 @@ export const createGame = async ({
 
     // Chunks around the starting position, before the first frame
     const start = createCamera().position;
-    await updateChunks(world, start, platform.renderer, assetLoader);
+    await updateChunks(world, start, platform.renderer);
     // The chunk streamed around last, compared as plain numbers every frame (M-1)
     let streamedChunkX = World.getChunkIndex(start.x);
     let streamedChunkZ = World.getChunkIndex(start.z);
@@ -109,6 +96,7 @@ export const createGame = async ({
         menuOverlay: platform.menu,
         speechOverlay: platform.speech,
         promptOverlay: platform.prompt,
+        battleOverlay: platform.battle,
         settings,
         displayCapabilities: platform.display.capabilities(),
         debugSettings,
@@ -127,7 +115,7 @@ export const createGame = async ({
         if (chunkX !== streamedChunkX || chunkZ !== streamedChunkZ) {
             streamedChunkX = chunkX;
             streamedChunkZ = chunkZ;
-            updateChunks(world, position, platform.renderer, assetLoader).catch((error) => {
+            updateChunks(world, position, platform.renderer).catch((error) => {
                 console.error('Error updating chunks:', error);
             });
         }

@@ -50,7 +50,7 @@ describe('pause menu - scenario (stub platform)', () => {
         scenario.press({ pause: true });
 
         expect(scenario.gameState.discrete.gameMode).toBe('world_3d');
-        expect(scenario.gameState.discrete.isTimeFrozen).toBe(false);
+        expect(scenario.gameState.discrete.instanceIsOpen).toBe(false);
     });
 
     it('resumes into the mode it paused from', () => {
@@ -123,7 +123,8 @@ describe('pause menu - scenario (stub platform)', () => {
 
             expect(gameState.discrete.gameMode).toBe('world_3d');
             expect(gameState.discrete.isPaused).toBe(false);
-            expect(gameState.discrete.sceneIsActive).toBe(false);
+            expect(gameState.discrete.sceneIsTransitioning).toBe(false);
+            expect(gameState.interpolated.sceneTransitionProgress).toBe(0);
         });
 
         it('does not quit on No', () => {

@@ -1,7 +1,16 @@
-import type { Renderer, SkyState, TextureHandle } from '../../services/renderer';
+import type {
+    MeshHandle,
+    Renderer,
+    SkyState,
+    TextureHandle,
+} from '../../services/renderer';
 import type { Camera } from '../camera';
 import type { GameState } from '../gameState';
+import type { BattleState } from '../battle/battle';
+import { BATTLE_SPRITE_SIZE } from '../battle/battleField';
+import { getSpriteId, isDefeated } from '../combat';
 import type { DebugHUD } from '../gameLoop';
+import type { DebugSettings } from '../settings/debugSettings';
 import { World } from '../world';
 import EnvironmentSystem from './environment';
 import { Vec3, Mat4 } from '../../types/common';
@@ -13,6 +22,14 @@ import {
 
 // The sky colours copied from the palette each frame, listed once rather than every frame (M-1)
 const SKY_COLOR_FIELDS = ['horizon', 'upper', 'zenith', 'glow', 'cloudLight', 'cloudMid', 'cloudShadow'] as const;
+
+// Blob shadows: a disc a bit narrower than the sprite and shallower front to back, almost flat,
+// lifted just off the floor so it doesn't flicker into it, and nearly black
+const BLOB_SHADOW_WIDTH = 0.8;
+const BLOB_SHADOW_DEPTH = 0.5;
+const BLOB_SHADOW_THICKNESS = 0.02;
+const BLOB_SHADOW_LIFT = 0.01;
+const BLOB_SHADOW_COLOR: Vec3 = { x: 0.04, y: 0.04, z: 0.06 };
 
 export default class RenderSystem {
     // PERFORMANCE: Pre-allocated matrices isolated to the drawing context
@@ -37,8 +54,17 @@ export default class RenderSystem {
     // Whether a world frame has been drawn, so overlays have a camera to be placed with
     private hasWorldViewProj = false;
 
-    // NPC textures by asset ID. null while loading, or if the load failed.
-    private readonly npcTextures: Map<string, TextureHandle | null> = new Map();
+    // Billboard textures (NPCs, combatants) by asset ID. null while loading, or if the load failed.
+    private readonly textures: Map<string, TextureHandle | null> = new Map();
+
+    // Blob shadows: one flattened sphere, scaled and placed under each combatant, filled in place (M-1)
+    private readonly shadowMesh: MeshHandle;
+
+    private readonly shadowTransform: Mat4 = { elements: new Float32Array(16) };
+
+    private readonly shadowCenter: Vec3 = { x: 0, y: 0, z: 0 };
+
+    private readonly shadowScale: Vec3 = { x: 0, y: 0, z: 0 };
 
     // Handed to the renderer every frame. They point at the environment's vectors, which are
     // filled in place, so they're built once in the constructor (M-1)
@@ -86,6 +112,8 @@ export default class RenderSystem {
         this.sceneOrthoProj = { elements: new Float32Array(16) };
         this.sunLight = { direction: environmentSystem.lightDirection, color: environmentSystem.sunColorWithVisibility };
         this.moonLight = { direction: environmentSystem.moonLightDirection, color: environmentSystem.moonColorWithVisibility };
+        // A unit-wide sphere, flattened per draw. Made once, at construction.
+        this.shadowMesh = renderer.createSphereMesh(0.5, 16);
     }
 
     private computeScaledTransform(center: Vec3, scale: Vec3, out: Mat4): void {
@@ -115,55 +143,105 @@ export default class RenderSystem {
         });
     }
 
-    // A quad standing upright at center, turned to face the camera around the vertical axis
-    private drawBillboard(texture: TextureHandle, center: Vec3, size: number, camera: Camera): void {
-        const toCamera = this.billboardNormal;
-        toCamera.x = camera.position.x - center.x;
-        toCamera.y = 0;
-        toCamera.z = camera.position.z - center.z;
-        const dist = Math.sqrt(toCamera.x * toCamera.x + toCamera.z * toCamera.z);
-        if (dist > 0.001) {
-            toCamera.x /= dist; toCamera.z /= dist;
+    /**
+     * A quad at center, facing the camera. Upright (tilt off), it only turns around the vertical axis,
+     * so looking down squashes it. Tilted, it also leans back to face the camera fully: full height, but it
+     * leans away from its feet (battle.md, Drawing the fight).
+     */
+    private drawBillboard(texture: TextureHandle, center: Vec3, size: number, camera: Camera, tilt: boolean): void {
+        // The direction to the camera: n, a unit vector. Flat (no y) when upright.
+        const n = this.billboardNormal;
+        n.x = camera.position.x - center.x;
+        n.y = tilt ? camera.position.y - center.y : 0;
+        n.z = camera.position.z - center.z;
+        const flat = Math.sqrt(n.x * n.x + n.z * n.z);
+        const length = Math.sqrt(flat * flat + n.y * n.y);
+        // Straight above or on top of it, there's no "towards the camera" across the floor: face +z, upright
+        if (flat < 0.001) {
+            n.x = 0; n.y = 0; n.z = 1;
         } else {
-            toCamera.x = 0; toCamera.z = 1;
+            n.x /= length; n.y /= length; n.z /= length;
         }
 
-        // The quad lies on XZ: its x runs along the camera's right, its z stands up
+        // The quad lies on XZ: its x runs along r, the camera's right (flat, n turned a quarter about y),
+        // and its z runs along u, its up: straight up when upright, tipped back towards the camera when tilted.
+        // u = r x n, which is (0, 1, 0) whenever n is flat.
+        const rLength = Math.sqrt(n.x * n.x + n.z * n.z);
+        const rx = -n.z / rLength;
+        const rz = n.x / rLength;
+        const ux = -n.y * rz;
+        const uy = rz * n.x - rx * n.z;
+        const uz = rx * n.y;
         const m = this.billboardTransform.elements;
-        m[0] = -toCamera.z * size; m[1] = 0; m[2] = toCamera.x * size; m[3] = 0;
+        m[0] = rx * size; m[1] = 0; m[2] = rz * size; m[3] = 0;
         m[4] = 0; m[5] = 0; m[6] = 0; m[7] = 0;
-        m[8] = 0; m[9] = size; m[10] = 0; m[11] = 0;
+        m[8] = ux * size; m[9] = uy * size; m[10] = uz * size; m[11] = 0;
         m[12] = center.x; m[13] = center.y; m[14] = center.z; m[15] = 1;
 
-        this.renderer.drawTexturedQuad(texture, this.billboardTransform, 1.0, toCamera);
+        this.renderer.drawTexturedQuad(texture, this.billboardTransform, n);
     }
 
-    // Loads each NPC's texture the first time it's seen, and draws it once loaded
-    private renderNpcs(camera: Camera): void {
+    // A billboard's texture once loaded, starting the load the first time it's asked for
+    private textureFor(assetId: string): TextureHandle | null {
+        if (!this.textures.has(assetId)) this.loadTexture(assetId);
+        return this.textures.get(assetId) ?? null;
+    }
+
+    // Draws a billboard standing on base, once its texture has loaded. The quad is centered on its origin.
+    private drawStanding(assetId: string, base: Vec3, size: number, camera: Camera, tilt: boolean): void {
+        const texture = this.textureFor(assetId);
+        if (!texture) return;
+        const center = this.billboardCenter;
+        center.x = base.x;
+        center.y = base.y + size / 2;
+        center.z = base.z;
+        this.drawBillboard(texture, center, size, camera, tilt);
+    }
+
+    // Every loaded NPC, except the one whose fight is on: its combatants stand in for it (renderCombatants)
+    private renderNpcs(camera: Camera, inFightId: string | null, tilt: boolean): void {
         const npcs = this.world.getVisibleNpcs();
         for (let i = 0; i < npcs.length; i += 1) {
             const npc = npcs[i];
-            if (!this.npcTextures.has(npc.textureId)) {
-                this.loadNpcTexture(npc.textureId);
-            }
-            const texture = this.npcTextures.get(npc.textureId);
-            if (texture) {
-                // Position is the sprite's base, the quad is centered on its origin
-                const center = this.billboardCenter;
-                center.x = npc.position.x;
-                center.y = npc.position.y + npc.size / 2;
-                center.z = npc.position.z;
-                this.drawBillboard(texture, center, npc.size, camera);
+            if (npc.id !== inFightId) this.drawStanding(npc.textureId, npc.position, npc.size, camera, tilt);
+        }
+    }
+
+    // Each standing combatant at its battle spot, with a blob shadow under it if switched on. The defeated leave the field.
+    private renderCombatants(battle: BattleState, camera: Camera, tilt: boolean, blobShadows: boolean): void {
+        const { combatants } = battle;
+        for (let i = 0; i < combatants.length; i += 1) {
+            const { unit, position } = combatants[i];
+            if (!isDefeated(unit)) {
+                if (blobShadows) this.drawBlobShadow(position, BATTLE_SPRITE_SIZE);
+                this.drawStanding(getSpriteId(unit), position, BATTLE_SPRITE_SIZE, camera, tilt);
             }
         }
     }
 
-    // A failed load stays null, so it's tried once and the NPC just isn't drawn
-    private loadNpcTexture(textureId: string): void {
-        this.npcTextures.set(textureId, null);
-        this.renderer.loadTexture(textureId)
-            .then((texture) => { this.npcTextures.set(textureId, texture); })
-            .catch((error) => { console.error(`Failed to load NPC texture '${textureId}':`, error); });
+    /**
+     * A dark, flattened disc on the floor under a character. It reads at any sun angle, where a flat card's
+     * real shadow under a low sun is a thin sliver (battle.md, Drawing the fight). Lifted a hair so it doesn't flicker into the floor.
+     */
+    private drawBlobShadow(base: Vec3, size: number): void {
+        const center = this.shadowCenter;
+        center.x = base.x;
+        center.y = base.y + BLOB_SHADOW_LIFT;
+        center.z = base.z;
+        const scale = this.shadowScale;
+        scale.x = size * BLOB_SHADOW_WIDTH;
+        scale.y = BLOB_SHADOW_THICKNESS;
+        scale.z = size * BLOB_SHADOW_DEPTH;
+        this.computeScaledTransform(center, scale, this.shadowTransform);
+        this.renderer.drawMesh(this.shadowMesh, this.shadowTransform, BLOB_SHADOW_COLOR);
+    }
+
+    // A failed load stays null, so it's tried once and the billboard just isn't drawn
+    private loadTexture(assetId: string): void {
+        this.textures.set(assetId, null);
+        this.renderer.loadTexture(assetId)
+            .then((texture) => { this.textures.set(assetId, texture); })
+            .catch((error) => { console.error(`Failed to load billboard texture '${assetId}':`, error); });
     }
 
     /**
@@ -206,9 +284,10 @@ export default class RenderSystem {
         debugHUD: DebugHUD | undefined,
         WALL_DEBUG_COLOR: Vec3,
         wallDebugTransform: Mat4,
-        // Debug menu switch, true without one
-        shadowsEnabled: boolean,
+        // The Debug screen's switches, or their defaults without one. Read by name, so two can't be swapped.
+        debug: Readonly<DebugSettings>,
     ): void {
+        const { shadows: shadowsEnabled, billboardTilt, blobShadows } = debug;
         // Before beginFrame, which clears to this frame's sky. Every mode, so the renderer
         // never holds a stale sky (scene_2d's own clear covers it).
         const { palette } = this.environmentSystem;
@@ -298,10 +377,14 @@ export default class RenderSystem {
                 this.renderer.drawMesh(sm.mesh, sm.transform, sm.color);
             });
 
-            this.renderNpcs(camera);
+            const { battle } = discreteState;
+            this.renderNpcs(camera, battle ? battle.npcId : null, billboardTilt);
+            if (battle) this.renderCombatants(battle, camera, billboardTilt, blobShadows);
 
-            if (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive) && partyMemberTexture1) {
-                this.drawBillboard(partyMemberTexture1, interpolatedState.instanceCharacterPosition, INSTANCE_CHARACTER_SIZE, camera);
+            // In a fight started from the instance, the circle is out on the field as a combatant instead
+            if (!battle && discreteState.instanceIsOpen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive)
+                && partyMemberTexture1) {
+                this.drawBillboard(partyMemberTexture1, interpolatedState.instanceCharacterPosition, INSTANCE_CHARACTER_SIZE, camera, billboardTilt);
             }
         }
 
@@ -321,7 +404,7 @@ export default class RenderSystem {
                 yaw: camera.yaw,
                 pitch: camera.pitch,
                 gameMode: discreteState.gameMode,
-                instancePosition: (discreteState.isTimeFrozen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
+                instancePosition: (discreteState.instanceIsOpen && (discreteState.instanceIsTransitioning || discreteState.instanceIsActive))
                     ? interpolatedState.instanceCharacterPosition
                     : undefined,
                 currentChunk: {

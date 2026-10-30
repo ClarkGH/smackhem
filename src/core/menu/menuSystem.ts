@@ -13,7 +13,19 @@ import {
     WINDOW_RESOLUTION_PRESETS,
     type Settings,
 } from '../settings/settings';
-import { QUARTERS_PER_DAY, SHADOW_BIAS_SCALES, type DebugSettings } from '../settings/debugSettings';
+import {
+    BATTLE_CAMERA_DISTANCE_RANGE,
+    BATTLE_CAMERA_DISTANCE_STEP,
+    BATTLE_CAMERA_PITCH_RANGE,
+    BATTLE_CAMERA_PITCH_STEP,
+    BATTLE_DEPTH_RANGE,
+    BATTLE_LAYOUT_STEP,
+    BATTLE_SPACING_RANGE,
+    QUARTERS_PER_DAY,
+    SHADOW_BIAS_SCALES,
+    type DebugSettings,
+} from '../settings/debugSettings';
+import type { BattleLayout } from '../battle/battleField';
 import type { AudioCategory } from '../../services/audio';
 import type { DisplayCapabilities } from '../../services/display';
 import type { PlayerIntent } from '../../services/input';
@@ -39,13 +51,16 @@ type MenuSetting =
     | { kind: 'volume'; category: AudioCategory }
     | { kind: 'sensitivity'; key: 'mouseSensitivity' | 'controllerSensitivity' }
     | { kind: 'toggle'; key: 'invertMouseY' | 'invertControllerY' | 'fullscreen' | 'reducedMotion' }
+    | { kind: 'battleMode' }
     | { kind: 'renderScale' }
     | { kind: 'textScale' }
     | { kind: 'windowResolution' }
     // Debug rows change DebugSettings, which is never saved
-    | { kind: 'debugToggle'; key: 'wireframe' | 'shadows' }
+    | { kind: 'debugToggle'; key: 'wireframe' | 'shadows' | 'billboardTilt' | 'blobShadows' }
     | { kind: 'timeOfDay' }
-    | { kind: 'shadowBias' };
+    | { kind: 'shadowBias' }
+    | { kind: 'battleCamera'; key: 'battleCameraPitchDeg' | 'battleCameraDistance' }
+    | { kind: 'battleLayout'; key: keyof BattleLayout };
 
 interface MenuItem {
     label: string;
@@ -127,6 +142,7 @@ const buildScreens = (capabilities: DisplayCapabilities, hasDebug: boolean): Rec
             settingItem('Invert Mouse Y', { kind: 'toggle', key: 'invertMouseY' }),
             settingItem('Controller Sensitivity', { kind: 'sensitivity', key: 'controllerSensitivity' }),
             settingItem('Invert Controller Y', { kind: 'toggle', key: 'invertControllerY' }),
+            settingItem('Battle Mode', { kind: 'battleMode' }),
             ...displayItems(capabilities),
             actionItem('Accessibility', 'open_accessibility'),
             actionItem('Back', 'back'),
@@ -140,6 +156,11 @@ const buildScreens = (capabilities: DisplayCapabilities, hasDebug: boolean): Rec
             actionItem('Back', 'back'),
         ],
     },
+    // Its own root: Back and Menu do nothing here, the only way on is back to the title
+    game_over: {
+        title: 'Game Over',
+        items: [actionItem('Return to Title', 'quit')],
+    },
     debug: {
         title: 'Debug',
         items: [
@@ -147,6 +168,13 @@ const buildScreens = (capabilities: DisplayCapabilities, hasDebug: boolean): Rec
             settingItem('Shadows', { kind: 'debugToggle', key: 'shadows' }),
             settingItem('Shadow Bias', { kind: 'shadowBias' }),
             settingItem('Time of Day', { kind: 'timeOfDay' }),
+            settingItem('Tilt Billboards', { kind: 'debugToggle', key: 'billboardTilt' }),
+            settingItem('Blob Shadows', { kind: 'debugToggle', key: 'blobShadows' }),
+            settingItem('Battle Cam Pitch', { kind: 'battleCamera', key: 'battleCameraPitchDeg' }),
+            settingItem('Battle Cam Distance', { kind: 'battleCamera', key: 'battleCameraDistance' }),
+            settingItem('Battle Party Depth', { kind: 'battleLayout', key: 'partyDepth' }),
+            settingItem('Battle Enemy Depth', { kind: 'battleLayout', key: 'enemyDepth' }),
+            settingItem('Battle Spacing', { kind: 'battleLayout', key: 'spacing' }),
             actionItem('Enter 2D Scene', 'enter_scene_2d'),
             actionItem('Back', 'back'),
         ],
@@ -230,6 +258,12 @@ export class MenuSystem {
         this.openScreen('pause');
     }
 
+    // Opened by GameLoop when a fight is lost
+    public openGameOver(): void {
+        this.history = [];
+        this.openScreen('game_over');
+    }
+
     // Back to the main menu's first screen, used after quitting
     public reset(): void {
         this.history = [];
@@ -305,7 +339,7 @@ export class MenuSystem {
 
         if (item.setting) {
             // Confirm flips a toggle, it does nothing on a slider
-            if (item.setting.kind === 'toggle' || item.setting.kind === 'debugToggle') {
+            if (item.setting.kind === 'toggle' || item.setting.kind === 'debugToggle' || item.setting.kind === 'battleMode') {
                 this.playSelectSound();
                 this.changeSetting(item.setting, 1);
             }
@@ -361,7 +395,8 @@ export class MenuSystem {
     private changeSetting(setting: MenuSetting, step: -1 | 1): void {
         const { settings } = this;
 
-        if (setting.kind === 'debugToggle' || setting.kind === 'timeOfDay' || setting.kind === 'shadowBias') {
+        if (setting.kind === 'debugToggle' || setting.kind === 'timeOfDay' || setting.kind === 'shadowBias'
+            || setting.kind === 'battleCamera' || setting.kind === 'battleLayout') {
             this.changeDebugSetting(setting, step);
             return;
         }
@@ -385,6 +420,10 @@ export class MenuSystem {
             case 'toggle':
                 // For fullscreen this is a request, the platform's answer comes back through bindDisplay
                 settings[setting.key] = !settings[setting.key];
+                break;
+            case 'battleMode':
+                // Two modes, so either direction flips it
+                settings.battleMode = settings.battleMode === 'wait' ? 'active' : 'wait';
                 break;
             case 'textScale': {
                 const index = MENU_TEXT_SCALES.indexOf(settings.menuTextScale);
@@ -431,6 +470,21 @@ export class MenuSystem {
             const next = SHADOW_BIAS_SCALES[clamp(index + step, 0, SHADOW_BIAS_SCALES.length - 1)];
             if (next === debug.shadowBiasScale) return;
             debug.shadowBiasScale = next;
+        } else if (setting.kind === 'battleCamera') {
+            const isPitch = setting.key === 'battleCameraPitchDeg';
+            const range = isPitch ? BATTLE_CAMERA_PITCH_RANGE : BATTLE_CAMERA_DISTANCE_RANGE;
+            const size = isPitch ? BATTLE_CAMERA_PITCH_STEP : BATTLE_CAMERA_DISTANCE_STEP;
+            // Rounded to tenths, so half-unit steps never drift
+            const next = clamp(roundStep(debug[setting.key] + step * size), range.min, range.max);
+            if (next === debug[setting.key]) return;
+            debug[setting.key] = next;
+        } else if (setting.kind === 'battleLayout') {
+            const layout = debug.battleLayout;
+            const range = setting.key === 'spacing' ? BATTLE_SPACING_RANGE : BATTLE_DEPTH_RANGE;
+            // Quarter units are exact in binary, so they never drift
+            const next = clamp(layout[setting.key] + step * BATTLE_LAYOUT_STEP, range.min, range.max);
+            if (next === layout[setting.key]) return;
+            layout[setting.key] = next;
         } else {
             // null (live) first, then 00:00..23:45 in quarter hours
             const current = debug.timeOfDayQuarter;
@@ -450,6 +504,8 @@ export class MenuSystem {
                 return `${this.settings[setting.key].toFixed(1)}x`;
             case 'toggle':
                 return this.settings[setting.key] ? 'On' : 'Off';
+            case 'battleMode':
+                return this.settings.battleMode === 'wait' ? 'Wait' : 'Active';
             case 'renderScale':
                 return `${Math.round(this.settings.renderScale * 100)}%`;
             case 'textScale':
@@ -462,6 +518,12 @@ export class MenuSystem {
                 return this.debug?.[setting.key] ? 'On' : 'Off';
             case 'shadowBias':
                 return `x${this.debug?.shadowBiasScale ?? 1}`;
+            case 'battleCamera':
+                return setting.key === 'battleCameraPitchDeg'
+                    ? `${this.debug?.battleCameraPitchDeg ?? 0}°`
+                    : (this.debug?.battleCameraDistance ?? 0).toFixed(1);
+            case 'battleLayout':
+                return (this.debug?.battleLayout[setting.key] ?? 0).toFixed(2);
             case 'timeOfDay': {
                 const quarter = this.debug?.timeOfDayQuarter ?? null;
                 if (quarter === null) return 'Live';
@@ -492,9 +554,9 @@ export class MenuSystem {
         return root === 'pause';
     }
 
-    // Opening a screen from another remembers where we came from, root screens use openPause/reset
+    // Opening a screen from another remembers where we came from, root screens use openPause/openGameOver/reset
     private openScreen(screen: MenuScreen): void {
-        if (screen !== 'main' && screen !== 'pause') {
+        if (screen !== 'main' && screen !== 'pause' && screen !== 'game_over') {
             this.history.push({ screen: this.screen, selected: this.selected });
         }
         this.screen = screen;
@@ -512,7 +574,7 @@ export class MenuSystem {
     }
 
     private resume(gameState: GameState): void {
-        // Mindfully overriding memory
+        // Writes shared state on purpose
         gameState.discrete.isPaused = false;
         this.history = [];
         // Leaving the menu, the overlay hides
@@ -521,7 +583,7 @@ export class MenuSystem {
 
     private startNewGame(gameState: GameState): void {
         const previousMode = gameState.discrete.gameMode;
-        // Mindfully overriding memory
+        // Writes shared state on purpose
         gameState.discrete.gameMode = 'world_3d';
         this.eventBus.publish({
             type: 'game_mode_changed',

@@ -10,9 +10,12 @@ Read the relevant doc before touching a system. Don't restate docs here or in co
 - [docs/portability-rules.md](docs/portability-rules.md) - the hard constraints (summarized below)
 - [docs/architecture.md](docs/architecture.md) - conceptual architecture. Snippets there are illustrative, not 1:1 with code
 - [docs/systems.md](docs/systems.md), [docs/rendering.md](docs/rendering.md), [docs/camera.md](docs/camera.md), [docs/events.md](docs/events.md) - per-system design
+- [docs/battle.md](docs/battle.md) - the battle system
 - [docs/data-formats.md](docs/data-formats.md) - chunk/asset JSON formats
 - [docs/project-structure.md](docs/project-structure.md) - code layout
 - [docs/LEARNING.md](docs/LEARNING.md) - Clark's own log. Read it for context; never edit it
+
+Finished spikes are archived in `.claude/spikes/` (local, gitignored) for context only: the decisions and history behind a system. The doc in `docs/` is the truth. `docs/` has no spike documents.
 
 `src/platforms/cpu`, `native`, `console` and `public/` are gitignored/private. Don't assume their contents.
 

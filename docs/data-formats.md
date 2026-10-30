@@ -87,19 +87,33 @@ When the format changes again: bump `EXPECTED_SCHEMA_VERSION`, update or migrate
 
 **Optional Fields:**
 
-- `npcs` (array): Non-combat characters standing in the chunk. Missing means none.
+- `npcs` (array): Non-combat or combat characters standing in the chunk. Missing means none.
 
 **NPC Object Fields:**
 
-- `id` (string): Unique NPC identifier, e.g. `"npc_01"`. Conversations and the interact prompt refer to it.
-- `sprite` (string): Texture asset ID, never a path (A-1). E.g. `"npc-lmao"` for `assets/images/npc-lmao.png`.
+- `id` (string): Unique NPC identifier, across every chunk. Conversations, the interact prompt and saves refer to it.
+  - **Convention: `npc_<who>_<n>`, in snake_case**, e.g. `"npc_evil_circle_1"`. The `npc_` prefix tells it apart from the sprite's asset ID, which shares the same `who` (`evil_circle_idle_1`). The two numbers mean different things: here, which placement; in a sprite, which frame.
+  - `who` is the character key. It's the same word as their name key, and the NPC's `id` is, by default, also its `encounterId`.
+  - `n` starts at 1 and goes up with each new placement of that character, usually one per event-flag stage. A character "going back to normal" with a new line is a new placement, so a new number.
+  - Two copies on the field at once (`npc_slime_1`, `npc_slime_2`) also get their own numbers.
+  - **Never reuse or renumber an id.** Saves refer to it, so a renamed id brings a beaten enemy back or breaks a flag. An appearance added later in development takes the next free number, even if it comes earlier in the story.
+- `sprite` (string): Texture asset ID, never a path (A-1). E.g. `"lmao_idle_1"` for `assets/images/lmao_idle_1.png`.
+  - **Convention: `<who>_<state>_<frame>`, in snake_case**, e.g. `"circle_sleep_1"`.
+  - `who` is the same character key as in the NPC's `id` and the combat sheet (`evil_circle`).
+  - `state` is a pose or animation: `idle`, `walk`, `attack`, `hurt`. A status gets its own state only when it changes the body (`sleep`, `ko`, `stone`). Statuses that don't (poison, haste, attack up) are drawn as an overlay, tint or icon, so mixed statuses never multiply files.
+  - `frame` starts at 1, in animation order.
+  - For now `sprite` names one frame. When animation arrives it will likely name a character (`"evil_circle"`) and the engine will pick the state and frame. That's a format change for then.
 - `pos` (number[3]): The sprite's **base**, relative to the chunk center, like a mesh's `pos`.
 - `size` (number): Billboard width and height, and its collision box: `size` wide on X and Z, from `pos[1]` up to `pos[1] + size`. It must be positive and finite.
 - `line` (string): What it says when interacted with.
+- `encounterId` (string, optional): Makes the NPC hostile. Its line ends in a Yes/No choice, and Yes starts this fight. By default it matches the NPC's `id`. A non-string value skips the NPC with a warning.
+  - **Enemy sheets with `keepsDamage` are individuals.** Kept HP is stored per sheet, not per NPC, so every encounter that uses the sheet is the same creature, still wounded, wherever you meet it, like Deathgaze. Two different bosses need two sheets. (Sheets live in `combatSheets.ts`, not in chunk JSON.)
+- `startsFightOn` (`"talk"` or `"touch"`, optional): What starts a hostile NPC's fight. Missing means `"talk"`, the Yes/No question. `"touch"` starts it as soon as you walk into the NPC, with no question, though talking to it first still asks. Only stepping into contact counts, so standing against it after running away doesn't start it again. `"touch"` needs an `encounterId`. Anything else skips the NPC with a warning.
 
 ```json
 "npcs": [
-  { "id": "npc_01", "sprite": "npc-lmao", "pos": [1.5, 0, -1.5], "size": 1, "line": "Me NPC, me no do nuthin' yet.. but me look great!" }
+  { "id": "npc_lmao_1", "sprite": "lmao_idle_1", "pos": [1.5, 0, -1.5], "size": 1, "line": "Me NPC, me no do nuthin' yet.. but me look great!" },
+  { "id": "npc_evil_circle_1", "encounterId": "npc_evil_circle_1", "sprite": "evil_circle_idle_1", "pos": [1.5, 0, -1.5], "size": 1, "line": "Me Fight! You want figh?!" }
 ]
 ```
 
@@ -234,6 +248,7 @@ interface SaveData {
 - **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
 - **[Controls](controls.md)** - Keyboard, mouse and controller bindings
 - **[Project Structure](project-structure.md)** - Code organization and project structure
 - **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

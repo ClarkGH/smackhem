@@ -16,6 +16,7 @@
         - [Audio Service Interface](#audio-service-interface)
         - [Audio System & Event Integration](#audio-system--event-integration)
         - [Menu Events](#menu-events)
+        - [Battle Events](#battle-events)
         - [Settings Events](#settings-events)
         - [Mode-Driven Audio](#mode-driven-audio)
         - [Buffered vs. Streamed Sounds](#buffered-vs-streamed-sounds)
@@ -72,7 +73,7 @@ While we may consider and utilize asynchronous javascript, the consideration for
 ```typescript
 type Event = {
    type: 'game_mode_changed';
-   previousMode: GameMode; // 'world_3d' | 'instance_3d' | 'scene_2d'
+   previousMode: GameMode; // 'main_menu' | 'world_3d' | 'instance_3d' | 'scene_2d' | 'battle_25djrpg' | 'game_over'
    currentMode: GameMode;
 }
 ```
@@ -415,6 +416,14 @@ Voices are checked with `isFinished()` from the tick, not through end-of-sound c
 
 `quit_to_main_menu_requested` has no payload. The pause menu publishes it when Quit is confirmed, and `GameLoop` handles it by resetting to a fresh boot: game state, camera and menu, followed by `game_mode_changed` to `main_menu`. Pausing and resuming publish nothing; they only set `DiscreteState.isPaused`.
 
+#### Battle Events
+
+Covered in full in [battle.md](battle.md).
+
+- `choice_made { npcId, optionIndex }`: published when a speech choice is picked. Back picks the last option. `BattleSystem.answer` listens, and Yes on a hostile NPC asks for its fight. The choice system itself knows nothing about battles, so later event flags can listen too.
+- `battle_requested { encounterId, npcId }`: every way into a fight ends here, whether talking or walking into the NPC. `BattleSystem.start` handles it on the next flush, one frame after it's asked for, and switches the mode to `battle_25djrpg`.
+- `game_over_requested` has no payload. A lost fight publishes it, and `GameLoop` switches to `game_over` and opens the Game Over screen. `BattleSystem` never opens menus itself.
+
 #### Settings Events
 
 `settings_changed` has no payload. Settings live in one shared `Settings` object (`src/core/settings/settings.ts`), which the menu changes in place, so subscribers read it directly. `main.ts` subscribes and saves the settings to storage. `bindDisplay` (`src/core/settings/displaySettings.ts`) subscribes and applies render scale, window size and fullscreen to the platform. When the platform reports a fullscreen change itself (a refusal, Escape, the page's button), it updates `settings.fullscreen` and publishes `settings_changed` so the menu redraws. Look sensitivity and invert need no event: `GameLoop` reads them every tick.
@@ -426,7 +435,7 @@ Core systems only publish intent (Rule I-1). `src/core/audio/modeAudio.ts` turns
 - pauses when entering the 2D scene (`scene_2d`)
 - stops when entering the instance (`instance_3d`)
 - starts or resumes when returning to the world (`world_3d`)
-- stops when quitting to the main menu (`main_menu`)
+- stops when quitting to the main menu (`main_menu`) or losing a fight (`game_over`)
 
 The pause menu isn't a mode change, so the ambience keeps playing while paused.
 
@@ -561,6 +570,7 @@ To uphold the deletion test (Rule P-1), a `StubAudioService` is provided in `src
 - **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
 - **[Controls](controls.md)** - Keyboard, mouse and controller bindings
 - **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure

@@ -25,7 +25,10 @@ describe('WebInputService', () => {
         return input.getIntent();
     };
 
-    const key = (name: string): void => window.dispatch('keydown', { key: name });
+    // A real event carries both: key is the character (Shift and Caps Lock change it), code is the physical key
+    const key = (name: string, code: string): void => window.dispatch('keydown', { key: name, code });
+
+    const release = (name: string, code: string): void => window.dispatch('keyup', { key: name, code });
 
     beforeEach(() => {
         ({ document, window } = installFakeDom());
@@ -35,19 +38,54 @@ describe('WebInputService', () => {
     });
 
     it('clears one-shot actions after they are read', () => {
-        key('e');
+        key('e', 'KeyE');
 
         expect(frame().interact).toBe(true);
         expect(frame().interact).toBe(false);
     });
 
+    it('interacts on the E key whatever it types, e.g. у on a Russian layout', () => {
+        key('у', 'KeyE');
+
+        expect(frame().interact).toBe(true);
+    });
+
     it('forgets held keys when the window loses focus, whose keyup never arrives', () => {
-        key('w');
+        key('w', 'KeyW');
         expect(frame().move.y).toBe(1);
 
         window.dispatch('blur');
 
         expect(frame().move.y).toBe(0);
+    });
+
+    describe('letting go of a movement key', () => {
+        it('stops, with Shift pressed while walking (it comes up as W)', () => {
+            key('w', 'KeyW');
+            key('Shift', 'ShiftLeft');
+            release('W', 'KeyW');
+            release('Shift', 'ShiftLeft');
+
+            expect(frame().move.y).toBe(0);
+        });
+
+        it('stops, with Shift let go first (it went down as W, comes up as w)', () => {
+            key('Shift', 'ShiftLeft');
+            key('W', 'KeyW');
+            release('Shift', 'ShiftLeft');
+            release('w', 'KeyW');
+
+            expect(frame().move.y).toBe(0);
+        });
+
+        it('stops, with Caps Lock switched on while walking', () => {
+            key('d', 'KeyD');
+            key('CapsLock', 'CapsLock');
+            release('CapsLock', 'CapsLock');
+            release('D', 'KeyD');
+
+            expect(frame().move.x).toBe(0);
+        });
     });
 
     describe('last-used device, for on-screen prompts', () => {
@@ -66,7 +104,7 @@ describe('WebInputService', () => {
             frame();
             expect(input.getLastDevice()).toBe('gamepad');
 
-            key('w');
+            key('w', 'KeyW');
             expect(input.getLastDevice()).toBe('keyboard');
         });
 
@@ -124,7 +162,7 @@ describe('WebInputService', () => {
     });
 
     it('Escape is both back and the menu button', () => {
-        key('Escape');
+        key('Escape', 'Escape');
 
         const intent = frame();
         expect(intent.back).toBe(true);
@@ -132,7 +170,7 @@ describe('WebInputService', () => {
     });
 
     it('Backspace is only back', () => {
-        key('Backspace');
+        key('Backspace', 'Backspace');
 
         const intent = frame();
         expect(intent.back).toBe(true);

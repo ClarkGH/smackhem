@@ -472,6 +472,7 @@ World/chunk/static collision ownership
 - **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
 - **[Controls](controls.md)** - Keyboard, mouse and controller bindings
 - **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure

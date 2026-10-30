@@ -1,5 +1,6 @@
 import { GameMode } from './gameState';
 import { AudioCategory } from '../services/audio';
+import type { EncounterId } from './combat';
 
 export type GameEvent =
     | {
@@ -35,22 +36,24 @@ export type GameEvent =
     }
     | {
         type: 'quit_to_main_menu_requested';
+    }
+    | {
+        type: 'choice_made';
+        npcId: string;
+        optionIndex: number;
+    }
+    | {
+        type: 'battle_requested';
+        encounterId: EncounterId;
+        npcId: string;
+    }
+    | {
+        type: 'game_over_requested';
     };
 
 type ExtractEvent<K extends GameEvent['type']> = Extract<GameEvent, { type: K }>;
 
-export interface EventBus {
-    publish(event: GameEvent): void;
-
-    flush(): void;
-
-    subscribe<K extends GameEvent['type']>(
-        type: K,
-        handler: (event: ExtractEvent<K>) => void,
-    ): () => void;
-}
-
-export class TypeSafeEventBus implements EventBus {
+export class TypeSafeEventBus {
     private listeners = new Map<string, Array<(event: any) => void>>();
 
     private incomingQueue: GameEvent[] = [];

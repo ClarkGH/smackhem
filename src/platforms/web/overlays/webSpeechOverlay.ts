@@ -1,11 +1,27 @@
 import type { SpeechOverlay, SpeechView } from '../../../services/speechOverlay';
 
+// Marks the selected option by shape as well as weight, so it never relies on looks alone
+const SELECTED_MARK = '▶ ';
+const UNSELECTED_MARK = '  ';
+
 /**
  * Web speech bubble: one absolutely placed div over the canvas, inside the same container.
  * A rough placeholder, the design comes later. It never takes mouse events.
  */
 export default class WebSpeechOverlay implements SpeechOverlay {
     private readonly bubble: HTMLDivElement;
+
+    private readonly text: HTMLDivElement;
+
+    private readonly optionList: HTMLDivElement;
+
+    // One row per option, made once and reused. Rows past the current options are hidden.
+    private readonly rows: HTMLDivElement[] = [];
+
+    // What the rows show now, so they're only rewritten when the choice changes, not every frame
+    private shownOptions: readonly string[] | null = null;
+
+    private shownSelected = -1;
 
     constructor(container: HTMLElement) {
         // The bubble is placed relative to the container
@@ -28,8 +44,21 @@ export default class WebSpeechOverlay implements SpeechOverlay {
             // Centered over the anchor, sitting on top of it
             transform: 'translate(-50%, -100%)',
         });
+
+        const text = document.createElement('div');
+        bubble.appendChild(text);
+
+        const optionList = document.createElement('div');
+        Object.assign(optionList.style, {
+            display: 'none',
+            marginTop: '6px',
+        });
+        bubble.appendChild(optionList);
+
         container.appendChild(bubble);
         this.bubble = bubble;
+        this.text = text;
+        this.optionList = optionList;
     }
 
     public render(view: SpeechView | null): void {
@@ -37,9 +66,40 @@ export default class WebSpeechOverlay implements SpeechOverlay {
             this.bubble.style.display = 'none';
             return;
         }
-        if (this.bubble.textContent !== view.text) this.bubble.textContent = view.text;
+        if (this.text.textContent !== view.text) this.text.textContent = view.text;
+        this.renderChoice(view.choice);
         this.bubble.style.left = `${view.x * 100}%`;
         this.bubble.style.top = `${view.y * 100}%`;
         this.bubble.style.display = 'block';
+    }
+
+    private renderChoice(choice: SpeechView['choice']): void {
+        const options = choice ? choice.options : null;
+        const selected = choice ? choice.selected : -1;
+        if (options === this.shownOptions && selected === this.shownSelected) return;
+        this.shownOptions = options;
+        this.shownSelected = selected;
+
+        const count = options ? options.length : 0;
+        for (let i = 0; i < count; i += 1) {
+            const row = this.rows[i] ?? this.addRow();
+            const isSelected = i === selected;
+            row.textContent = `${isSelected ? SELECTED_MARK : UNSELECTED_MARK}${options![i]}`;
+            row.style.fontWeight = isSelected ? 'bold' : 'normal';
+            row.style.display = 'block';
+        }
+        for (let i = count; i < this.rows.length; i += 1) {
+            this.rows[i].style.display = 'none';
+        }
+        this.optionList.style.display = count > 0 ? 'block' : 'none';
+    }
+
+    private addRow(): HTMLDivElement {
+        const row = document.createElement('div');
+        // Keeps the unselected mark's spaces, so the options line up under each other
+        row.style.whiteSpace = 'pre';
+        this.optionList.appendChild(row);
+        this.rows.push(row);
+        return row;
     }
 }

@@ -244,7 +244,10 @@ Gameplay update loops must not:
 - Create arrays
 - Spawn objects
 
-Chunk loading is the only allowed allocation boundary.
+There are two allowed allocation boundaries:
+
+- Chunk loading
+- Battle start: a fight's state is created when it starts and dropped when it ends. Its log grows at most once per action, never per tick ([battle.md](battle.md#rules-it-follows))
 
 ### RULE M-2: Predictable Lifetime
 
@@ -343,6 +346,7 @@ Break them knowingly. With intent and not ignorance.
 - **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
 - **[Controls](controls.md)** - Keyboard, mouse and controller bindings
 - **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure

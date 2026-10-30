@@ -9,7 +9,7 @@ import { createScenario, type Scenario } from '../../testing/scenario';
 
 // One unit ahead of where the player can stand, straight down the starting view (-z)
 const NPC: NpcJSON = {
-    id: 'npc_01', sprite: 'npc-lmao', pos: [0, 0, -2], size: 1, line: 'Hello',
+    id: 'npc_lmao_1', sprite: 'lmao_idle_1', pos: [0, 0, -2], size: 1, line: 'Hello',
 };
 
 const withSpawnChunk = (npcs: NpcJSON[]): Scenario => {
@@ -47,7 +47,7 @@ describe('NPC collision - scenario (stub platform)', () => {
 const settleLoads = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0); });
 
 describe('NPC billboard - scenario (stub platform)', () => {
-    const isNpcTexture = (id: string): boolean => id.startsWith('stub_texture_npc-lmao');
+    const isNpcTexture = (id: string): boolean => id.startsWith('stub_texture_lmao_idle_1');
 
     it('loads its texture once, and draws nothing until it has', async () => {
         const scenario = withSpawnChunk([NPC]);
@@ -55,12 +55,12 @@ describe('NPC billboard - scenario (stub platform)', () => {
         const draw = vi.spyOn(scenario.renderer, 'drawTexturedQuad');
 
         scenario.tick(3);
-        expect(load.mock.calls.filter(([id]) => id === 'npc-lmao')).toHaveLength(1);
+        expect(load.mock.calls.filter(([id]) => id === 'lmao_idle_1')).toHaveLength(1);
         expect(draw).not.toHaveBeenCalled();
 
         await settleLoads();
         scenario.tick(3);
-        expect(load.mock.calls.filter(([id]) => id === 'npc-lmao')).toHaveLength(1);
+        expect(load.mock.calls.filter(([id]) => id === 'lmao_idle_1')).toHaveLength(1);
         // One quad per frame, all with the NPC's texture
         expect(draw).toHaveBeenCalledTimes(3);
         expect(draw.mock.calls.every(([texture]) => isNpcTexture(texture.id))).toBe(true);
@@ -73,7 +73,7 @@ describe('NPC billboard - scenario (stub platform)', () => {
         await settleLoads();
         scenario.tick();
 
-        const [, model, , normal] = draw.mock.calls[0];
+        const [, model, normal] = draw.mock.calls[0];
         const m = model.elements;
         // Centered half its size above its base, at its spot
         expect([m[12], m[13], m[14]]).toEqual([0, 0.5, -2]);

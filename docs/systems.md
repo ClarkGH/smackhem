@@ -108,7 +108,7 @@ This works identically on:
 
 Nothing is freed when a chunk unloads, and that is deliberate for now. Two caches keep everything:
 - **Renderer mesh cache:** keyed by shape and size (`cube_1`, `plane_10`, …). Chunks share these meshes.
-- **Asset loader chunk cache:** every chunk ever loaded, so walking back is instant.
+- **`ChunkLoader`'s kept chunks** (core, one per game's chunk updater): every chunk ever loaded, empty stand-ins for missing or broken files included, so walking back is instant and a bad file is only fetched once.
 
 So GPU memory grows with the number of *distinct shape sizes*, not with how much the player walks, and memory overall grows with the number of chunks visited. With the current hand-made map this is tiny.
 
@@ -475,6 +475,7 @@ The 2D scene system (more TBD). Entered from Pause → Debug → Enter 2D Scene:
 - **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
 - **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
+- **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
 - **[Controls](controls.md)** - Keyboard, mouse and controller bindings
 - **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure

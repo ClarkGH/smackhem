@@ -10,7 +10,7 @@ export default class NullSpeechOverlay implements SpeechOverlay {
     public renderCount = 0;
 
     public render(view: SpeechView | null): void {
-        this.lastView = view ? { ...view } : null;
+        this.lastView = view ? { ...view, choice: view.choice ? { ...view.choice } : null } : null;
         this.renderCount += 1;
     }
 }

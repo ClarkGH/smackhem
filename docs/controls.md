@@ -79,6 +79,10 @@ Toggleable, never needed to play (Rule D-1).
   - Space/Y (instance) will be freed. Until then Space is fine: it usually means jump, but the game has none.
   - The 2D scene is only reachable from the Debug menu for now. Interact inside it still leaves it.
 - **The `pause` intent's name.** It drives the instance toggle, not a pause. Renaming it (e.g. `toggleInstance`) would free "pause" for the real pause menu.
+- **Key remapping (TBD).** Rebinding keys in Settings is planned. Still to settle:
+  - **What a binding stores:** the physical key, not the character it types, so a binding survives a change of keyboard layout. The web already matches movement and Interact this way. Prompts still need to show the character printed on the key. Browsers only offer that in some cases, and a desktop build will need its own way. The stored form has to be one that both the web and desktop builds can read.
+  - **Fixed keys:** Escape, Backspace and Enter can't be rebound. They're the same on every keyboard, so the rebinding screen itself always works.
+  - **Controller remapping:** later, not part of the first version.
 
 ## Navigation
 
@@ -89,6 +93,7 @@ Toggleable, never needed to play (Rule D-1).
 - **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
 - **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure
 - **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

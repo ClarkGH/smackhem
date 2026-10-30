@@ -8,6 +8,7 @@ import NullRenderer from '../platforms/stub/nullRenderer';
 import NullMenuOverlay from '../platforms/stub/nullMenuOverlay';
 import NullSpeechOverlay from '../platforms/stub/nullSpeechOverlay';
 import NullPromptOverlay from '../platforms/stub/nullPromptOverlay';
+import NullBattleOverlay from '../platforms/stub/nullBattleOverlay';
 import StubInput from '../platforms/stub/stubInput';
 import type { DisplayCapabilities } from '../services/display';
 import type { PlayerIntent } from '../services/input';
@@ -33,6 +34,7 @@ export interface Scenario {
     overlay: NullMenuOverlay;
     speech: NullSpeechOverlay;
     prompt: NullPromptOverlay;
+    battleOverlay: NullBattleOverlay;
     renderer: NullRenderer;
     settings: Settings;
     // Empty to start, tests add chunks to it
@@ -65,6 +67,7 @@ export const createScenario = (options: ScenarioOptions = {}): Scenario => {
     const overlay = new NullMenuOverlay();
     const speech = new NullSpeechOverlay();
     const prompt = new NullPromptOverlay();
+    const battleOverlay = new NullBattleOverlay();
     const settings = options.settings ?? createDefaultSettings();
     const renderer = new NullRenderer();
     const world = new World();
@@ -78,6 +81,7 @@ export const createScenario = (options: ScenarioOptions = {}): Scenario => {
         menuOverlay: overlay,
         speechOverlay: speech,
         promptOverlay: prompt,
+        battleOverlay,
         settings,
         displayCapabilities: options.displayCapabilities,
         debugSettings: options.debugSettings,
@@ -120,6 +124,22 @@ export const createScenario = (options: ScenarioOptions = {}): Scenario => {
     };
 
     return {
-        input, gameState, gameLoop, eventBus, overlay, speech, prompt, renderer, settings, world, press, tick, frame, click, enterScene, addChunk,
+        input,
+        gameState,
+        gameLoop,
+        eventBus,
+        overlay,
+        speech,
+        prompt,
+        battleOverlay,
+        renderer,
+        settings,
+        world,
+        press,
+        tick,
+        frame,
+        click,
+        enterScene,
+        addChunk,
     };
 };

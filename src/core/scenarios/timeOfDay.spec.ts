@@ -68,7 +68,7 @@ describe('time of day - scenario (stub platform)', () => {
     it('stands still while time is frozen for the instance', () => {
         const { gameState, press, tick } = scenario;
         press({ pause: true });
-        expect(gameState.discrete.isTimeFrozen).toBe(true);
+        expect(gameState.discrete.instanceIsOpen).toBe(true);
         const time = gameState.timeOfDay;
         tick(30);
 

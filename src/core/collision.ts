@@ -5,6 +5,7 @@ import {
     aabbIntersects,
 } from './math/aabb';
 
+// Scratch objects reused by every resolveCollision call, so resolving a move allocates nothing (M-1)
 export interface CollisionContext {
     newPos: Vec3;
     xOnlyPos: Vec3;
@@ -44,7 +45,7 @@ export const getPlayerAABB = (position: Vec3, height: number, radius: number): A
     );
 };
 
-// PERFORMANCE: Update AABB in-place (zero allocation)
+// Fills out in place
 export const updatePlayerAABB = (
     position: Vec3,
     height: number,
@@ -77,7 +78,6 @@ export const resolveCollision = (
     context.newPos.x = playerPos.x + movement.x;
     context.newPos.y = playerPos.y + movement.y;
     context.newPos.z = playerPos.z + movement.z;
-    // PERFORMANCE: Update AABB in-place (zero allocation)
     updatePlayerAABB(context.newPos, playerHeight, playerRadius, context.playerAABB);
 
     let hasCollision = false;
@@ -89,7 +89,6 @@ export const resolveCollision = (
     }
 
     if (!hasCollision) {
-        // PERFORMANCE: Write into existing object to avoid allocation
         context.resolvedMovement.x = movement.x;
         context.resolvedMovement.y = movement.y;
         context.resolvedMovement.z = movement.z;
@@ -100,7 +99,6 @@ export const resolveCollision = (
     context.xOnlyPos.x = playerPos.x + movement.x;
     context.xOnlyPos.y = playerPos.y;
     context.xOnlyPos.z = playerPos.z;
-    // PERFORMANCE: Update AABB in-place (zero allocation)
     updatePlayerAABB(context.xOnlyPos, playerHeight, playerRadius, context.xOnlyAABB);
     let xCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
@@ -114,7 +112,6 @@ export const resolveCollision = (
     context.zOnlyPos.x = playerPos.x;
     context.zOnlyPos.y = playerPos.y;
     context.zOnlyPos.z = playerPos.z + movement.z;
-    // PERFORMANCE: Update AABB in-place (zero allocation)
     updatePlayerAABB(context.zOnlyPos, playerHeight, playerRadius, context.zOnlyAABB);
     let zCollision = false;
     for (let i = 0; i < worldAABBs.length; i += 1) {
@@ -124,7 +121,16 @@ export const resolveCollision = (
         }
     }
 
-    // PERFORMANCE: Write into existing object to avoid allocation (complies with RULE M-1)
+    // Heading into a corner, each axis alone is clear but both together go into the box.
+    // Slide along the larger one only, x on an exact tie.
+    if (!xCollision && !zCollision) {
+        if (Math.abs(movement.x) >= Math.abs(movement.z)) {
+            zCollision = true;
+        } else {
+            xCollision = true;
+        }
+    }
+
     context.resolvedMovement.x = xCollision ? 0 : movement.x;
     context.resolvedMovement.y = movement.y;
     context.resolvedMovement.z = zCollision ? 0 : movement.z;

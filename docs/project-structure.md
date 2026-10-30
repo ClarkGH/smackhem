@@ -63,8 +63,10 @@ src/
 ├─ core/
 │  ├─ camera.ts               # 3D camera math and logic
 │  ├─ camera.spec.ts          # Flat move directions and the camera matrix, filled in place
-│  ├─ chunkLoader.ts          # Chunk JSON parsing and mesh creation
-│  ├─ chunkLoader.spec.ts     # Mesh placement and collision per shape, schema version, NPCs
+│  ├─ chunkLoader.ts          # Chunk JSON parsing and mesh creation, loading through a ChunkSource, kept chunks
+│  ├─ chunkLoader.spec.ts     # Mesh placement and collision per shape, schema version, NPCs, loadChunk's fallbacks
+│  ├─ chunkStreamer.ts        # Loads and unloads chunks around the player, for every platform; ChunkUpdater
+│  ├─ chunkStreamer.spec.ts   # Chunk streaming when loads finish out of order
 │  ├─ collision.ts            # Collision logic
 │  ├─ combat.ts               # Combat rules: HP, attacks, battle outcome (pure)
 │  ├─ combat.spec.ts          # Sheets, HP clamping, damage and battle outcomes
@@ -78,13 +80,22 @@ src/
 │  ├─ overheadOverlays.ts     # Places the speech bubble and interact prompt over NPCs' heads
 │  ├─ party.ts                # Party logic
 │  ├─ scene.ts                # Scene system
-│  ├─ world.ts                # World and chunking logic
+│  ├─ world.ts                # World and chunking logic, hidden NPCs, duplicate NPC id warning
 │  ├─ world.spec.ts           # Boundary walls between chunks, cached mesh/NPC/collision lists
 │  ├─ audio/
 │  │  ├─ audioSystem.ts       # Owns sound handles, turns audio events into AudioService calls
 │  │  ├─ audioSystem.spec.ts  # Tests for audio event handling (stub audio)
 │  │  ├─ modeAudio.ts         # Game mode changes -> audio requests (ambience, mode sound)
 │  │  └─ modeAudio.spec.ts    # Scenario tests for mode-driven audio (stub platform)
+│  ├─ battle/
+│  │  ├─ battle.ts            # Battle state types: combatants, phase, ready queue, log, commands. findCombatant
+│  │  ├─ battleField.ts       # Where a fight stands (party and enemy lines) and the battle camera, pure layout math
+│  │  ├─ battleField.spec.ts  # Facing, line placement and spacing, and the camera's pitch, distance and aim
+│  │  ├─ battleMenu.ts        # The party's unconfirmed choice: Command, then Target, Back between them
+│  │  ├─ battleScreen.ts      # Builds the BattleView in place each frame, words the log
+│  │  ├─ battleSystem.ts      # Starts a fight on Yes, runs turns and beats, resolves commands, ends it
+│  │  ├─ enemyAi.ts           # The enemy's command for its turn (basic attack on the first standing)
+│  │  └─ enemyAi.spec.ts      # Enemy target choice, skipping party members who are down
 │  ├─ lighting/
 │  │  ├─ clouds.ts            # Cloud cycle timing, shared with the sky shader
 │  │  ├─ clouds.spec.ts       # Cloud time wraps with no jump, whole noise periods per cycle
@@ -106,13 +117,27 @@ src/
 │  │  ├─ displaySettings.spec.ts # Fullscreen requests, refusals and outside changes (stub display)
 │  │  └─ debugSettings.ts     # Debug screen values (wireframe, shadows, bias, time), never saved
 │  ├─ scenarios/              # Scenario specs that cross systems (stub platform)
+│  │  ├─ battle.spec.ts       # Starting a fight on Yes, the world waiting, pause and quit, coming back
+│  │  ├─ battleContact.spec.ts # Fights that start on touch: walking in, only stepping in counts, the instance
+│  │  ├─ battleAtb.spec.ts    # ATB: full start, filling from sim time, waiting, Active vs Wait, the Battle Mode setting
+│  │  ├─ battleDefeat.spec.ts # A win hides the NPC for good (reload test), a loss keeps it, duplicate id warning
+│  │  ├─ battleView.spec.ts   # The battle screen's view: who's who, hidden enemy HP, wording, hiding, a fresh fight
+│  │  ├─ battleRun.spec.ts    # Running away: Run row, getting away, encounters you can't flee, enemies that keep damage
+│  │  ├─ battleRunUp.spec.ts  # Running to the target and back: the hit lands on arrival, skips, pause, no run after the last
+│  │  ├─ battleStage.spec.ts  # The field and its layout, the battle camera, billboards, blob shadows, battle debug rows
+│  │  ├─ battleTurns.spec.ts  # Turn loop: Command/Target/Back, one confirm once, beats, pause, log order, win/lose
+│  │  ├─ battleEnemyCommand.spec.ts # A refused enemy command throws, enemies can't run (enemyAi mocked)
+│  │  ├─ choice.spec.ts       # NPC Yes/No choice: selection, Interact and Back picks, choice_made, pause
+│  │  ├─ collision.spec.ts    # Walking diagonally into a corner stops outside the box, and can back away
 │  │  ├─ debugMenu.spec.ts    # Debug screen: wireframe, shadows, bias and time reach the renderer
 │  │  ├─ frameCap.spec.ts     # Catch-up after a stall is capped at a quarter second
+│  │  ├─ gameOver.spec.ts     # A lost fight goes to Game Over, keeps the enemy, only Return to Title leaves
 │  │  ├─ interaction.spec.ts  # NPC speech: facing, reach, opening, closing, the world waiting
 │  │  ├─ look.spec.ts         # Look timing: mouse once per frame, stick per tick
 │  │  ├─ modeChange.spec.ts   # Game mode changes
 │  │  ├─ npc.spec.ts          # NPC collision, and its billboard's texture and placement
 │  │  ├─ pause.spec.ts        # Pause, resume and quit-to-menu
+│  │  ├─ presses.spec.ts      # Presses on a frame with no tick wait for the next one, used once
 │  │  ├─ scene.spec.ts        # 2D scene movement, the whole grid walkable
 │  │  └─ timeOfDay.spec.ts    # Day clock: advances per tick, wraps, stands still when frozen
 │  └─ math/                   # Shared engine math logic
@@ -123,9 +148,10 @@ src/
 │  ├─ renderer.ts             # Abstract Renderer interface
 │  ├─ input.ts                # Abstract Input service
 │  ├─ clock.ts                # Time service
-│  ├─ assetLoader.ts          # Asset loading service
+│  ├─ chunkSource.ts          # Chunk files by coordinates, as text: the platform fetches, core parses
 │  ├─ audio.ts                # Abstract Audio service interface
 │  ├─ display.ts              # Display service: render scale, window size, fullscreen
+│  ├─ battleOverlay.ts        # Battle screen interface and the BattleView/CombatantView it draws
 │  ├─ menuOverlay.ts          # Menu overlay interface and the MenuView it draws
 │  ├─ promptOverlay.ts        # Interact prompt interface and the PromptView it draws
 │  ├─ speechOverlay.ts        # Speech bubble interface and the SpeechView it draws
@@ -135,9 +161,9 @@ src/
 ├─ platforms/
 │  ├─ web/
 │  │  ├─ webBootstrap.ts      # Bootstraps the webGL game engine
-│  │  ├─ webBootstrap.spec.ts # Chunk streaming when loads finish out of order
 │  │  ├─ webClock.ts          # Web platform clock implementation
-│  │  ├─ webAssetLoader.ts    # Web asset loader (chunks)
+│  │  ├─ webChunkSource.ts    # Web ChunkSource: chunk JSON files over fetch
+│  │  ├─ webChunkSource.spec.ts # File names from coordinates, missing files, Vite's HTML fallback, offline
 │  │  ├─ webDisplay.ts        # Canvas fills its container, render scale, fullscreen on the container
 │  │  ├─ webDisplay.spec.ts   # Canvas sizing, render scale, fullscreen and refusals (fake DOM)
 │  │  ├─ localStorageStore.ts # Key-value storage on localStorage, never throws
@@ -145,6 +171,7 @@ src/
 │  │  ├─ debugHUD.ts          # Debug HUD overlay
 │  │  ├─ rendering/
 │  │  │  ├─ webGLRenderer.ts  # WebGL2 renderer: shaders, shadow map, depth and lit passes
+│  │  │  ├─ webGLRenderer.spec.ts # Setup and a frame's draws, counted on a fake GL context
 │  │  │  ├─ drawList.ts       # A frame's draws, copied in and replayed in endFrame
 │  │  │  ├─ drawList.spec.ts  # Copies scratch matrices, keeps call order, pool reuse
 │  │  │  ├─ shadowMath.ts     # Light view-projection for the shadow map, texel-snapped
@@ -160,14 +187,18 @@ src/
 │  │  │  ├─ menuHitTest.ts    # Mouse position to menu item, and menu scrolling (pure math)
 │  │  │  └─ menuHitTest.spec.ts # Hit-test, CSS-scaling and scrolling tests
 │  │  ├─ overlays/
+│  │  │  ├─ webBattleOverlay.ts # Battle screen, a first pass: log banner, enemy names, party panel, commands
+│  │  │  ├─ webBattleOverlay.spec.ts # Marks by shape, defeated styling, reused rows, text scale (fake DOM)
 │  │  │  ├─ webPromptOverlay.ts # Interact key hint over the target, label follows the last device
-│  │  │  └─ webSpeechOverlay.ts # Speech bubble, a placed div over the canvas
+│  │  │  ├─ webSpeechOverlay.ts # Speech bubble, a placed div over the canvas, with choice rows
+│  │  │  └─ webSpeechOverlay.spec.ts # Choice rows: the selected mark, reused rows, hiding
 │  │  └─ audio/
 │  │     ├─ webAudioService.ts # Web audio playback and mixing service
 │  │     └─ webAudioService.spec.ts # Playback, loading, autoplay retry, and the AudioService contract
 │  ├─ stub/
 │  │  ├─ nullRenderer.ts      # Stub renderer for testing/validation
 │  │  ├─ nullRenderer.spec.ts # Tests for stub renderer
+│  │  ├─ nullBattleOverlay.ts # Stub battle screen, keeps a deep copy of the last view and counts renders
 │  │  ├─ nullMenuOverlay.ts   # Stub menu overlay, keeps the last view for tests
 │  │  ├─ nullPromptOverlay.ts # Stub interact prompt, keeps a copy of the last view
 │  │  ├─ nullSpeechOverlay.ts # Stub speech bubble, keeps a copy of the last view and counts renders
@@ -180,8 +211,11 @@ src/
 │  └─ cpu/                    # CPU platform (future)
 ├─ testing/                   # Test-only helpers, never imported by the game
 │  ├─ scenario.ts             # Scenario harness: real GameLoop on the stub platform
+│  ├─ battleScenario.ts       # Shared fight steps for battle specs: start, attack, skip, win, lose, a round
 │  ├─ fakeDom.ts              # Minimal document/window/canvas fakes for web platform tests
-│  └─ fakeWebAudio.ts         # Minimal AudioContext/Audio/fetch fakes for web audio tests
+│  ├─ fakeWebAudio.ts         # Minimal AudioContext/Audio/fetch fakes for web audio tests
+│  ├─ fakeWebGL.ts            # WebGL2 context that draws nothing and records every call
+│  └─ fakeWebGL.spec.ts       # Uniforms told apart by program, finding a program by its uniform
 ├─ types/
 │  └─ common.d.ts             # Common type definitions
 ├─ index.html                 # HTML entry point for web platform
@@ -198,7 +232,7 @@ public/
 ├─ chunks/                    # Chunk JSON files
 │  └─ {fileX}_{fileZ}.json    # Offset-based naming (fileX = chunkX + 10000)
 └─ assets/
-   ├─ images/                 # Textures, asset ID naming (e.g. circle-sleep00.png)
+   ├─ images/                 # Textures, asset ID naming (<who>_<state>_<frame>, e.g. circle_sleep_1.png, see data-formats.md)
    └─ audio/                  # Audio files, file name is the sound ID
       ├─ ambient_night.ogg    # snake_case, led by purpose. All placeholders for now
       ├─ sfx_mode_change.ogg  # Played on every game mode change
@@ -264,6 +298,7 @@ No rewrites. Just additions.
 - **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
+- **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
 - **[Controls](controls.md)** - Keyboard, mouse and controller bindings
 - **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing

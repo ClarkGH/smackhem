@@ -464,7 +464,7 @@ describe('MenuSystem - scenario through GameLoop (stub platform)', () => {
         scenario.press({ pause: true });
 
         expect(scenario.gameState.discrete.gameMode).toBe('main_menu');
-        expect(scenario.gameState.discrete.isTimeFrozen).toBe(false);
+        expect(scenario.gameState.discrete.instanceIsOpen).toBe(false);
     });
 
     it('only redraws the overlay when the menu changes', () => {

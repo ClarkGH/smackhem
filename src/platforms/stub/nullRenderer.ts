@@ -181,7 +181,7 @@ export default class NullRenderer implements Renderer {
         return { id: `stub_texture_${_assetId}_${this.textureCounter}` };
     }
 
-    public drawTexturedQuad(_texture: TextureHandle, _model: Mat4, _size: number, _normal?: Vec3): void {
+    public drawTexturedQuad(_texture: TextureHandle, _model: Mat4, _normal?: Vec3): void {
         // Stub implementation - validates texture handle exists
         if (!_texture.id.startsWith('stub_texture_')) {
             throw new Error(`Invalid texture handle: ${_texture.id}`);

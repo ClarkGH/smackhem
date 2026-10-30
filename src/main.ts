@@ -15,8 +15,7 @@ const setUpPlatform = async (): Promise<GameSetup> => {
     const platform = await createWebPlatform();
     return {
         platform,
-        updateChunks: createChunkUpdater(),
-        assetLoader: platform.assetLoader,
+        updateChunks: createChunkUpdater(platform.chunkSource),
         debugHUD: createDebugHUD(platform.canvas),
         // Dev server only, so released builds have no Debug screen
         debugSettings: import.meta.env.DEV ? createDebugSettings() : undefined,

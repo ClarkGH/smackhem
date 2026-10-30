@@ -36,10 +36,8 @@ export default class Instance3DSystem {
     private readonly proposedMovement: Vec3 = { x: 0, y: 0, z: 0 };
 
     constructor(
-        // I assure you, these variables are in use.
-        // TODO: Being lazy, we can do the this.collisionContext pattern when we refactor
-        // I want to start building features and stop optimizing for a while
-        // We cool?
+        // Parameter properties: each becomes a private field, e.g. this.world
+        // TODO: declare the fields explicitly, as GameLoop does, in a later refactor
         private collisionContext: CollisionContext,
         private world: World,
         private camera: Camera,
@@ -71,7 +69,7 @@ export default class Instance3DSystem {
 
         const interpolatedState = gameState.interpolated;
 
-        discreteState.isTimeFrozen = true;
+        discreteState.instanceIsOpen = true;
         discreteState.targetPitch = 0;
         discreteState.isTransitioningPitch = true;
 
@@ -87,7 +85,7 @@ export default class Instance3DSystem {
         interpolatedState.instanceCharacterPosition.z = this.transitionStartPos.z;
 
         const previousMode = discreteState.gameMode;
-        // Mindfully overriding memory
+        // Writes shared state on purpose
         gameState.discrete.gameMode = 'instance_3d';
         this.publishModeChange(previousMode, 'instance_3d');
     }
@@ -133,7 +131,7 @@ export default class Instance3DSystem {
         const discreteState = gameState.discrete;
         const interpolatedState = gameState.interpolated;
 
-        if (discreteState.isTimeFrozen && discreteState.instanceIsTransitioning) {
+        if (discreteState.instanceIsOpen && discreteState.instanceIsTransitioning) {
             // Reduced motion: the whole transition in one tick
             const duration = this.settings.reducedMotion ? dt : TRANSITION_DURATION;
             interpolatedState.instanceTransitionProgress += (
@@ -173,14 +171,14 @@ export default class Instance3DSystem {
             if (interpolatedState.instanceTransitionProgress <= 0.0) {
                 discreteState.instanceIsTransitioning = false;
                 discreteState.instanceIsActive = false;
-                discreteState.isTimeFrozen = false;
+                discreteState.instanceIsOpen = false;
                 const previousMode = discreteState.gameMode;
                 discreteState.gameMode = 'world_3d';
                 this.publishModeChange(previousMode, 'world_3d');
             }
         }
 
-        if (discreteState.isTimeFrozen && discreteState.isTransitioningPitch) {
+        if (discreteState.instanceIsOpen && discreteState.isTransitioningPitch) {
             const pitchTransitionSpeed = 2.0;
             const pitchDelta = (discreteState.targetPitch - this.camera.pitch) * pitchTransitionSpeed * dt;
 
@@ -195,7 +193,7 @@ export default class Instance3DSystem {
             }
         }
 
-        if (discreteState.isTimeFrozen && discreteState.instanceIsActive && !discreteState.instanceIsTransitioning) {
+        if (discreteState.instanceIsOpen && discreteState.instanceIsActive && !discreteState.instanceIsTransitioning) {
             const { x: moveX, y: moveY } = intent.move;
 
             if (moveX !== 0 || moveY !== 0) {

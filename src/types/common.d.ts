@@ -1,12 +1,5 @@
-import type { Chunk } from '../core/world';
-
 declare global {
     var __PLATFORM__: string | undefined;
-}
-
-export interface MapData {
-    id: string;
-    chunks: Chunk[];
 }
 
 export interface Mat4 {

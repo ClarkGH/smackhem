@@ -142,6 +142,7 @@ describe('reduced motion - scenario (stub platform)', () => {
         enterScene();
 
         expect(gameState.discrete.gameMode).toBe('scene_2d');
-        expect(gameState.discrete.sceneIsActive).toBe(true);
+        expect(gameState.discrete.sceneIsTransitioning).toBe(false);
+        expect(gameState.interpolated.sceneTransitionProgress).toBe(1);
     });
 });

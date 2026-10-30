@@ -6,6 +6,7 @@ import {
 } from 'vitest';
 import { createScenario, type Scenario } from '../../testing/scenario';
 import { createDebugSettings } from '../settings/debugSettings';
+import { SCENE_TILE_SIZE } from '../scene';
 
 describe('2D scene movement - scenario (stub platform)', () => {
     let scenario: Scenario;
@@ -20,7 +21,7 @@ describe('2D scene movement - scenario (stub platform)', () => {
     // The grid is 18.75 tiles tall, so the last row is partly off screen. It's still walkable.
     it('walks the whole bottom row, into the bottom-right tile', () => {
         const { gameState, input, tick } = scenario;
-        expect(gameState.discrete.sceneIsActive).toBe(true);
+        expect(gameState.discrete.sceneIsTransitioning).toBe(false);
 
         // One axis at a time: a step past the scene's edge is refused on both axes
         input.setIntent({ move: { x: 0, y: -1 } });
@@ -28,6 +29,7 @@ describe('2D scene movement - scenario (stub platform)', () => {
         input.setIntent({ move: { x: 1, y: 0 } });
         tick(900);
 
-        expect(gameState.discrete.sceneCharacterPositionGrid).toEqual({ x: 24, y: 18 });
+        const { x, y } = gameState.interpolated.sceneCharacterPositionPx;
+        expect({ x: Math.floor(x / SCENE_TILE_SIZE), y: Math.floor(y / SCENE_TILE_SIZE) }).toEqual({ x: 24, y: 18 });
     });
 });

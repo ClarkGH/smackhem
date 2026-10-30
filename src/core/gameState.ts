@@ -1,4 +1,6 @@
 import type { Vec3 } from '../types/common';
+import type { BattleState } from './battle/battle';
+import type { EnemySheetId } from './combat';
 import { PLAYER_HEIGHT } from './camera';
 
 export interface TransitionState<T> {
@@ -30,7 +32,7 @@ export interface InterpolatedState {
     sceneTransitionProgress: number;
 }
 
-export type GameMode = 'main_menu' | 'world_3d' | 'instance_3d' | 'scene_2d';
+export type GameMode = 'main_menu' | 'world_3d' | 'instance_3d' | 'scene_2d' | 'battle_25djrpg' | 'game_over';
 
 // TODO: Establish a differentiation between exploration in the world and in the instance
 export interface DiscreteState {
@@ -41,16 +43,22 @@ export interface DiscreteState {
     instanceTransitionDirection: 1 | -1;
     interactTarget: string | null;
     savedCameraState: { position: Vec3; yaw: number; pitch: number } | null;
-    sceneIsActive: boolean
     sceneIsTransitioning: boolean;
     sceneTransitionDirection: 1 | -1;
     isPaused: boolean;
-    isTimeFrozen: boolean;
-    sceneCharacterPositionGrid: { x: number; y: number };
+    // From the instance starting to open until it has fully closed, a fight started inside it included.
+    // The world's time, movement and look stop while it's set.
+    instanceIsOpen: boolean;
     isTransitioningPitch: boolean;
     targetPitch: number;
-    // The NPC line on screen, null when nobody is talking. Stays until Interact or Back closes it (see GameLoop).
-    activeSpeech: { npcId: string; line: string;} | null;
+    // The NPC line on screen, null when nobody is talking. choice is null for a plain line.
+    // A plain line closes on Interact or Back. A choice closes when an option is picked, and Back picks No (see GameLoop).
+    activeSpeech: { npcId: string; line: string; choice: { options: readonly string[]; selected: number } | null } | null;
+    battle: BattleState | null;
+    defeatedNpcIds: string[];
+    // HP carried between fights by enemies whose sheet keepsDamage (Deathgaze-style, battle.md).
+    // By sheet, not placement, since one such enemy can turn up in several places. Missing means full.
+    keptEnemyHp: Partial<Record<EnemySheetId, number>>;
 }
 
 export interface GameState {
@@ -73,7 +81,7 @@ export const createGameState = (initialMode: GameMode = 'world_3d'): GameState =
     },
     discrete: {
         gameMode: initialMode,
-        isTimeFrozen: false,
+        instanceIsOpen: false,
         isPaused: false,
         debugHUDVisible: false,
         instanceIsActive: false,
@@ -81,12 +89,14 @@ export const createGameState = (initialMode: GameMode = 'world_3d'): GameState =
         instanceTransitionDirection: 1,
         interactTarget: null,
         savedCameraState: null,
-        sceneIsActive: false,
         sceneIsTransitioning: false,
         sceneTransitionDirection: 1,
-        sceneCharacterPositionGrid: { x: 12, y: 9 },
         isTransitioningPitch: false,
         targetPitch: 0,
         activeSpeech: null,
+        // The fight in progress, null outside one. Built at battle start (flag 1), dropped when it ends.
+        battle: null,
+        defeatedNpcIds: [],
+        keptEnemyHp: {},
     },
 });

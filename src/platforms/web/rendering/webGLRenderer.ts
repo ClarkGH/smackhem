@@ -199,13 +199,13 @@ export default class WebGLRenderer implements Renderer {
 
     private screenQuadVAO: WebGLVertexArrayObject | null = null;
 
-    private sunDirection: Vec3 = { x: -1, y: 0, z: 0 };
+    private readonly sunDirection: Vec3 = { x: -1, y: 0, z: 0 };
 
-    private sunColor: Vec3 = { x: 0, y: 0, z: 0 };
+    private readonly sunColor: Vec3 = { x: 0, y: 0, z: 0 };
 
-    private moonDirection: Vec3 = { x: 1, y: 0, z: 0 };
+    private readonly moonDirection: Vec3 = { x: 1, y: 0, z: 0 };
 
-    private moonColor: Vec3 = { x: 0, y: 0, z: 0 };
+    private readonly moonColor: Vec3 = { x: 0, y: 0, z: 0 };
 
     private ambientIntensity: number = 0.3;
 
@@ -1079,13 +1079,32 @@ ${LIGHT_CARD_GLSL}
             this.gl.uniform3f(this.uniformLocations.color, color.x, color.y, color.z);
         }
 
-        // Set view-projection and model uniforms (using cached locations)
-        if (this.uniformLocations.viewProj) {
-            this.gl.uniformMatrix4fv(this.uniformLocations.viewProj, false, this.viewProj.elements);
-        }
-
         if (this.uniformLocations.model) {
             this.gl.uniformMatrix4fv(this.uniformLocations.model, false, model.elements);
+        }
+
+        // Set wireframe mode
+        if (this.wireframe) {
+            this.gl.polygonOffset(0, 0);
+            this.gl.drawArrays(this.gl.LINE_LOOP, 0, webglMesh.vertexCount);
+        } else {
+            this.gl.drawArrays(this.gl.TRIANGLES, 0, webglMesh.vertexCount);
+        }
+
+        this.gl.bindVertexArray(null);
+    }
+
+    // The same for every lit mesh in a frame, so sent once before the replay rather than per mesh.
+    // A program keeps its uniforms while other programs draw, so sprites in between don't undo this
+    private sendLitFrameUniforms(): void {
+        if (!this.program) {
+            return;
+        }
+
+        this.gl.useProgram(this.program);
+
+        if (this.uniformLocations.viewProj) {
+            this.gl.uniformMatrix4fv(this.uniformLocations.viewProj, false, this.viewProj.elements);
         }
 
         // Use identity normal matrix (keep normals in world space since model transforms are translation-only)
@@ -1156,16 +1175,6 @@ ${LIGHT_CARD_GLSL}
         if (locs.skyZenith) this.gl.uniform3f(locs.skyZenith, sky.zenith.x, sky.zenith.y, sky.zenith.z);
         if (locs.skyGlow) this.gl.uniform3f(locs.skyGlow, sky.glow.x, sky.glow.y, sky.glow.z);
         if (locs.eye) this.gl.uniform3f(locs.eye, eye.x, eye.y, eye.z);
-
-        // Set wireframe mode
-        if (this.wireframe) {
-            this.gl.polygonOffset(0, 0);
-            this.gl.drawArrays(this.gl.LINE_LOOP, 0, webglMesh.vertexCount);
-        } else {
-            this.gl.drawArrays(this.gl.TRIANGLES, 0, webglMesh.vertexCount);
-        }
-
-        this.gl.bindVertexArray(null);
     }
 
     public endFrame(): void {
@@ -1181,6 +1190,7 @@ ${LIGHT_CARD_GLSL}
 
         // Behind everything, before the replay draws the world over it
         this.drawSky();
+        this.sendLitFrameUniforms();
 
         // Replay in call order: scene_2d clears over its meshes before the screen quad
         const list = this.drawList;
@@ -1697,10 +1707,19 @@ ${SKY_COLOR_GLSL}
         sun: { direction: Vec3; color: Vec3 },
         moon: { direction: Vec3; color: Vec3 },
     ): void {
-        this.sunDirection = sun.direction;
-        this.sunColor = sun.color;
-        this.moonDirection = moon.direction;
-        this.moonColor = moon.color;
+        // Copy, not keep a reference, as setViewProjection does: the values are read later, in endFrame
+        this.sunDirection.x = sun.direction.x;
+        this.sunDirection.y = sun.direction.y;
+        this.sunDirection.z = sun.direction.z;
+        this.sunColor.x = sun.color.x;
+        this.sunColor.y = sun.color.y;
+        this.sunColor.z = sun.color.z;
+        this.moonDirection.x = moon.direction.x;
+        this.moonDirection.y = moon.direction.y;
+        this.moonDirection.z = moon.direction.z;
+        this.moonColor.x = moon.color.x;
+        this.moonColor.y = moon.color.y;
+        this.moonColor.z = moon.color.z;
     }
 
     private initTextureShaders(): void {
@@ -1902,7 +1921,7 @@ ${FOG_GLSL}
         return handle;
     }
 
-    public drawTexturedQuad(texture: TextureHandle, model: Mat4, size: number, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
+    public drawTexturedQuad(texture: TextureHandle, model: Mat4, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
         this.drawList.pushTexturedQuad(texture.id, model, normal);
     }
 

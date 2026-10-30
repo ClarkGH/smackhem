@@ -1,9 +1,10 @@
 import type { Renderer } from '../services/renderer';
+import type { ChunkSource } from '../services/chunkSource';
 import type { Chunk, Npc, StaticMesh } from './world';
 import type { Vec3 } from '../types/common';
 import { AABB, createAABB } from './math/aabb';
 import { createTranslationMatrix } from './math/mathHelpers';
-import { CHUNK_SIZE } from './world';
+import { CHUNK_SIZE, World } from './world';
 
 /**
  * JSON representation of a mesh (from file)
@@ -21,10 +22,13 @@ export interface MeshJSON {
  */
 export interface NpcJSON {
     id: string;
-    sprite: string; // asset ID, e.g. "npc-lmao"
+    sprite: string; // asset ID, e.g. "lmao_idle_1"
     pos: number[]; // relative to chunk center, like meshes
     size: number;
     line: string;
+    encounterId?: string;
+    // What starts a hostile NPC's fight: talking (a Yes/No question) or touching it. Missing means talk.
+    startsFightOn?: 'talk' | 'touch';
 }
 
 /**
@@ -50,10 +54,38 @@ const EXPECTED_SCHEMA_VERSION = 2;
  * - Batch mesh creation per chunk (all meshes created together, not individually)
  * - Mesh creation only during chunk load/unload (not per-frame)
  * - Validate version field for schema evolution
- * - Cache loaded chunks to avoid re-parsing
+ * - Keep loaded chunks, so walking back into one reuses it (loadChunk)
  */
 export class ChunkLoader {
-    private cache: Map<string, ChunkJSON> = new Map();
+    // Every chunk loadChunk has made, empty stand-ins too, for the whole session
+    private readonly chunks: Map<string, Chunk> = new Map();
+
+    /**
+     * A chunk by coordinates: from the platform's file, or an empty floor when there's none or it can't be read.
+     * A stand-in is kept like a real chunk, so a missing or broken file is only asked for once.
+     */
+    public async loadChunk(source: ChunkSource, chunkX: number, chunkZ: number, renderer: Renderer): Promise<Chunk> {
+        const chunkId = World.getChunkID(chunkX, chunkZ);
+        const kept = this.chunks.get(chunkId);
+        if (kept) return kept;
+
+        let chunk: Chunk;
+        try {
+            const jsonText = await source.fetchChunkJSON(chunkX, chunkZ);
+            if (jsonText === null) {
+                chunk = this.createEmptyChunk(chunkX, chunkZ, renderer);
+            } else {
+                chunk = this.loadChunkFromJSON(jsonText, chunkX, chunkZ, renderer);
+                // The file's own id can be anything ("0,0" in a copied template): the coordinates decide
+                chunk.id = chunkId;
+            }
+        } catch (error) {
+            console.error(`Unavailable chunk ${chunkId}:`, error);
+            chunk = this.createEmptyChunk(chunkX, chunkZ, renderer);
+        }
+        this.chunks.set(chunkId, chunk);
+        return chunk;
+    }
 
     /**
      * Parse and validate JSON chunk data
@@ -346,12 +378,18 @@ export class ChunkLoader {
 
         npcsJSON.forEach((npcJSON, i) => {
             const {
-                id, sprite, pos, size, line,
+                id, sprite, pos, size, line, encounterId, startsFightOn = 'talk',
             } = npcJSON;
             if (typeof id !== 'string' || typeof sprite !== 'string' || typeof line !== 'string'
                 // Finite as well: JSON.parse reads 1e999 as Infinity, an endless box nobody could move in
-                || typeof size !== 'number' || !Number.isFinite(size) || size <= 0 || !Array.isArray(pos)) {
-                console.warn(`Skipping NPC ${i}: needs id, sprite, line, pos and a positive, finite size`);
+                || typeof size !== 'number' || !Number.isFinite(size) || size <= 0 || !Array.isArray(pos)
+                // Optional, but a broken one would make a hostile NPC quietly friendly
+                || (encounterId !== undefined && typeof encounterId !== 'string')
+                // Optional too. Touch with nothing to fight would be a trigger that can never fire.
+                || (startsFightOn !== 'talk' && startsFightOn !== 'touch')
+                || (startsFightOn === 'touch' && encounterId === undefined)) {
+                console.warn(`Skipping NPC ${i}: needs id, sprite, line, pos, a positive, finite size, a string encounterId if any, `
+                    + 'and startsFightOn talk or touch (touch only with an encounterId) if any');
                 return;
             }
 
@@ -372,6 +410,8 @@ export class ChunkLoader {
                     { x: position.x + half, y: position.y + size, z: position.z + half },
                 ),
                 line,
+                encounterId,
+                startsFightOn,
             });
         });
 
@@ -409,26 +449,5 @@ export class ChunkLoader {
             hasContent: false,
             npcs: [],
         };
-    }
-
-    /**
-     * Cache JSON text for a chunk (avoids re-parsing)
-     */
-    public cacheJSON(chunkId: string, jsonText: string): void {
-        this.cache.set(chunkId, JSON.parse(jsonText) as ChunkJSON);
-    }
-
-    /**
-     * Get cached JSON for a chunk (if available)
-     */
-    public getCachedJSON(chunkId: string): ChunkJSON | undefined {
-        return this.cache.get(chunkId);
-    }
-
-    /**
-     * Clear cache (useful for testing or memory management)
-     */
-    public clearCache(): void {
-        this.cache.clear();
     }
 }

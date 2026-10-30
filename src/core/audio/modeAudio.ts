@@ -16,7 +16,7 @@ export const playAmbience = (eventBus: TypeSafeEventBus): void => {
 
 /**
  * Mode-driven audio: a sound on every mode change, and ambience that
- * pauses in the 2D scene, stops in the instance and on quitting to the main menu,
+ * pauses in the 2D scene, stops in the instance, on quitting to the main menu and on Game Over,
  * and starts or resumes in the world. The pause menu isn't a mode change, so ambience keeps playing.
  * Requests published here are handled on the next flush.
  */
@@ -36,7 +36,8 @@ export const subscribeModeAudio = (eventBus: TypeSafeEventBus): (() => void) => 
                 playAmbience(eventBus);
                 break;
             case 'main_menu':
-                // Quitting a run, the menu is silent
+            case 'game_over':
+                // Quitting or losing a run, the menu is silent
                 eventBus.publish({ type: 'stop_sound_requested', soundId: AMBIENT_SOUND });
                 break;
             default:

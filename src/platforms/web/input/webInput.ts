@@ -1,5 +1,7 @@
 import { InputState } from '../../../core/input';
 
+// Physical keys (KeyboardEvent.code), not the characters they type: Shift or Caps Lock can change the
+// character between press and release, and a release that doesn't match its press leaves the key held
 export interface KeyMapping {
     forward: string[];
     backward: string[];
@@ -8,10 +10,10 @@ export interface KeyMapping {
 }
 
 export const DEFAULT_KEY_MAPPING: KeyMapping = {
-    forward: ['w', 'W', 'ArrowUp'],
-    backward: ['s', 'S', 'ArrowDown'],
-    left: ['a', 'A', 'ArrowLeft'],
-    right: ['d', 'D', 'ArrowRight'],
+    forward: ['KeyW', 'ArrowUp'],
+    backward: ['KeyS', 'ArrowDown'],
+    left: ['KeyA', 'ArrowLeft'],
+    right: ['KeyD', 'ArrowRight'],
 };
 
 // Browser "standard" gamepad layout, Xbox labels (A bottom, B right, X left, Y top)
@@ -44,6 +46,7 @@ export interface WebInputState {
         padLookX: number;
         padLookY: number;
     };
+    // Held keys by KeyboardEvent.code, matched against the KeyMapping
     pressedKeys: Set<string>;
     keyMapping: KeyMapping;
     toggleDebugHUD: boolean;
@@ -100,7 +103,7 @@ export const setupWebInput = (
     });
 
     const handleKeyDown = (e: KeyboardEvent) => {
-        webState.pressedKeys.add(e.key);
+        webState.pressedKeys.add(e.code);
         webState.lastDevice = 'keyboard';
         // Toggle debug HUD on F3 (debug keys live on the F-keys, see docs/controls.md)
         if (e.key === 'F3') {
@@ -113,8 +116,8 @@ export const setupWebInput = (
             webState.pause = true;
             e.preventDefault(); // Prevent page scroll
         }
-        // Interact on E key, Enter also confirms in menus
-        if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
+        // Interact on the E key (by code, it's the only letter here, see KeyMapping), Enter also confirms in menus
+        if (e.code === 'KeyE' || e.key === 'Enter') {
             webState.interact = true;
         }
         if (e.key === 'Escape' || e.key === 'Backspace') {
@@ -131,14 +134,15 @@ export const setupWebInput = (
         }
         // Menu steps from the movement keys, key repeat scrolls through items
         const mapping = webState.keyMapping;
-        if (mapping.forward.includes(e.key)) webState.navigate.y = 1;
-        if (mapping.backward.includes(e.key)) webState.navigate.y = -1;
-        if (mapping.left.includes(e.key)) webState.navigate.x = -1;
-        if (mapping.right.includes(e.key)) webState.navigate.x = 1;
+        if (mapping.forward.includes(e.code)) webState.navigate.y = 1;
+        if (mapping.backward.includes(e.code)) webState.navigate.y = -1;
+        if (mapping.left.includes(e.code)) webState.navigate.x = -1;
+        if (mapping.right.includes(e.code)) webState.navigate.x = 1;
     };
 
+    // By code, so it always matches its keydown whatever Shift or Caps Lock did in between
     const handleKeyUp = (e: KeyboardEvent) => {
-        webState.pressedKeys.delete(e.key);
+        webState.pressedKeys.delete(e.code);
     };
 
     window.addEventListener('keydown', handleKeyDown);

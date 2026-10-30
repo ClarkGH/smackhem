@@ -7,7 +7,7 @@ const LINE = "Me NPC, me no do nuthin' yet.. but me look great!";
 
 // The player starts at the origin looking down -z
 const npcAt = (id: string, x: number, z: number): NpcJSON => ({
-    id, sprite: 'npc-lmao', pos: [x, 0, z], size: 1, line: LINE,
+    id, sprite: 'lmao_idle_1', pos: [x, 0, z], size: 1, line: LINE,
 });
 
 const AHEAD = npcAt('ahead', 0, -1.5);
@@ -122,7 +122,7 @@ describe('NPC speech - scenario (stub platform)', () => {
         press({ pause: true });
 
         expect(gameState.discrete.gameMode).toBe('world_3d');
-        expect(gameState.discrete.isTimeFrozen).toBe(false);
+        expect(gameState.discrete.instanceIsOpen).toBe(false);
     });
 
     it('says nothing to an NPC behind you, or out of reach', () => {
