@@ -17,8 +17,34 @@ export class FakeNode {
     }
 }
 
+// An AudioParam that records its schedule instead of running it. value never moves along a ramp:
+// a test sets it to stand for where a ramp has got to.
+export class FakeParam {
+    public value = 1;
+
+    // Scheduled since the last cancel, oldest first: each value set, and when
+    public sets: Array<{ value: number; time: number }> = [];
+
+    // Scheduled since the last cancel, oldest first: the value each ramp reaches, and when
+    public ramps: Array<{ value: number; endTime: number }> = [];
+
+    public setValueAtTime(value: number, time: number): void {
+        this.value = value;
+        this.sets.push({ value, time });
+    }
+
+    public linearRampToValueAtTime(value: number, endTime: number): void {
+        this.ramps.push({ value, endTime });
+    }
+
+    public cancelScheduledValues(): void {
+        this.sets = [];
+        this.ramps = [];
+    }
+}
+
 export class FakeGain extends FakeNode {
-    public gain = { value: 1 };
+    public gain = new FakeParam();
 }
 
 export class FakeBufferSource extends FakeNode {
@@ -32,12 +58,16 @@ export class FakeBufferSource extends FakeNode {
 
     public stopped = false;
 
+    // When stop was told to happen, 0 for at once
+    public stopTime = 0;
+
     public start(_when: number, offset: number): void {
         this.startOffset = offset;
     }
 
-    public stop(): void {
+    public stop(when: number = 0): void {
         this.stopped = true;
+        this.stopTime = when;
     }
 
     // Test-only: the sound played to its end

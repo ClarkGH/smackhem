@@ -77,7 +77,8 @@ Not all code examples in the documentation are 1:1 with how the code actually fu
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
 - **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
+- **[Events and State](events.md)** - The event bus, global state, and the event reference
+- **[Audio](audio.md)** - Sounds, voices, mix buses, fades, ambience, music, and the web and stub backends
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
 - **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera

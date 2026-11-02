@@ -3,6 +3,7 @@ import {
     it,
     expect,
     beforeEach,
+    afterEach,
     vi,
 } from 'vitest';
 import { WebAudioService } from './webAudioService';
@@ -40,6 +41,17 @@ const describeAudioServiceContract = (name: string, create: () => AudioService):
             expect(voice.isFinished()).toBe(true);
         });
 
+        it('a voice stopped with a fade is finished at once, not when the fade ends', async () => {
+            const buffered = audio.play(await audio.loadSound('ui_menu_select', 'ui'), 'ui');
+            const streamed = audio.play(await audio.loadSound('ambient_night', 'ambient'), 'ambient', true, 2);
+
+            buffered.stop(1);
+            streamed.stop(1);
+
+            expect(buffered.isFinished()).toBe(true);
+            expect(streamed.isFinished()).toBe(true);
+        });
+
         it('a paused voice is not finished, so it can still be stopped', async () => {
             const voice = audio.play(await audio.loadSound('ambient_night', 'ambient'), 'ambient', true);
 
@@ -74,6 +86,11 @@ describe('WebAudioService', () => {
         ({ fetchCalls } = installFakeWebAudio());
         ctx = new FakeAudioContext();
         audio = new WebAudioService('/assets/audio/', ctx as unknown as AudioContext);
+    });
+
+    // Here, not at the end of a spec, so a failed assertion can't leave fake timers on for the specs after it
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     describe('loading', () => {
@@ -164,6 +181,78 @@ describe('WebAudioService', () => {
 
             expect(voice.isFinished()).toBe(true);
             expect(ctx.sources).toHaveLength(1);
+        });
+    });
+
+    describe('fades', () => {
+        // Each voice makes its own gain last, after the buses
+        const voiceGain = () => ctx.gains[ctx.gains.length - 1];
+
+        it('fades a new voice in from silence on its own gain, not the bus', async () => {
+            ctx.currentTime = 10;
+            audio.play(await audio.loadSound('ui_menu_select', 'sfx'), 'sfx', false, 2);
+
+            expect(voiceGain().gain.value).toBe(0);
+            expect(voiceGain().gain.ramps).toEqual([{ value: 1, endTime: 12 }]);
+            // The sfx bus is untouched, so other sfx voices keep their volume
+            expect(ctx.gains.filter((g) => g.gain.ramps.length > 0)).toHaveLength(1);
+        });
+
+        it('starts at full volume with no fade', async () => {
+            audio.play(await audio.loadSound('ui_menu_select', 'sfx'), 'sfx');
+
+            expect(voiceGain().gain.value).toBe(1);
+            expect(voiceGain().gain.ramps).toHaveLength(0);
+        });
+
+        it('fades a buffered voice out, then its source stops itself at the end of the fade', async () => {
+            const voice = audio.play(await audio.loadSound('ui_menu_select', 'sfx'), 'sfx');
+            ctx.currentTime = 3;
+
+            voice.stop(1.5);
+
+            expect(voiceGain().gain.ramps).toEqual([{ value: 0, endTime: 4.5 }]);
+            expect(ctx.sources[0].stopTime).toBe(4.5);
+            // Resume can't bring a stopped voice back mid-fade
+            voice.resume();
+            expect(ctx.sources).toHaveLength(1);
+        });
+
+        it('fades out from where a fade-in got to, not from full', async () => {
+            const voice = audio.play(await audio.loadSound('ui_menu_select', 'sfx'), 'sfx', false, 4);
+            // A second into the 4 second fade-in, a quarter of the way up
+            ctx.currentTime = 1;
+            voiceGain().gain.value = 0.25;
+
+            voice.stop(1);
+
+            // The fade-in is cancelled, and the fade-out starts from the quarter it reached
+            expect(voiceGain().gain.sets).toEqual([{ value: 0.25, time: 1 }]);
+            expect(voiceGain().gain.ramps).toEqual([{ value: 0, endTime: 2 }]);
+        });
+
+        it('cuts a paused voice at once, there is nothing playing to fade', async () => {
+            const voice = audio.play(await audio.loadSound('ui_menu_select', 'sfx'), 'sfx');
+            voice.pause();
+
+            voice.stop(2);
+
+            expect(voiceGain().gain.ramps).toHaveLength(0);
+            expect(voiceGain().connected).toBe(false);
+        });
+
+        it('releases a stream only once its fade is over', async () => {
+            vi.useFakeTimers();
+            const voice = audio.play(await audio.loadSound('ambient_night', 'ambient'), 'ambient', true);
+            const element = FakeAudio.created[0];
+
+            voice.stop(2);
+            expect(voiceGain().gain.ramps).toEqual([{ value: 0, endTime: 2 }]);
+            expect(element.src).not.toBe('');
+
+            vi.advanceTimersByTime(2000);
+            expect(element.paused).toBe(true);
+            expect(element.src).toBe('');
         });
     });
 

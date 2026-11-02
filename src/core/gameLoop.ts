@@ -38,7 +38,7 @@ import {
     type DebugSettings,
 } from './settings/debugSettings';
 import { battleCameraInto } from './battle/battleField';
-import EnvironmentSystem, { DAY_LENGTH_SECONDS } from './lighting/environment';
+import EnvironmentSystem, { DAY_LENGTH_SECONDS, dayPhaseAt } from './lighting/environment';
 import RenderSystem from './lighting/renderSystem';
 import InteractionSystem, { type Interactor } from './interaction';
 import OverheadOverlays from './overheadOverlays';
@@ -356,7 +356,10 @@ export class GameLoop {
         // Normal 3D simulation updates
         interpolatedState.simulationTime += dt;
         // Seconds into a share of the day, wrapped so it always means where in the day (0..1)
+        const phaseBefore = dayPhaseAt(this.gameState.timeOfDay);
         this.gameState.timeOfDay = (this.gameState.timeOfDay + dt / DAY_LENGTH_SECONDS) % 1;
+        const phase = dayPhaseAt(this.gameState.timeOfDay);
+        if (phase !== phaseBefore) this.eventBus.publish({ type: 'day_phase_changed', phase });
 
         this.camera.yaw += lookYaw;
         this.camera.pitch -= lookPitch;

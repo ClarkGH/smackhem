@@ -469,7 +469,8 @@ World/chunk/static collision ownership
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
+- **[Events and State](events.md)** - The event bus, global state, and the event reference
+- **[Audio](audio.md)** - Sounds, voices, mix buses, fades, ambience, music, and the web and stub backends
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
 - **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera

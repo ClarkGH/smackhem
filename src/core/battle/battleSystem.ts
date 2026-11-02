@@ -30,6 +30,7 @@ import { ENCOUNTERS, ENEMY_SHEETS, PARTY_MEMBER_SHEETS } from '../combatSheets';
 import { ENCOUNTER_YES } from '../interaction';
 import BattleMenu, { isCommandEnabled } from './battleMenu';
 import BattleScreen from './battleScreen';
+import BattleSounds from './battleSounds';
 import { findCombatant } from './battle';
 import { facingFrom, placeCombatants, type BattleLayout } from './battleField';
 import chooseEnemyCommand from './enemyAi';
@@ -119,6 +120,8 @@ export default class BattleSystem {
 
     private readonly screen = new BattleScreen();
 
+    private readonly sounds: BattleSounds;
+
     // Scratch for the spot an attacker runs to, filled in place each tick (M-1)
     private readonly strike: Vec3 = { x: 0, y: 0, z: 0 };
 
@@ -129,7 +132,9 @@ export default class BattleSystem {
         private readonly settings: Settings,
         // The Debug screen's layout, changed in place. Copied at each start, so a change applies to the next fight.
         private readonly layout: Readonly<BattleLayout>,
-    ) {}
+    ) {
+        this.sounds = new BattleSounds(eventBus);
+    }
 
     /**
      * Yes to a hostile NPC's question asks for its fight. Any other answer, or a plain NPC, does nothing.
@@ -220,6 +225,7 @@ export default class BattleSystem {
             log: [{ kind: 'battle_started', encounterId: event.encounterId }],
         };
         this.startNextTurn(battle);
+        this.sounds.begin();
 
         // Writes shared state on purpose
         discreteState.battle = battle;
@@ -234,6 +240,13 @@ export default class BattleSystem {
     public update(gameState: GameState, intent: PlayerIntent, dt: number): void {
         const { battle } = gameState.discrete;
         if (!battle) return;
+        this.step(gameState, battle, intent, dt);
+        // After the step, so whatever a tick logs sounds on that tick, even the tick that ends the fight
+        this.sounds.update(battle);
+    }
+
+    // One tick of the fight. Each return ends the tick's work early (battle.md, A turn).
+    private step(gameState: GameState, battle: BattleState, intent: PlayerIntent, dt: number): void {
         const { phase } = battle;
 
         // Wait mode stops the clock while a command menu is open. Active never stops it.

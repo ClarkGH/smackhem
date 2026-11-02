@@ -1,6 +1,7 @@
 import { GameMode } from './gameState';
 import { AudioCategory } from '../services/audio';
 import type { EncounterId } from './combat';
+import type { DayPhase } from './lighting/environment';
 
 export type GameEvent =
     | {
@@ -13,6 +14,8 @@ export type GameEvent =
         soundId: string;
         category: AudioCategory;
         loop?: boolean
+        // Only for a new voice. A paused loop resumes as it was.
+        fadeInSeconds?: number;
     }
     | {
         type: 'pause_sound_requested';
@@ -22,8 +25,14 @@ export type GameEvent =
         type: 'scene_2d_requested';
     }
     | {
+        // Published by GameLoop on the tick the time of day crosses into another phase. Only world_3d moves time.
+        type: 'day_phase_changed';
+        phase: DayPhase;
+    }
+    | {
         type: 'stop_sound_requested';
         soundId: string
+        fadeOutSeconds?: number;
     }
     | {
         // No payload, subscribers read the shared Settings
@@ -67,11 +76,14 @@ export class TypeSafeEventBus {
     public flush(): void {
         if (this.incomingQueue.length === 0) return;
 
-        this.processingQueue = this.incomingQueue;
-        this.incomingQueue = [];
+        // The two queues swap places, so flushing allocates nothing (M-1).
+        // Events published by a handler land in the other queue, for the next flush.
+        const queue = this.incomingQueue;
+        this.incomingQueue = this.processingQueue;
+        this.processingQueue = queue;
 
-        for (let i = 0; i < this.processingQueue.length; i += 1) {
-            const event = this.processingQueue[i];
+        for (let i = 0; i < queue.length; i += 1) {
+            const event = queue[i];
             const handlers = this.listeners.get(event.type);
             if (handlers) {
                 for (let j = 0; j < handlers.length; j += 1) {
@@ -80,7 +92,7 @@ export class TypeSafeEventBus {
             }
         }
 
-        this.processingQueue = [];
+        queue.length = 0;
     }
 
     public subscribe<K extends GameEvent['type']>(

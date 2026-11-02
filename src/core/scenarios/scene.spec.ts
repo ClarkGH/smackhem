@@ -6,7 +6,7 @@ import {
 } from 'vitest';
 import { createScenario, type Scenario } from '../../testing/scenario';
 import { createDebugSettings } from '../settings/debugSettings';
-import { SCENE_TILE_SIZE } from '../scene';
+import { SCENE_SPEED, SCENE_TILE_SIZE } from '../scene';
 
 describe('2D scene movement - scenario (stub platform)', () => {
     let scenario: Scenario;
@@ -16,6 +16,16 @@ describe('2D scene movement - scenario (stub platform)', () => {
         scenario.enterScene();
         // Let the entry transition finish
         scenario.tick(120);
+    });
+
+    it('walks SCENE_SPEED units in a second of ticks', () => {
+        const { gameState, input, tick } = scenario;
+        const startX = gameState.interpolated.sceneCharacterPositionPx.x;
+
+        input.setIntent({ move: { x: 1, y: 0 } });
+        tick(60);
+
+        expect(gameState.interpolated.sceneCharacterPositionPx.x - startX).toBeCloseTo(SCENE_SPEED);
     });
 
     // The grid is 18.75 tiles tall, so the last row is partly off screen. It's still walkable.

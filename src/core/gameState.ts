@@ -3,24 +3,6 @@ import type { BattleState } from './battle/battle';
 import type { EnemySheetId } from './combat';
 import { PLAYER_HEIGHT } from './camera';
 
-export interface TransitionState<T> {
-    isActive: boolean;
-    isTransitioning: boolean;
-    progress: number;
-    direction: 1 | -1;
-    from: T | null;
-    to: T | null;
-}
-
-export const createTransitionState = <T>(): TransitionState<T> => ({
-    isActive: false,
-    isTransitioning: false,
-    progress: 0,
-    direction: 1,
-    from: null,
-    to: null,
-});
-
 export interface InterpolatedState {
     cameraPosition: Vec3;
     cameraYaw: number;

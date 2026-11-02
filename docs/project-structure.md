@@ -72,6 +72,7 @@ src/
 │  ├─ combat.spec.ts          # Sheets, HP clamping, damage and battle outcomes
 │  ├─ combatSheets.ts         # Player and enemy sheets and attacks, fixed templates
 │  ├─ events.ts               # Eventing pub/sub systems
+│  ├─ events.spec.ts          # Event bus: delivery order, a handler's events wait a flush, swapped queues deliver once
 │  ├─ gameLoop.ts             # Game loop logic
 │  ├─ gameState.ts            # Game State logic
 │  ├─ input.ts                # Player input logic
@@ -85,14 +86,17 @@ src/
 │  ├─ audio/
 │  │  ├─ audioSystem.ts       # Owns sound handles, turns audio events into AudioService calls
 │  │  ├─ audioSystem.spec.ts  # Tests for audio event handling (stub audio)
-│  │  ├─ modeAudio.ts         # Game mode changes -> audio requests (ambience, mode sound)
-│  │  └─ modeAudio.spec.ts    # Scenario tests for mode-driven audio (stub platform)
+│  │  ├─ modeAudio.ts         # Game mode and day phase changes -> ambience requests (day/night bed, fight start sound)
+│  │  ├─ modeAudio.spec.ts    # Scenario tests for mode-driven audio (stub platform)
+│  │  ├─ modeMusic.ts         # Game mode changes -> music requests, one current track, crossfaded
+│  │  └─ modeMusic.spec.ts    # Scenario tests for mode-driven music (stub platform)
 │  ├─ battle/
 │  │  ├─ battle.ts            # Battle state types: combatants, phase, ready queue, log, commands. findCombatant
 │  │  ├─ battleField.ts       # Where a fight stands (party and enemy lines) and the battle camera, pure layout math
 │  │  ├─ battleField.spec.ts  # Facing, line placement and spacing, and the camera's pitch, distance and aim
 │  │  ├─ battleMenu.ts        # The party's unconfirmed choice: Command, then Target, Back between them
 │  │  ├─ battleScreen.ts      # Builds the BattleView in place each frame, words the log
+│  │  ├─ battleSounds.ts      # Voices the log: one sound request per entry that has a sound, as it arrives
 │  │  ├─ battleSystem.ts      # Starts a fight on Yes, runs turns and beats, resolves commands, ends it
 │  │  ├─ enemyAi.ts           # The enemy's command for its turn (basic attack on the first standing)
 │  │  └─ enemyAi.spec.ts      # Enemy target choice, skipping party members who are down
@@ -124,6 +128,7 @@ src/
 │  │  ├─ battleView.spec.ts   # The battle screen's view: who's who, hidden enemy HP, wording, hiding, a fresh fight
 │  │  ├─ battleRun.spec.ts    # Running away: Run row, getting away, encounters you can't flee, enemies that keep damage
 │  │  ├─ battleRunUp.spec.ts  # Running to the target and back: the hit lands on arrival, skips, pause, no run after the last
+│  │  ├─ battleSounds.spec.ts # Battle sounds from the log: on landing not confirm, once each, a fresh fight from its start
 │  │  ├─ battleStage.spec.ts  # The field and its layout, the battle camera, billboards, blob shadows, battle debug rows
 │  │  ├─ battleTurns.spec.ts  # Turn loop: Command/Target/Back, one confirm once, beats, pause, log order, win/lose
 │  │  ├─ battleEnemyCommand.spec.ts # A refused enemy command throws, enemies can't run (enemyAi mocked)
@@ -235,8 +240,14 @@ public/
 └─ assets/
    ├─ images/                 # Textures, asset ID naming (<who>_<state>_<frame>, e.g. circle_sleep_1.png, see data-formats.md)
    └─ audio/                  # Audio files, file name is the sound ID
-      ├─ ambient_night.ogg    # snake_case, led by purpose. All placeholders for now
-      ├─ sfx_mode_change.ogg  # Played on every game mode change
+      ├─ ambient_day.ogg      # snake_case, led by purpose. The day's bed, crossfaded with the night's
+      ├─ ambient_night.ogg    # The night's bed
+      ├─ music_field.ogg      # Exploring: the world, the instance and the 2D scene
+      ├─ music_battle.ogg     # A fight
+      ├─ music_game_over.ogg  # Game Over, plays once
+      ├─ sfx_battle_start.ogg # A fight starting
+      ├─ sfx_hit.ogg          # A hit landing
+      ├─ sfx_defeated.ogg     # Someone going down
       └─ ui_menu_select.ogg   # Played when a menu item is chosen
 ```
 
@@ -296,7 +307,8 @@ No rewrites. Just additions.
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
 - **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
+- **[Events and State](events.md)** - The event bus, global state, and the event reference
+- **[Audio](audio.md)** - Sounds, voices, mix buses, fades, ambience, music, and the web and stub backends
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
 - **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera

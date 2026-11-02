@@ -33,6 +33,7 @@ Built in the battle spike (October 2026). This doc is how it works now.
 | [enemyAi.ts](../src/core/battle/enemyAi.ts) | An enemy's command. Today: attack the first standing party member |
 | [battleField.ts](../src/core/battle/battleField.ts) | Pure layout math: where everyone stands, and the battle camera |
 | [battleScreen.ts](../src/core/battle/battleScreen.ts) | Builds the `BattleView` the overlay draws, and words the log |
+| [battleSounds.ts](../src/core/battle/battleSounds.ts) | Voices the log: one sound request per entry that has a sound |
 | [combat.ts](../src/core/combat.ts), [combatSheets.ts](../src/core/combatSheets.ts) | The rules (HP, attacks, outcome) and the data (sheets, encounters) |
 
 **The menu reports, the battle system resolves.** `BattleMenu` and `enemyAi` both hand over a `BattleCommand`. `BattleSystem` checks it and resolves it exactly once. Neither the menu nor the view ever applies a rule.
@@ -253,6 +254,21 @@ All of this is in [renderSystem.ts](../src/core/lighting/renderSystem.ts) (R-1).
 The HUD is data, like the menus: `BattleScreen.build` fills one reused `BattleView` each frame from the fight and the menu, and the platform's `BattleOverlay` draws it ([battleOverlay.ts](../src/services/battleOverlay.ts)). It's never written back. The overlay gets `null` once when the fight ends.
 
 - **The log has two jobs.** `BattleLogEntry` is the record: typed facts in core, pushed once per action, in a fixed order (`battle_started` first; a finishing blow is `attacked`, `defeated`, `battle_ended`). `damage` is the HP actually lost. Wording happens in `BattleScreen`, once per entry when it arrives, so tests assert on entries, never on strings.
+- **Sounds come from the log too.** The rules never ask for a sound. `BattleSounds` maps each entry kind to a sound (`LOG_SOUNDS`: `attacked` is `sfx_hit`, `defeated` is `sfx_defeated`, the rest are silent) and voices each entry once. It keeps a count of entries voiced, and `start()` resets it with `begin()`. Forgetting the reset silences the next fight's first hits. `update` voices after the step, so whatever a tick logs sounds on that tick. The fight's start sound and its music belong to the mode change ([events.md](audio.md#a-fight-start-to-finish)).
+
+```mermaid
+sequenceDiagram
+    participant U as BattleSystem.update
+    participant S as step()
+    participant BS as BattleSounds
+    participant Bus as EventBus
+    U->>S: rules run, entries pushed to the log
+    S-->>U: may call end(), battle = null
+    U->>BS: update(battle), the local reference
+    loop each entry not yet voiced
+        BS->>Bus: play_sound_requested, if the kind has a sound
+    end
+```
 - **Enemy HP and gauges are `null` in the view.** What the player may know is a core rule, so no platform can leak it.
 - **`CombatantView` carries flags, not looks:** acting, targeted, defeated. The overlay picks how they're drawn, and marks never rely on color alone.
 - **The web overlay** ([webBattleOverlay.ts](../src/platforms/web/overlays/webBattleOverlay.ts)) is a first pass: the newest log line in a top banner, enemy names, the party panel with an eight-block ATB gauge, and the command rows. It isn't the final design. The [party panel prototype](prototypes/party-panel.html) explores where it's heading.
@@ -316,7 +332,8 @@ Open, for later:
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
 - **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
+- **[Events and State](events.md)** - The event bus, global state, and the event reference
+- **[Audio](audio.md)** - Sounds, voices, mix buses, fades, ambience, music, and the web and stub backends
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
 - **[Controls](controls.md)** - Keyboard, mouse and controller bindings

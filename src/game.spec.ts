@@ -99,7 +99,7 @@ describe('createGame on the stub platform', () => {
         expect(game.gameState.discrete.gameMode).toBe('world_3d');
     });
 
-    it('plays the menu, mode and ambient sounds through the real audio wiring', async () => {
+    it('plays the menu and ambient sounds through the real audio wiring', async () => {
         await boot();
         game.frame();
 
@@ -108,7 +108,6 @@ describe('createGame on the stub platform', () => {
 
         const played = stub.audio.playCalls.map((call) => call.id);
         expect(played).toContain('ui_menu_select');
-        expect(played).toContain('sfx_mode_change');
         expect(played).toContain('ambient_night');
     });
 

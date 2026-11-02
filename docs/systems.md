@@ -449,7 +449,7 @@ The 2D scene system (more TBD). Entered from Pause → Debug → Enter 2D Scene:
   - `back` goes up one level to wherever the screen was opened from, with the item that opened it selected. The menu keeps a stack of the screens you came through, because Settings opens from both menus.
 - **The pause menu:**
   - **Opening:** the menu button (`menu`: Escape or Start) during play sets `isPaused`. The game mode doesn't change, so Resume returns to the world, the instance or the 2D scene.
-  - **While paused**, `GameLoop` runs only the menu: no movement, transitions or day/night. The instance toggle is ignored. Ambience keeps playing.
+  - **While paused**, `GameLoop` runs only the menu: no movement, transitions or day/night. The instance toggle is ignored. Ambience and music keep playing.
   - **Closing:** Escape steps back one level, and at the Pause screen it resumes. Start closes the pause menu from any screen (Escape sends both `back` and `menu`, and `back` wins).
   - **Quit to Main Menu** asks first, with No selected. Yes publishes `quit_to_main_menu_requested`, and `GameLoop` resets to a fresh boot: new game state (the shared `GameState` object keeps its identity, its contents are replaced), the camera at the start with no render blending, the menu back on its first screen, and `game_mode_changed` to `main_menu`.
   - **Lost cursor:** on the web, losing the captured cursor during play (Escape, switching windows) also opens the pause menu, because browsers may not pass that Escape on to the page.
@@ -473,7 +473,8 @@ The 2D scene system (more TBD). Entered from Pause → Debug → Enter 2D Scene:
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
 - **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
+- **[Events and State](events.md)** - The event bus, global state, and the event reference
+- **[Audio](audio.md)** - Sounds, voices, mix buses, fades, ambience, music, and the web and stub backends
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
 - **[Controls](controls.md)** - Keyboard, mouse and controller bindings

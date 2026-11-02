@@ -161,6 +161,7 @@ The lighting system supports a deterministic sun/moon cycle that rotates light d
 - Core tracks accumulated simulation time (fixed timestep)
 - Parameters are passed to renderer via optional service interface methods
 - Renderer implementation applies these values in shaders
+- The day phase (`dayPhaseAt`: day from 06:00 to 19:00, night otherwise) is announced as `day_phase_changed` for the ambient bed ([events.md](audio.md#ambience-and-the-day-phase)). It follows simulation time, so the Debug time-of-day override, which only changes what's drawn, doesn't switch it
 
 ### Physical Sun/Moon Rules
 
@@ -515,7 +516,8 @@ No GPU calls should appear outside the renderer layer. All WebGL/GPU operations 
 - **[Index](INDEX.md)** - Project overview and documentation index
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
-- **[Events, State, and Audio Systems](events.md)** - Eventing, global state, audio, and settings events
+- **[Events and State](events.md)** - The event bus, global state, and the event reference
+- **[Audio](audio.md)** - Sounds, voices, mix buses, fades, ambience, music, and the web and stub backends
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
 - **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera

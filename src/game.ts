@@ -2,7 +2,14 @@ import { World } from './core/world';
 import { GameLoop, type DebugHUD } from './core/gameLoop';
 import { TypeSafeEventBus } from './core/events';
 import AudioSystem from './core/audio/audioSystem';
-import { AMBIENT_SOUND, MODE_CHANGE_SOUND, subscribeModeAudio } from './core/audio/modeAudio';
+import { AMBIENT_BEDS, BATTLE_START_SOUND, subscribeModeAudio } from './core/audio/modeAudio';
+import {
+    BATTLE_MUSIC,
+    FIELD_MUSIC,
+    GAME_OVER_MUSIC,
+    subscribeModeMusic,
+} from './core/audio/modeMusic';
+import { DEFEATED_SOUND, HIT_SOUND } from './core/battle/battleSounds';
 import { MENU_SELECT_SOUND } from './core/menu/menuSystem';
 import { createGameState, type GameState } from './core/gameState';
 import {
@@ -63,20 +70,28 @@ export const createGame = async ({
     });
 
     // Missing audio files are not fatal, the game runs silent (see README)
+    // TODO: Consider looping through instead of explicitly naming
     const preloads = await Promise.allSettled([
-        audioSystem.preload(AMBIENT_SOUND, 'ambient'),
-        audioSystem.preload(MODE_CHANGE_SOUND, 'sfx'),
+        audioSystem.preload(AMBIENT_BEDS.day, 'ambient'),
+        audioSystem.preload(AMBIENT_BEDS.night, 'ambient'),
+        audioSystem.preload(FIELD_MUSIC.soundId, 'music'),
+        audioSystem.preload(BATTLE_MUSIC.soundId, 'music'),
+        audioSystem.preload(GAME_OVER_MUSIC.soundId, 'music'),
+        audioSystem.preload(BATTLE_START_SOUND, 'sfx'),
+        audioSystem.preload(HIT_SOUND, 'sfx'),
+        audioSystem.preload(DEFEATED_SOUND, 'sfx'),
         audioSystem.preload(MENU_SELECT_SOUND, 'ui'),
     ]);
     preloads.forEach((result) => {
         if (result.status === 'rejected') console.error('Failed to preload audio:', result.reason);
     });
 
-    // The ambience starts on New Game, when the mode changes to world_3d
-    subscribeModeAudio(eventBus);
-
     // Boots into the start-up menu, the world renders frozen behind it
     const gameState = createGameState('main_menu');
+
+    // The ambience and the music start on New Game, when the mode changes to world_3d
+    subscribeModeAudio(eventBus, gameState);
+    subscribeModeMusic(eventBus);
 
     // Chunks around the starting position, before the first frame
     const start = createCamera().position;

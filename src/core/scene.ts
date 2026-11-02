@@ -1,7 +1,6 @@
 import type { GameMode, GameState } from './gameState';
 import type { PlayerIntent } from '../services/input';
 import type { TypeSafeEventBus } from './events';
-import { PLAYER_SPEED } from './camera';
 import type { Settings } from './settings/settings';
 
 // The 2D scene lives in a fixed logical space (units, not screen pixels).
@@ -14,6 +13,8 @@ const SCENE_GRID_ROWS = Math.ceil(SCENE_GRID_HEIGHT); // 19
 export const SCENE_WIDTH_PX = SCENE_GRID_WIDTH * SCENE_TILE_SIZE; // 800 logical units
 export const SCENE_HEIGHT_PX = Math.round(SCENE_GRID_HEIGHT * SCENE_TILE_SIZE); // 600 logical units
 const SCENE_TRANSITION_DURATION = 1.0; // seconds
+// Logical units per second, about two tiles. The speed the old PLAYER_SPEED * dt + 1 per tick came to at 60 Hz.
+export const SCENE_SPEED = 70;
 
 interface Scene {
     collisionGrid: Uint8Array; // 25 x 19 = 475 bytes, tile-based (0 = walkable, 1 = solid)
@@ -50,8 +51,7 @@ export class Scene2DSystem {
         const { x: moveX, y: moveY } = intent.move;
 
         if (moveX !== 0 || moveY !== 0) {
-            // TODO: Figure out 2D scene movement speed constants or a new equation
-            const moveSpeed = PLAYER_SPEED * dt + 1;
+            const moveSpeed = SCENE_SPEED * dt;
             const newPxX = interpolatedState.sceneCharacterPositionPx.x + moveX * moveSpeed;
             const newPxY = interpolatedState.sceneCharacterPositionPx.y - moveY * moveSpeed;
 

@@ -7,6 +7,18 @@ import { starTimeAt } from './stars';
 
 export const DAY_LENGTH_SECONDS = 120;
 
+// The coarse part of the day that sound and, later, schedules follow. Dawn and dusk join when they need their own.
+export type DayPhase = 'day' | 'night';
+
+// Day starts at the sky's dawn key and night at its dusk key (skyPalette.ts), fractions of the day like timeOfDay
+export const DAY_STARTS_AT = 6 / 24;
+
+export const NIGHT_STARTS_AT = 19 / 24;
+
+export const dayPhaseAt = (timeOfDay: number): DayPhase => (
+    timeOfDay >= DAY_STARTS_AT && timeOfDay < NIGHT_STARTS_AT ? 'day' : 'night'
+);
+
 export default class EnvironmentSystem {
     // Configuration Constants
     // Latitude of the sun's path, about the southern US: at noon the sun is 90° minus this above

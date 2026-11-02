@@ -39,7 +39,7 @@ export default class AudioSystem {
                 voice.stop();
             }
 
-            this.voices.set(event.soundId, this.audio.play(handle, event.category, event.loop));
+            this.voices.set(event.soundId, this.audio.play(handle, event.category, event.loop, event.fadeInSeconds));
         });
 
         eventBus.subscribe('pause_sound_requested', (event) => {
@@ -49,7 +49,8 @@ export default class AudioSystem {
         eventBus.subscribe('stop_sound_requested', (event) => {
             const voice = this.voices.get(event.soundId);
             if (!voice) return;
-            voice.stop();
+            // Forgotten at once, even while it fades out, so a play request after this starts a new voice
+            voice.stop(event.fadeOutSeconds);
             this.voices.delete(event.soundId);
         });
 

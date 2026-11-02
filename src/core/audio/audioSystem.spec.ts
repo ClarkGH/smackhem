@@ -27,7 +27,9 @@ describe('AudioSystem - event integration', () => {
         eventBus.publish({ type: 'play_sound_requested', soundId: 'menu_select', category: 'ui' });
         eventBus.flush();
 
-        expect(audio.playCalls).toEqual([{ id: 'menu_select', category: 'ui', loop: false }]);
+        expect(audio.playCalls).toEqual([{
+            id: 'menu_select', category: 'ui', loop: false, fadeInSeconds: 0,
+        }]);
     });
 
     it('passes loop through to the audio service', async () => {
@@ -41,7 +43,9 @@ describe('AudioSystem - event integration', () => {
         });
         eventBus.flush();
 
-        expect(audio.playCalls).toEqual([{ id: 'night_ambience', category: 'ambient', loop: true }]);
+        expect(audio.playCalls).toEqual([{
+            id: 'night_ambience', category: 'ambient', loop: true, fadeInSeconds: 0,
+        }]);
     });
 
     it('does not play before the bus is flushed', async () => {
@@ -116,12 +120,60 @@ describe('AudioSystem - event integration', () => {
         expect(audio.voices[1].isFinished()).toBe(false);
     });
 
+    it('passes a fade-in through to a new voice', async () => {
+        await audioSystem.preload('ambient_night', 'ambient');
+
+        eventBus.publish({
+            type: 'play_sound_requested',
+            soundId: 'ambient_night',
+            category: 'ambient',
+            loop: true,
+            fadeInSeconds: 3,
+        });
+        eventBus.flush();
+
+        expect(audio.playCalls[0].fadeInSeconds).toBe(3);
+    });
+
+    it('resumes a paused loop as it was, ignoring a fade-in', async () => {
+        await audioSystem.preload('ambient_night', 'ambient');
+
+        playLoop('ambient_night');
+        eventBus.flush();
+        eventBus.publish({ type: 'pause_sound_requested', soundId: 'ambient_night' });
+        eventBus.publish({
+            type: 'play_sound_requested',
+            soundId: 'ambient_night',
+            category: 'ambient',
+            loop: true,
+            fadeInSeconds: 3,
+        });
+        eventBus.flush();
+
+        expect(audio.playCalls).toHaveLength(1);
+        expect(audio.voices[0].paused).toBe(false);
+    });
+
+    it('passes a fade-out through, and forgets the voice at once so the next play starts fresh', async () => {
+        await audioSystem.preload('ambient_night', 'ambient');
+
+        playLoop('ambient_night');
+        eventBus.flush();
+        eventBus.publish({ type: 'stop_sound_requested', soundId: 'ambient_night', fadeOutSeconds: 2 });
+        playLoop('ambient_night');
+        eventBus.flush();
+
+        expect(audio.voices[0].fadeOutSeconds).toBe(2);
+        expect(audio.voices).toHaveLength(2);
+        expect(audio.voices[1].isFinished()).toBe(false);
+    });
+
     it('restarts a one-shot, leaving one live voice', async () => {
-        await audioSystem.preload('sfx_mode_change', 'sfx');
+        await audioSystem.preload('ui_menu_select', 'ui');
 
         // Two requests in the same flush, as from two fixed ticks in one frame
-        eventBus.publish({ type: 'play_sound_requested', soundId: 'sfx_mode_change', category: 'sfx' });
-        eventBus.publish({ type: 'play_sound_requested', soundId: 'sfx_mode_change', category: 'sfx' });
+        eventBus.publish({ type: 'play_sound_requested', soundId: 'ui_menu_select', category: 'ui' });
+        eventBus.publish({ type: 'play_sound_requested', soundId: 'ui_menu_select', category: 'ui' });
         eventBus.flush();
 
         expect(audio.voices).toHaveLength(2);
@@ -130,14 +182,14 @@ describe('AudioSystem - event integration', () => {
     });
 
     it('does not stop a voice that already finished', async () => {
-        await audioSystem.preload('sfx_mode_change', 'sfx');
+        await audioSystem.preload('ui_menu_select', 'ui');
 
-        eventBus.publish({ type: 'play_sound_requested', soundId: 'sfx_mode_change', category: 'sfx' });
+        eventBus.publish({ type: 'play_sound_requested', soundId: 'ui_menu_select', category: 'ui' });
         eventBus.flush();
         audio.voices[0].finish();
 
         const stop = vi.spyOn(audio.voices[0], 'stop');
-        eventBus.publish({ type: 'play_sound_requested', soundId: 'sfx_mode_change', category: 'sfx' });
+        eventBus.publish({ type: 'play_sound_requested', soundId: 'ui_menu_select', category: 'ui' });
         eventBus.flush();
 
         expect(stop).not.toHaveBeenCalled();

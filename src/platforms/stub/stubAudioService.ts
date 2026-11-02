@@ -9,6 +9,8 @@ export interface StubPlayCall {
     id: string;
     category: AudioCategory;
     loop: boolean;
+    // 0 for no fade
+    fadeInSeconds: number;
 }
 
 /**
@@ -20,6 +22,9 @@ export class StubPlaybackHandle implements PlaybackHandle {
     public paused = false;
 
     public stopped = false;
+
+    // What the last stop asked for, 0 for a cut
+    public fadeOutSeconds = 0;
 
     private ended = false;
 
@@ -35,8 +40,9 @@ export class StubPlaybackHandle implements PlaybackHandle {
         this.paused = false;
     }
 
-    public stop(): void {
+    public stop(fadeOutSeconds: number = 0): void {
         this.stopped = true;
+        this.fadeOutSeconds = fadeOutSeconds;
     }
 
     public isFinished(): boolean {
@@ -64,8 +70,15 @@ export default class StubAudioService implements AudioService {
         return { id: soundId };
     }
 
-    public play(sound: SoundHandle, category: AudioCategory = 'sfx', loop: boolean = false): PlaybackHandle {
-        this.playCalls.push({ id: sound.id, category, loop });
+    public play(
+        sound: SoundHandle,
+        category: AudioCategory = 'sfx',
+        loop: boolean = false,
+        fadeInSeconds: number = 0,
+    ): PlaybackHandle {
+        this.playCalls.push({
+            id: sound.id, category, loop, fadeInSeconds,
+        });
         const voice = new StubPlaybackHandle(sound.id);
         this.voices.push(voice);
         return voice;

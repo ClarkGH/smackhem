@@ -10,6 +10,22 @@ const STREAMED_CATEGORIES: ReadonlySet<AudioCategory> = new Set<AudioCategory>([
 
 const MIX_CATEGORIES: readonly AudioCategory[] = ['sfx', 'ui', 'music', 'ambient'];
 
+// Ramps a voice's own gain up from silence, on the audio clock. 0 seconds leaves it at full volume.
+const fadeIn = (ctx: AudioContext, gain: GainNode, seconds: number): void => {
+    if (seconds <= 0) return;
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(1, now + seconds);
+};
+
+// Ramps a voice's own gain down to silence from wherever it is now, a fade-in still running included
+const fadeOut = (ctx: AudioContext, gain: GainNode, seconds: number): void => {
+    const now = ctx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(0, now + seconds);
+};
+
 /**
  * Buffered sound, hidden from core: contains raw decompressed PCM AudioBuffer in memory
  */
@@ -41,6 +57,7 @@ export class WebStreamHandle implements SoundHandle {
 /**
  * Playback of a buffered sound.
  * AudioBufferSourceNodes are single-use, so every start/resume creates a fresh node.
+ * Source -> [voice gain] -> [category gain]: the voice gain is its own, so it fades without touching other voices.
  */
 export class WebPlaybackHandle implements PlaybackHandle {
     private source: AudioBufferSourceNode | null = null;
@@ -55,15 +72,17 @@ export class WebPlaybackHandle implements PlaybackHandle {
 
     private readonly buffer: AudioBuffer;
 
-    private readonly output: AudioNode;
+    private readonly gain: GainNode;
 
     private readonly loop: boolean;
 
-    constructor(ctx: AudioContext, buffer: AudioBuffer, output: AudioNode, loop: boolean) {
+    constructor(ctx: AudioContext, buffer: AudioBuffer, output: AudioNode, loop: boolean, fadeInSeconds: number) {
         this.ctx = ctx;
         this.buffer = buffer;
-        this.output = output;
         this.loop = loop;
+        this.gain = ctx.createGain();
+        this.gain.connect(output);
+        fadeIn(ctx, this.gain, fadeInSeconds);
         this.start(0);
     }
 
@@ -71,12 +90,13 @@ export class WebPlaybackHandle implements PlaybackHandle {
         const source = this.ctx.createBufferSource();
         source.buffer = this.buffer;
         source.loop = this.loop;
-        source.connect(this.output);
+        source.connect(this.gain);
         source.onended = () => {
             // Ignore stale nodes, pause/stop detach their own handler
             if (this.source !== source) return;
             this.source = null;
             this.finished = true;
+            this.gain.disconnect();
         };
         source.start(0, offset);
 
@@ -107,9 +127,24 @@ export class WebPlaybackHandle implements PlaybackHandle {
         this.start(this.pauseOffset);
     }
 
-    public stop(): void {
-        this.halt();
+    public stop(fadeOutSeconds: number = 0): void {
+        if (this.finished) return;
         this.finished = true;
+        const { source } = this;
+        // Paused has nothing playing to fade
+        if (!source || fadeOutSeconds <= 0) {
+            this.halt();
+            this.gain.disconnect();
+            return;
+        }
+        // Finished now, but the source plays on through the fade and stops itself at the end of it
+        this.source = null;
+        fadeOut(this.ctx, this.gain, fadeOutSeconds);
+        source.onended = () => {
+            source.disconnect();
+            this.gain.disconnect();
+        };
+        source.stop(this.ctx.currentTime + fadeOutSeconds);
     }
 
     public isFinished(): boolean {
@@ -119,11 +154,16 @@ export class WebPlaybackHandle implements PlaybackHandle {
 
 /**
  * Playback of a streamed sound, an HTMLAudioElement routed into the category mix bus.
+ * Element -> [voice gain] -> [category gain], like a buffered voice.
  */
 export class WebStreamPlaybackHandle implements PlaybackHandle {
+    private readonly ctx: AudioContext;
+
     private readonly element: HTMLAudioElement;
 
     private readonly node: MediaElementAudioSourceNode;
+
+    private readonly gain: GainNode;
 
     private readonly onBlocked: (handle: WebStreamPlaybackHandle) => void;
 
@@ -137,8 +177,10 @@ export class WebStreamPlaybackHandle implements PlaybackHandle {
         url: string,
         output: AudioNode,
         loop: boolean,
+        fadeInSeconds: number,
         onBlocked: (handle: WebStreamPlaybackHandle) => void,
     ) {
+        this.ctx = ctx;
         this.onBlocked = onBlocked;
         this.element = new Audio(url);
         this.element.loop = loop;
@@ -149,8 +191,12 @@ export class WebStreamPlaybackHandle implements PlaybackHandle {
             console.error(`Failed to stream audio: ${url}`);
             this.finish();
         });
+        this.gain = ctx.createGain();
+        this.gain.connect(output);
         this.node = ctx.createMediaElementSource(this.element);
-        this.node.connect(output);
+        this.node.connect(this.gain);
+        // A suspended context's clock stands still, so a stream waiting on autoplay still fades in once it plays
+        fadeIn(ctx, this.gain, fadeInSeconds);
         this.playElement();
     }
 
@@ -172,8 +218,13 @@ export class WebStreamPlaybackHandle implements PlaybackHandle {
         if (this.finished) return;
         this.finished = true;
         this.blocked = false;
+        this.release();
+    }
+
+    private release(): void {
         this.element.pause();
         this.node.disconnect();
+        this.gain.disconnect();
         // Release the network stream
         this.element.removeAttribute('src');
         this.element.load();
@@ -199,8 +250,18 @@ export class WebStreamPlaybackHandle implements PlaybackHandle {
         this.playElement();
     }
 
-    public stop(): void {
-        this.finish();
+    public stop(fadeOutSeconds: number = 0): void {
+        // Paused or refused by autoplay, there's nothing playing to fade
+        if (fadeOutSeconds <= 0 || this.finished || this.element.paused) {
+            this.finish();
+            return;
+        }
+        // Finished now, released once the fade is over. An element can't be told to stop later like a buffer source,
+        // so it's a timer: platform code, not core, so a wall clock is fine (T-1 is about the simulation).
+        this.finished = true;
+        this.blocked = false;
+        fadeOut(this.ctx, this.gain, fadeOutSeconds);
+        setTimeout(() => this.release(), fadeOutSeconds * 1000);
     }
 
     public isFinished(): boolean {
@@ -316,18 +377,23 @@ export class WebAudioService implements AudioService {
         return new WebSoundHandle(soundId, audioBuffer);
     }
 
-    public play(sound: SoundHandle, category: AudioCategory = 'sfx', loop: boolean = false): PlaybackHandle {
+    public play(
+        sound: SoundHandle,
+        category: AudioCategory = 'sfx',
+        loop: boolean = false,
+        fadeInSeconds: number = 0,
+    ): PlaybackHandle {
         const ctx = this.getAudioContext();
         const output = this.getCategoryGain(category);
 
         if (sound instanceof WebStreamHandle) {
-            return new WebStreamPlaybackHandle(ctx, sound.url, output, loop, (handle) => {
+            return new WebStreamPlaybackHandle(ctx, sound.url, output, loop, fadeInSeconds, (handle) => {
                 this.blockedStreams.push(handle);
             });
         }
 
         if (sound instanceof WebSoundHandle) {
-            return new WebPlaybackHandle(ctx, sound.buffer, output, loop);
+            return new WebPlaybackHandle(ctx, sound.buffer, output, loop, fadeInSeconds);
         }
 
         throw new Error(`Invalid asset passed to WebAudioService: ${sound.id}`);

@@ -46,6 +46,11 @@ export default class RenderSystem {
 
     private readonly billboardCenter: Vec3 = { x: 0, y: 0, z: 0 };
 
+    // A debug wall box's center and size, rewritten per wall each frame (M-1)
+    private readonly wallCenter: Vec3 = { x: 0, y: 0, z: 0 };
+
+    private readonly wallScale: Vec3 = { x: 0, y: 0, z: 0 };
+
     // The 3D camera's view-projection, rebuilt in place every frame (M-1)
     private readonly viewProj: Mat4 = { elements: new Float32Array(16) };
 
@@ -124,23 +129,32 @@ export default class RenderSystem {
         o[12] = center.x; o[13] = center.y; o[14] = center.z; o[15] = 1;
     }
 
+    // Every visible chunk mesh, every frame, so an indexed loop with no callback (M-1)
+    private renderWorldMeshes(): void {
+        const meshes = this.world.getVisibleMeshes();
+        for (let i = 0; i < meshes.length; i += 1) {
+            const sm = meshes[i];
+            this.renderer.drawMesh(sm.mesh, sm.transform, sm.color);
+        }
+    }
+
     private renderBoundaryWireframe(wallDebugTransform: Mat4, WALL_DEBUG_COLOR: Vec3): void {
         if (!this.renderer.getWireframeEnabled?.()) return;
 
-        this.world.getBoundaryWallAABBs().forEach((wall) => {
-            const center = {
-                x: (wall.min.x + wall.max.x) / 2,
-                y: (wall.min.y + wall.max.y) / 2,
-                z: (wall.min.z + wall.max.z) / 2,
-            };
-            const scale = {
-                x: wall.max.x - wall.min.x,
-                y: wall.max.y - wall.min.y,
-                z: wall.max.z - wall.min.z,
-            };
+        const walls = this.world.getBoundaryWallAABBs();
+        const center = this.wallCenter;
+        const scale = this.wallScale;
+        for (let i = 0; i < walls.length; i += 1) {
+            const wall = walls[i];
+            center.x = (wall.min.x + wall.max.x) / 2;
+            center.y = (wall.min.y + wall.max.y) / 2;
+            center.z = (wall.min.z + wall.max.z) / 2;
+            scale.x = wall.max.x - wall.min.x;
+            scale.y = wall.max.y - wall.min.y;
+            scale.z = wall.max.z - wall.min.z;
             this.computeScaledTransform(center, scale, wallDebugTransform);
             this.renderer.drawMesh(this.wallDebugMesh, wallDebugTransform, WALL_DEBUG_COLOR, true);
-        });
+        }
     }
 
     /**
@@ -326,9 +340,7 @@ export default class RenderSystem {
 
             this.declareLighting(camera.position, shadowsEnabled);
 
-            this.world.getVisibleMeshes().forEach((sm) => {
-                this.renderer.drawMesh(sm.mesh, sm.transform, sm.color);
-            });
+            this.renderWorldMeshes();
 
             const width = this.renderer.getViewportWidth?.() ?? 800;
             const height = this.renderer.getViewportHeight?.() ?? 600;
@@ -373,9 +385,7 @@ export default class RenderSystem {
 
             this.declareLighting(camera.position, shadowsEnabled);
 
-            this.world.getVisibleMeshes().forEach((sm) => {
-                this.renderer.drawMesh(sm.mesh, sm.transform, sm.color);
-            });
+            this.renderWorldMeshes();
 
             const { battle } = discreteState;
             this.renderNpcs(camera, battle ? battle.npcId : null, billboardTilt);

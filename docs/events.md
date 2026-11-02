@@ -1,9 +1,10 @@
-# Eventing, State, and Audio Systems
+# Eventing and State
 
 ## Table of Contents
 
 - [Introduction](#introduction)
 - [Architectural Design](#architectural-design)
+    - [How it runs today](#how-it-runs-today)
 - [Proposed Implementation](#proposed-implementation)
     - [The Event Bus](#the-event-bus)
         - [Synchronous Events](#synchronous-events)
@@ -11,17 +12,12 @@
         - [Double-buffered events](#double-buffered-events)
         - [MPSC Queue](#mpsc-queue)
     - [Global State management](#global-state-management)
-    - [Audio Systems](#audio-systems)
-        - [Portability & Separation of Concerns](#portability--separation-of-concerns)
-        - [Audio Service Interface](#audio-service-interface)
-        - [Audio System & Event Integration](#audio-system--event-integration)
-        - [Menu Events](#menu-events)
-        - [Battle Events](#battle-events)
-        - [Settings Events](#settings-events)
-        - [Mode-Driven Audio](#mode-driven-audio)
-        - [Buffered vs. Streamed Sounds](#buffered-vs-streamed-sounds)
-        - [Web Audio Platform Implementation](#web-audio-platform-implementation)
-        - [Stub Platform & Testing (Rule P-1)](#stub-platform--testing-rule-p-1)
+- [Event Reference](#event-reference)
+    - [Mode and World Events](#mode-and-world-events)
+    - [Audio Events](#audio-events)
+    - [Menu Events](#menu-events)
+    - [Battle Events](#battle-events)
+    - [Settings Events](#settings-events)
 - [Pitfalls to Avoid](#pitfalls-to-avoid)
 - [Navigation](#navigation)
 
@@ -30,6 +26,8 @@
 There is information that needs to be delivered between naive systems, and that's what our event bus does. We trigger an event, and the necessary information is delivered to all relevant systems.
 
 We abstract the event bus as if it runs in c++/OpenGL, in typescript. From there we create the functional equivalent to webGL.
+
+Audio, the biggest listener on the bus, has its own doc: **[Audio](audio.md)**.
 
 ## Architectural Design
 
@@ -59,6 +57,31 @@ flowchart TB
 
     Render["Render Step<br/>Variable DT / requestAnimationFrame<br/>Lerp(StateBuffer.Previous,<br/>StateBuffer.Current, Alpha)"]
 ```
+
+### How it runs today
+
+There's no MPSC queue yet, and the bus is flushed once per frame, after all of the frame's ticks, not twice per tick.
+
+```mermaid
+sequenceDiagram
+    participant F as frame() (game.ts)
+    participant L as GameLoop.update
+    participant B as EventBus
+    participant R as GameLoop.render
+
+    F->>F: clock.update(), input.update()
+    F->>L: update(deltaTime)
+    loop each FIXED_DT tick the frame owes
+        L->>L: updateSimulation: menu, fight, speech, scene, instance or world
+        Note over L: systems publish, nothing is handled yet
+    end
+    L->>B: flush()
+    Note over B: handlers run now. What they publish waits for the next frame's flush.
+    F->>F: stream chunks if the player changed chunk
+    F->>R: render()
+```
+
+So a chain of events moves one frame per link: a mode change is handled on one flush, and the sounds it asks for on the next. Scenario specs tick twice after a change before asserting on its audio.
 
 ## Proposed Implementation
 
@@ -128,7 +151,7 @@ Double-buffered event queues are primarily useful for single-threaded frame phas
 
 They rely on pointer swapping, are entirely deterministic, and can be sorted before execution. We can control nitty gritty render events and maximize cache performance manually.
 
-Generic Double-buffered event queue with synchronous dispatch:
+Generic Double-buffered event queue with synchronous dispatch. The two queues swap places on each flush and are emptied in place, so flushing allocates nothing (M-1):
 
 ```typescript
 export class TypeSafeEventBus implements EventBus {
@@ -145,11 +168,13 @@ export class TypeSafeEventBus implements EventBus {
     flush(): void {
         if (this.incomingQueue.length === 0) return;
 
-        this.processingQueue = this.incomingQueue;
-        this.incomingQueue = [];
+        // Events published by a handler land in the other queue, for the next flush
+        const queue = this.incomingQueue;
+        this.incomingQueue = this.processingQueue;
+        this.processingQueue = queue;
 
-        for (let i = 0; i < this.processingQueue.length; i += 1) {
-            const event = this.processingQueue[i];
+        for (let i = 0; i < queue.length; i += 1) {
+            const event = queue[i];
             const handlers = this.listeners.get(event.type);
             if (handlers) {
                 for (let j = 0; j < handlers.length; j += 1) {
@@ -158,7 +183,7 @@ export class TypeSafeEventBus implements EventBus {
             }
         }
 
-        this.processingQueue = [];
+        queue.length = 0;
     }
 
     subscribe<K extends Event['type']>(
@@ -184,6 +209,8 @@ export class TypeSafeEventBus implements EventBus {
     }
 }
 ```
+
+The swap assumes no handler calls `flush()` itself. An inner flush would empty the queue the outer one is still walking.
 
 #### MPSC Queue
 
@@ -234,189 +261,32 @@ Not interpolated yet: the instance character and the 2D scene character. They mo
 
 (Screen tearing, horizontal split lines, is a different problem. It comes from how the browser and the OS present frames, for example NVIDIA on X11, and the game can't fix it.)
 
-### Audio Systems
+**State that can change without an event.** Quitting to the main menu replaces the state's contents directly, and loading a save will too. A listener that needs a value at the moment it acts (modeAudio's bed for the time of day) reads it from `GameState` then, rather than remembering the last event that mentioned it. Whatever replaces state wholesale publishes `game_mode_changed` afterwards, so mode listeners rebuild from it.
 
-Audio needs to be playable, pauseable, streamable, and stopable. For game engines requiring low latency and precision playback, the strategy is to fetch audio files as binary ArrayBuffers, decode them into raw PCM buffers (e.g. Web Audio `AudioBuffer`), and wrap them behind platform-agnostic handles.
+## Event Reference
 
-Original sound fx will be created as lossless .wav, then exported and coverted into .ogg directly into smackhem/public/assets/audio/. The file name is the sound ID: snake_case, led by its purpose (`ui_menu_select.ogg`, `ambient_night.ogg`).
+Every event is one member of the `GameEvent` union in [events.ts](../src/core/events.ts).
 
-**Every current sound is a placeholder and subject to change:** `ambient_night`, `sfx_mode_change` and `ui_menu_select` (currently the same file as `sfx_mode_change`). Sound IDs are the stable contract, so replacing a file needs no code change. Non-original audio is open source, royalty free, and free for commercial use. Sources are linked in the credits section of **[RESOURCES](RESOURCES.md)**.
+### Mode and World Events
 
-#### Sound Compression
+- `game_mode_changed { previousMode, currentMode }`: published by whatever switches the mode: the menu (New Game), the scene and instance systems, `BattleSystem`, and `GameLoop` (game over, quitting). Read the old mode before writing the new one (Pitfall 4). Audio's two mode listeners are in [audio.md](audio.md#mode-driven-audio).
+- `scene_2d_requested` has no payload. The pause menu's Debug screen publishes it, and `GameLoop` enters the scene on the flush, after the menu has closed.
+- `day_phase_changed { phase }`: published by `GameLoop` on the tick the time of day crosses into another `DayPhase` (day from 06:00 to 19:00, night otherwise). Only the world tick moves time, so it's only ever published in `world_3d`. modeAudio crossfades the beds on it ([audio.md](audio.md#ambience-and-the-day-phase)).
 
-For simplicity's sake, there's a set of bash scripts in `scripts/audio-aliases.sh` that will compress and cut dead-air from sound files.
+### Audio Events
 
-To run, source the file `source scripts/audio-aliases.sh`.
+Requests, all handled by `AudioSystem`. What it does with each is in [audio.md](audio.md#audiosystem-one-voice-per-sound).
 
-Alternatively, you can run the script via bash.
+- `play_sound_requested { soundId, category, loop?, fadeInSeconds? }`
+- `stop_sound_requested { soundId, fadeOutSeconds? }`
+- `pause_sound_requested { soundId }`
+- `audio_bus_volume_changed { category, volume }`: published by the Settings menu each time a volume steps, and by `createGame` once per bus at boot
 
-##### To compress and trim:
-
-Run only the commands without sourcing
-
-```bash
-bash scripts/audio-aliases.sh --trim
-```
-
-Sourced
-
-```bash
-mp32ogg-trim menu-select.mp3
-# or
-wav2ogg-trim footstep.wav
-# or multiple
-wav2ogg-trim jump.wav land.wav hit.wav
-# or all audio files in current dir
-audio2ogg-trim
-```
-
-##### To compress, not trim:
-
-Run only the commands without sourcing
-
-```bash
-bash scripts/audio-aliases.sh
-```
-
-With sourcing
-
-```bash
-mp32ogg night-time.mp3
-# or
-wav2ogg overworld_theme.wav
-# or multiple
-wav2ogg jump.wav land.wav hit.wav
-# or all
-audio2ogg
-```
-
-#### Portability & Separation of Concerns
-
-Asset loading in Smackhem originally risked becoming a monolithic "God Asset Loader" combining chunks, textures, and maps. For audio, **Portability First** demands strict separation:
-
-1. **Different Hardware Targets**: On native platforms and consoles, audio buffers route to sound chip memory or dedicated audio mixing threads (e.g., miniaudio, SDL_mixer, OpenAL). Textures route to GPU VRAM via graphics APIs, and chunks stream from disk into spatial world grids. Tying them together creates an artificial dependency tangle.
-2. **AudioService Owns Audio Loading**: Just as [`Renderer`](rendering.md) owns mesh generation and texture loading (`loadTexture`), the [`AudioService`](#audio-service-interface) owns sound loading, playback, and category mixing. There is no need for a separate loader interface.
-3. **Opaque Handles (Constraints P-1, P-2)**: Core logic only holds an opaque `SoundHandle` (`{ readonly id: string }`). Core never knows about `AudioBuffer`, `AudioContext`, or hardware sound cards.
-4. **Logical IDs (Rule A-1)**: Sounds are always requested by logical ID (`loadSound('ui_select')`), never raw file paths or URLs. Path mapping (`/assets/audio/ui_select.ogg`) is strictly a backend concern.
-
-#### Audio Service Interface
-
-```text
-Individual PCM Playback Voice (e.g., SFX Effect)
-               │
-               ▼
-         [sfxGainNode]       [uiGainNode]      [musicGainNode]
-              │                    │                  │
-              └───────────┬────────┴──────────────────┘
-                          ▼
-                   [masterGainNode]
-                          │
-                          ▼
-                 [Hardware Speakers]
-```
-
-With consideration for multiple sound types and volume, we support audio categories and mix buses.
-
-```typescript
-export type AudioCategory = 'master' | 'sfx' | 'music' | 'ambient' | 'ui';
-
-export interface SoundHandle {
-    // Opaque identifier, FFI-friendly and serializable
-    readonly id: string;
-}
-
-export interface PlaybackHandle {
-    pause(): void;
-    resume(): void;
-    stop(): void;
-    // True once the sound ends on its own or is stopped. A paused voice is not finished.
-    isFinished(): boolean;
-}
-
-export interface AudioService {
-    // Category lets the backend decide buffered vs streamed, core never knows which
-    loadSound(soundId: string, category?: AudioCategory): Promise<SoundHandle>;
-    play(sound: SoundHandle, category?: AudioCategory, loop?: boolean): PlaybackHandle;
-    setVolume(category: AudioCategory, volume: number): void;
-    getVolume(category: AudioCategory): number;
-}
-```
-
-#### Audio System & Event Integration
-
-We dropped the standalone `SoundRegistry`. It isn't needed on the web, and it isn't needed for C++.
-
-Every backend already keeps a `soundId -> decoded buffer` cache: the web keeps `AudioBuffer`s, and a native backend (miniaudio, OpenAL) keeps its own sound objects. A registry in core would be a second copy of that map that has to stay in sync. The one thing it bought us was a synchronous lookup from an event's `soundId`, since `loadSound` is async. That lookup now lives in `AudioSystem` (`src/core/audio/audioSystem.ts`), which owns its handles and the audio event subscriptions. It's the same shape as other systems holding their `TextureHandle`s, and it ports to C++ as one system owning a `std::unordered_map<std::string, SoundHandle>`.
-
-```typescript
-export default class AudioSystem {
-    private sounds = new Map<string, SoundHandle>();
-
-    // One voice per sound
-    private voices = new Map<string, PlaybackHandle>();
-
-    constructor(audio: AudioService, eventBus: TypeSafeEventBus) {
-        eventBus.subscribe('play_sound_requested', (event) => {
-            const handle = this.sounds.get(event.soundId);
-            if (!handle) return; // Never load inside a handler (Pitfall 2)
-
-            const voice = this.voices.get(event.soundId);
-            if (voice && !voice.isFinished()) {
-                // Loops continue, or resume if paused. One-shots restart.
-                if (event.loop) {
-                    voice.resume();
-                    return;
-                }
-                voice.stop();
-            }
-
-            this.voices.set(event.soundId, audio.play(handle, event.category, event.loop));
-        });
-
-        eventBus.subscribe('pause_sound_requested', (event) => {
-            this.voices.get(event.soundId)?.pause();
-        });
-
-        eventBus.subscribe('stop_sound_requested', (event) => {
-            const voice = this.voices.get(event.soundId);
-            if (!voice) return;
-            voice.stop();
-            this.voices.delete(event.soundId);
-        });
-
-        eventBus.subscribe('audio_bus_volume_changed', (event) => {
-            audio.setVolume(event.category, event.volume);
-        });
-    }
-
-    public async preload(soundId: string, category: AudioCategory): Promise<void>;
-}
-```
-
-Sounds are preloaded up front, so playing one is a map lookup at flush time.
-
-**One voice per sound.** Like Godot's default `max_polyphony` of 1, or Unity's `AudioSource.Play()`, each sound has at most one live voice:
-
-| Request | Voice state | Result |
-|---|---|---|
-| `play_sound_requested` with `loop: true` | playing | Ignored, so asking for ambience again is harmless |
-| `play_sound_requested` with `loop: true` | paused | Resumed, so "start or resume" is one request |
-| `play_sound_requested` without loop | playing | Restarted, so rapid one-shots re-trigger cleanly |
-| any play | none, stopped or finished | A new voice starts |
-| `pause_sound_requested` | any | Paused, can be resumed or stopped later |
-| `stop_sound_requested` | any | Stopped and forgotten |
-
-This absorbs duplicate requests from several fixed ticks landing in one flush, and there are no voice lists to prune. A finished voice sits in the map until the sound plays again, so the map is bounded by the number of audio files shipped (M-2). If a sound ever needs real overlap, like several party members' footsteps, give it a voice limit and stop the oldest voice at the limit.
-
-**Volume.** `audio_bus_volume_changed` is published by the Settings menu each time a volume steps, and by `main.ts` once per bus at boot, to apply the saved volumes. `AudioSystem` passes it to `setVolume`.
-
-Voices are checked with `isFinished()` from the tick, not through end-of-sound callbacks. On native backends those callbacks fire on the audio thread, and calling into core from there would need the MPSC queue or locks. Checking from the tick keeps audio single-threaded, and miniaudio supports it directly (`ma_sound_at_end`). It is `isFinished()` rather than `isPlaying()` so a paused voice is kept and can still be stopped.
-
-#### Menu Events
+### Menu Events
 
 `quit_to_main_menu_requested` has no payload. The pause menu publishes it when Quit is confirmed, and `GameLoop` handles it by resetting to a fresh boot: game state, camera and menu, followed by `game_mode_changed` to `main_menu`. Pausing and resuming publish nothing; they only set `DiscreteState.isPaused`.
 
-#### Battle Events
+### Battle Events
 
 Covered in full in [battle.md](battle.md).
 
@@ -424,136 +294,9 @@ Covered in full in [battle.md](battle.md).
 - `battle_requested { encounterId, npcId }`: every way into a fight ends here, whether talking or walking into the NPC. `BattleSystem.start` handles it on the next flush, one frame after it's asked for, and switches the mode to `battle_25djrpg`.
 - `game_over_requested` has no payload. A lost fight publishes it, and `GameLoop` switches to `game_over` and opens the Game Over screen. `BattleSystem` never opens menus itself.
 
-#### Settings Events
+### Settings Events
 
-`settings_changed` has no payload. Settings live in one shared `Settings` object (`src/core/settings/settings.ts`), which the menu changes in place, so subscribers read it directly. `main.ts` subscribes and saves the settings to storage. `bindDisplay` (`src/core/settings/displaySettings.ts`) subscribes and applies render scale, window size and fullscreen to the platform. When the platform reports a fullscreen change itself (a refusal, Escape, the page's button), it updates `settings.fullscreen` and publishes `settings_changed` so the menu redraws. Look sensitivity and invert need no event: `GameLoop` reads them every tick.
-
-#### Mode-Driven Audio
-
-Core systems only publish intent (Rule I-1). `src/core/audio/modeAudio.ts` turns `game_mode_changed` into audio requests: `sfx_mode_change` plays on every change, and `ambient_night`
-
-- pauses when entering the 2D scene (`scene_2d`)
-- stops when entering the instance (`instance_3d`)
-- starts or resumes when returning to the world (`world_3d`)
-- stops when quitting to the main menu (`main_menu`) or losing a fight (`game_over`)
-
-The pause menu isn't a mode change, so the ambience keeps playing while paused.
-
-```typescript
-eventBus.subscribe('game_mode_changed', (event) => {
-    eventBus.publish({ type: 'play_sound_requested', soundId: MODE_CHANGE_SOUND, category: 'sfx' });
-
-    switch (event.currentMode) {
-        case 'scene_2d':
-            eventBus.publish({ type: 'pause_sound_requested', soundId: AMBIENT_SOUND });
-            break;
-        case 'instance_3d':
-            eventBus.publish({ type: 'stop_sound_requested', soundId: AMBIENT_SOUND });
-            break;
-        case 'world_3d':
-            playAmbience(eventBus); // looping play_sound_requested
-            break;
-        default:
-            break;
-    }
-});
-```
-
-Requests published from inside a handler go into the next flush, so audio follows a mode change one frame later. `main.ts` preloads the sounds (a missing file is logged, not fatal) and subscribes these rules. The game boots into the start-up menu in silence, and the ambience starts when New Game changes the mode to `world_3d`. That keypress also unlocks browser audio.
-
-#### Buffered vs. Streamed Sounds
-
-Audio needs vary significantly based on clip length and memory footprint:
-
-- **Short Sounds (SFX / UI)**: Pre-loaded and decoded into memory via `audioService.loadSound()`. Stored as decompressed PCM buffers for instant, low-latency playback across polyphonic voices.
-- **Long Sounds (Music / Ambience / Environmental loops)**: Streaming is not exclusive to music—long ambient loops (rain, wind, river) and heavy sound effects must also be streamed. Decompressing several multi-minute tracks into RAM causes severe buffer volatility (Pitfall 3). The audio backend handles streaming on-demand by `soundId` directly into the designated mix bus, without core needing to know the asset's size or streaming mechanism.
-- **Who decides**: the backend, by the category passed to `loadSound`. On the web, `music` and `ambient` stream through an `HTMLAudioElement`, and everything else is decoded into an `AudioBuffer`. Pass `loop: true` to `play` for loops.
-
-#### Web Audio Platform Implementation
-
-The Web platform implementation packs the Web Audio API primitives (`AudioContext`, `AudioBuffer`, gain nodes) safely inside the backend layer, completely hidden from `core/`.
-
-**WebSoundHandle**:
-```typescript
-export class WebSoundHandle implements SoundHandle {
-    // Hidden from core: contains raw decompressed PCM AudioBuffer in memory
-    public readonly buffer: AudioBuffer;
-    public readonly id: string;
-
-    constructor(id: string, buffer: AudioBuffer) {
-        this.id = id;
-        this.buffer = buffer;
-    }
-}
-```
-
-**WebPlaybackHandle & WebAudioService**:
-The web platform requires renewing source nodes upon resumption since Web Audio `AudioBufferSourceNode`s are single-use. Browsers also start the `AudioContext` suspended, so `webBootstrap` calls the web-only `resumeContext()` on the first pointer or key press. Streams have the same problem: a stream played before that gesture (like the boot ambience) gets `NotAllowedError` from `play()`. The service queues those streams and retries them synchronously inside `resumeContext()`, because `play()` only counts as user-initiated during the gesture. `WebAudioService` also handles decoding audio buffers, managing mix buses, and streaming longer tracks via media elements routed into category gain nodes.
-
-```typescript
-export class WebPlaybackHandle implements PlaybackHandle {
-    // ... tracks sourceNode, pauseOffset, buffer duration ...
-    public resume(): void {
-        if (this.isPlaying) return;
-        if (this.pauseOffset < this.buffer.duration) {
-            this.start(this.pauseOffset);
-        }
-    }
-}
-
-export class WebAudioService implements AudioService {
-    // Keyed by sound ID only, a sound's category is fixed by its first load
-    private cache: Map<string, Promise<SoundHandle>> = new Map();
-    private audioContext?: AudioContext;
-    private basePath: string;
-
-    constructor(basePath: string, audioContext?: AudioContext) {
-        this.basePath = basePath;
-        this.audioContext = audioContext;
-    }
-
-    public loadSound(soundId: string, category: AudioCategory = 'sfx'): Promise<SoundHandle> {
-        const cached = this.cache.get(soundId);
-        if (cached) return cached;
-
-        // Cache the in-flight load so concurrent requests share one fetch and decode
-        const pending = this.fetchSound(soundId, category);
-        this.cache.set(soundId, pending);
-        pending.catch(() => this.cache.delete(soundId)); // failed loads can be retried
-        return pending;
-    }
-
-    private async fetchSound(soundId: string, category: AudioCategory): Promise<SoundHandle> {
-        const path = `${this.basePath}${soundId}.ogg`;
-        if (STREAMED_CATEGORIES.has(category)) {
-            // music/ambient: keep only the URL, stream on play
-            return new WebStreamHandle(soundId, path);
-        }
-
-        const response = await fetch(path);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await this.getAudioContext().decodeAudioData(arrayBuffer);
-        return new WebSoundHandle(soundId, audioBuffer);
-    }
-
-    public play(sound: SoundHandle, category: AudioCategory = 'sfx', loop: boolean = false): PlaybackHandle {
-        const ctx = this.getAudioContext();
-        const output = this.getCategoryGain(category);
-
-        if (sound instanceof WebStreamHandle) {
-            return new WebStreamPlaybackHandle(ctx, sound.url, output, loop);
-        }
-        if (sound instanceof WebSoundHandle) {
-            return new WebPlaybackHandle(ctx, sound.buffer, output, loop);
-        }
-        throw new Error(`Invalid asset passed to WebAudioService: ${sound.id}`);
-    }
-}
-```
-
-#### Stub Platform & Testing (Rule P-1)
-
-To uphold the deletion test (Rule P-1), a `StubAudioService` is provided in `src/platforms/stub/`. It implements `AudioService` and returns mock `SoundHandle` and `PlaybackHandle` objects without instantiating any browser audio contexts, ensuring that unit and integration tests run headlessly in Node/Vitest without mock polyfills.
+`settings_changed` has no payload. Settings live in one shared `Settings` object (`src/core/settings/settings.ts`), which the menu changes in place, so subscribers read it directly. `createGame` subscribes and saves the settings to storage. `bindDisplay` (`src/core/settings/displaySettings.ts`) subscribes and applies render scale, window size and fullscreen to the platform. When the platform reports a fullscreen change itself (a refusal, Escape, the page's button), it updates `settings.fullscreen` and publishes `settings_changed` so the menu redraws. Look sensitivity and invert need no event: `GameLoop` reads them every tick.
 
 ## Pitfalls to Avoid
 
@@ -568,6 +311,7 @@ To uphold the deletion test (Rule P-1), a `StubAudioService` is provided in `src
 - **[Portability Rules](portability-rules.md)** - All portability enforcement rules and constraints
 - **[Architecture](architecture.md)** - High-level architecture, design principles, and platform strategy
 - **[Rendering](rendering.md)** - Rendering system, lighting, day/night cycle, and display size
+- **[Audio](audio.md)** - Sounds, voices, mix buses, fades, ambience, music, and the web and stub backends
 - **[Camera](camera.md)** - Camera system and mathematical formulas
 - **[Systems](systems.md)** - World, party, input, collision, geometry, and menu systems
 - **[Battle](battle.md)** - Fights: starting one, turns and ATB, commands, the field and battle camera
