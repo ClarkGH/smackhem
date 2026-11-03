@@ -53,6 +53,7 @@ Everything you do, mindfully, builds pattern recognition. Read, ask questions, g
    - Everytime I think "x was the hard part, y will be so much more fun", I end up being completely wrong. Sound is an instance of this
    - I wanted to implement an MPSC queue, but that's not something possible for Javascript without overbloating the project with uneccesary service workers
    - Programming a pseudo MPSC queue with async javascript is a headache. The web concepts will not translate to c++, but they're good to know
+   - I had to learn what a ramp was to understand a fade better. The whole audio system is a massive mind-blender that has added more jello-ification. I firmly believe that anyone who creates a game engine can program anything, except for in Rust... Anyhow, we'll figure out Slerps at some point in the future when we want 3D rotations.
 
 ## Patterns / Paradigms
 
