@@ -373,7 +373,7 @@ export class GameLoop {
         const { x: moveX, y: moveY } = intent.move;
 
         if (moveX !== 0 || moveY !== 0) {
-            // Along the floor whatever the pitch, as getCameraForward(yaw, pitch) gave before
+            // Along the floor whatever the pitch
             const forward = flatForwardInto(this.camera.yaw, this.moveForward);
             const right = flatRightInto(this.camera.yaw, this.moveRight);
 

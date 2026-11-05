@@ -5,8 +5,6 @@ import {
     lookDirectionInto,
     matrixMultiply,
     matrixMultiplyInto,
-    quaternionFromYawPitch,
-    quaternionApplyToVector,
 } from './math/mathHelpers';
 import type { Mat4, Vec3 } from '../types/common';
 
@@ -66,26 +64,8 @@ export const getCameraMatrixInto = (
 // View matrix for normal matrix computation
 export const getViewMatrix = (camera: Camera): Mat4 => lookDirection(camera.position, camera.yaw, camera.pitch);
 
-// Forward vector for movement
-export const getCameraForward = (yaw: number, pitch: number): Vec3 => {
-    const rotation = quaternionFromYawPitch(yaw, pitch);
-    const forward = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
-    // Zero out Y component for horizontal movement
-    const len = Math.sqrt(forward.x * forward.x + forward.z * forward.z);
-    if (len < 0.0001) return { x: 0, y: 0, z: -1 };
-    return { x: forward.x / len, y: 0, z: forward.z / len };
-};
-
-// Right vector for movement
-export const getCameraRight = (yaw: number): Vec3 => {
-    const rightYaw = yaw + Math.PI / 2;
-    const rotation = quaternionFromYawPitch(rightYaw, 0);
-    const right = quaternionApplyToVector(rotation, { x: 0, y: 0, z: -1 });
-    return { x: right.x, y: 0, z: right.z };
-};
-
 // The flat direction a yaw looks in, written into out so it can run every tick (M-1).
-// Matches getCameraForward(yaw, 0), which camera.spec checks.
+// camera.spec checks it against the camera's quaternion rotation.
 export const flatForwardInto = (yaw: number, out: Vec3): Vec3 => {
     out.x = Math.sin(yaw);
     out.y = 0;
@@ -93,7 +73,7 @@ export const flatForwardInto = (yaw: number, out: Vec3): Vec3 => {
     return out;
 };
 
-// Forward turned a quarter to the right, written into out (M-1). Matches getCameraRight, which camera.spec checks.
+// Forward turned a quarter to the right, written into out (M-1). camera.spec checks it the same way.
 export const flatRightInto = (yaw: number, out: Vec3): Vec3 => {
     out.x = Math.cos(yaw);
     out.y = 0;

@@ -6,7 +6,6 @@ import { lerpVec3, smoothstep } from './math/mathHelpers';
 import {
     flatForwardInto,
     flatRightInto,
-    getCameraForward,
     INSTANCE_CHARACTER_SIZE,
     PLAYER_SPEED,
     type Camera,
@@ -28,7 +27,7 @@ export default class Instance3DSystem {
 
     private readonly transitionEndPos: Vec3 = { x: 0, y: 0, z: 0 };
 
-    // Filled in place on every tick the circle moves (M-1)
+    // Filled in place on every tick the circle moves, and when an instance opens (M-1)
     private readonly moveForward: Vec3 = { x: 0, y: 0, z: -1 };
 
     private readonly moveRight: Vec3 = { x: 1, y: 0, z: 0 };
@@ -78,7 +77,7 @@ export default class Instance3DSystem {
         interpolatedState.instanceTransitionProgress = 0.0;
         discreteState.instanceIsActive = false;
 
-        this.calculateTransitionPositions(gameState);
+        this.calculateTransitionPositions();
 
         interpolatedState.instanceCharacterPosition.x = this.transitionStartPos.x;
         interpolatedState.instanceCharacterPosition.y = this.transitionStartPos.y;
@@ -112,8 +111,9 @@ export default class Instance3DSystem {
         // Mode stays instance_3d until the exit transition finishes in update()
     }
 
-    private calculateTransitionPositions(gameState: GameState): void {
-        const forward = getCameraForward(this.camera.yaw, gameState.discrete.targetPitch);
+    // Along the floor in front of the camera, whatever its pitch
+    private calculateTransitionPositions(): void {
+        const forward = flatForwardInto(this.camera.yaw, this.moveForward);
         const circleSize = INSTANCE_CHARACTER_SIZE;
         const floorY = circleSize / 2;
 

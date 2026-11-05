@@ -107,7 +107,7 @@ describe('battleCameraInto', () => {
         const dz = target.z - camera.position.z;
         expect(Math.sqrt(dx * dx + dy * dy + dz * dz)).toBeCloseTo(7, 6);
         // And the target is straight ahead of it: the view's forward, as lookDirectionInto builds it
-        // (getCameraForward flattens pitch away, it's for walking)
+        // (flatForwardInto drops the pitch, it's for walking)
         const forward = {
             x: Math.cos(camera.pitch) * Math.sin(camera.yaw),
             y: Math.sin(camera.pitch),
