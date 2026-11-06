@@ -71,7 +71,7 @@ Expect a blank field, without sounds, and with potential errors. Some public ass
 
 - Install dependencies (node/pnpm)
 - `$ pnpm install && pnpm build && pnpm vite`
-- Debug and run via browser. The game fills the window and boots into a start-up menu: arrow keys or W/S to move, Enter to choose. See [Controls](docs/controls.md)
+- Debug and run via browser. The game fills the window and boots into a start-up menu: arrow keys or WASD to move, Enter to choose. See [Controls](docs/controls.md)
 - There are assets not included
   - To add collision/field objects, create chunk JSON files in `public/chunks/`. See [Data Formats](docs/data-formats.md) for chunk file format and naming conventions
   - To add the missing `circle-sleep00.png` asset, add whatever png you want into `public/assets/images` and rename it to match
