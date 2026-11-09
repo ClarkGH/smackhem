@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smackhem Scene Systems</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: the 800x600 game area inside a white bezel, beside a knob rail. Below: what to try, and the log.
+   Single dark page on purpose, like party-panel.html: the game area is judged on its own. */
+:root {
+  color-scheme: dark;
+  --bg: #0c1018;
+  --surface: #131a26;
+  --surface-2: #1a2333;
+  --line: #2a3548;
+  --fg: #e6ecf5;
+  --muted: #93a1b8;
+  --accent: #7fb2ff;
+  --bezel: #ffffff;
+  --font-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 24px 16px 48px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 24px; }
+header h1 { font-family: var(--font-display); font-size: 1.9rem; margin: 0 0 6px; }
+header p { margin: 0; color: var(--muted); max-width: 75ch; }
+code, kbd { font-family: var(--font-num); font-size: 0.9em; }
+kbd { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.bezel { background: var(--bezel); padding: 18px; border-radius: 10px; }
+canvas { display: block; width: 100%; aspect-ratio: 4 / 3; background: #000; outline: none; }
+.rail { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 14px; max-height: 92vh; overflow-y: auto; }
+.rail h2 { font-family: var(--font-display); font-size: 1rem; margin: 0; letter-spacing: 0.02em; }
+.group { display: grid; gap: 6px; }
+.group > .label { color: var(--muted); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; }
+label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.row { display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-num); font-size: 0.85rem; }
+.stats { display: grid; grid-template-columns: auto 1fr auto auto; gap: 4px 8px; align-items: center; font-family: var(--font-num); font-size: 0.9rem; }
+button { font: inherit; font-size: 0.85rem; background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.below { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 900px) { .below { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; }
+.card h2 { font-family: var(--font-display); font-size: 1.05rem; margin: 0 0 8px; }
+.card ul, .card ol { margin: 0; padding-left: 20px; }
+.card li { margin: 4px 0; }
+#log { list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto; font-family: var(--font-num); font-size: 0.82rem; color: var(--muted); }
+#log li:first-child { color: var(--fg); }
+.keys { color: var(--muted); font-size: 0.88rem; margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Scene systems sandbox</h1>
+    <p>Odin Sphere's ring stage on a Final Fight floor: walk left, right <em>and</em> into the depth of the lane, jump, chop, sweep and block. Points level your weapon, healing items live in a menu, and stat checks gate the interactables. Every number is a knob, not a decision.</p>
+  </header>
+
+  <div class="main">
+    <div class="bezel"><canvas id="game" width="800" height="600" tabindex="0" aria-label="Game area. Click to focus, then use the keyboard."></canvas></div>
+
+    <aside class="rail">
+      <h2>Knobs</h2>
+      <p class="keys"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Space</kbd> jump · <kbd>J</kbd> chop · <kbd>K</kbd> sweep · <kbd>L</kbd> hold to block · <kbd>E</kbd> interact · <kbd>I</kbd> items · <kbd>Q</kbd> absorb</p>
+      <div class="group">
+        <span class="label">Debug</span>
+        <label><input type="checkbox" id="hitboxes" checked> Show attack hitboxes</label>
+      </div>
+      <div class="group">
+        <span class="label">Chop (J): vertical, short</span>
+        <div class="row"><span>Reach</span><span id="chopReachOut"></span></div>
+        <input type="range" id="chopReach" min="30" max="120" step="5" value="55">
+        <div class="row"><span>Depth tolerance</span><span id="chopDepthOut"></span></div>
+        <input type="range" id="chopDepth" min="4" max="60" step="2" value="14">
+        <div class="row"><span>Height</span><span id="chopHeightOut"></span></div>
+        <input type="range" id="chopHeight" min="20" max="200" step="5" value="45">
+      </div>
+      <div class="group">
+        <span class="label">Sweep (K): horizontal, wide</span>
+        <div class="row"><span>Reach</span><span id="sweepReachOut"></span></div>
+        <input type="range" id="sweepReach" min="50" max="160" step="5" value="95">
+        <div class="row"><span>Depth tolerance</span><span id="sweepDepthOut"></span></div>
+        <input type="range" id="sweepDepth" min="10" max="120" step="2" value="60">
+        <div class="row"><span>Height</span><span id="sweepHeightOut"></span></div>
+        <input type="range" id="sweepHeight" min="40" max="240" step="5" value="170">
+        <div class="row"><span>Startup (s)</span><span id="sweepStartupOut"></span></div>
+        <input type="range" id="sweepStartup" min="0.04" max="0.3" step="0.02" value="0.14">
+      </div>
+      <div class="group">
+        <span class="label">POW</span>
+        <div class="row"><span>Chop cost (sweep ×1.6)</span><span id="powCostOut"></span></div>
+        <input type="range" id="powCost" min="6" max="40" step="1" value="16">
+      </div>
+      <div class="group">
+        <span class="label">Jump</span>
+        <div class="row"><span>Gravity</span><span id="gravityOut"></span></div>
+        <input type="range" id="gravity" min="1200" max="3600" step="100" value="2200">
+        <div class="row"><span>Jump speed</span><span id="jumpOut"></span></div>
+        <input type="range" id="jump" min="500" max="1100" step="20" value="800">
+        <label><input type="checkbox" id="shortHop" checked> Short hop on early release</label>
+      </div>
+      <div class="group">
+        <span class="label">Items</span>
+        <div class="row"><span>Starting Patches</span><span id="startPatchOut"></span></div>
+        <input type="range" id="startPatch" min="0" max="9" step="1" value="3">
+        <div class="row"><span>Starting Full Circles</span><span id="startFullOut"></span></div>
+        <input type="range" id="startFull" min="0" max="3" step="1" value="1">
+        <div class="row"><span>Patch drop chance (%)</span><span id="dropChanceOut"></span></div>
+        <input type="range" id="dropChance" min="0" max="100" step="5" value="25">
+        <div class="row"><span>Game speed in menu (%)</span><span id="menuSpeedOut"></span></div>
+        <input type="range" id="menuSpeed" min="0" max="100" step="5" value="35">
+        <p class="keys">Starting counts apply on Reset all.</p>
+      </div>
+      <div class="group">
+        <span class="label">Stage</span>
+        <label><input type="checkbox" id="wrap" checked> Ring wraps (Odin Sphere)</label>
+      </div>
+      <div class="group">
+        <span class="label">Stat checks</span>
+        <label><input type="radio" name="checks" value="threshold" checked> Threshold (stat ≥ DC)</label>
+        <label><input type="radio" name="checks" value="dice"> d20 + modifier ≥ DC</label>
+      </div>
+      <div class="group">
+        <span class="label">Points</span>
+        <label><input type="radio" name="absorb" value="auto" checked> Auto-absorb nearby</label>
+        <label><input type="radio" name="absorb" value="hold"> Hold <kbd>Q</kbd> to absorb</label>
+      </div>
+      <div class="group">
+        <span class="label">CON growth</span>
+        <div class="row"><span>Hits survived per CON</span><span id="hitsPerConOut"></span></div>
+        <input type="range" id="hitsPerCon" min="1" max="12" step="1" value="4">
+        <div class="row"><span>CON cap per area</span><span id="conCapOut"></span></div>
+        <input type="range" id="conCap" min="0" max="6" step="1" value="2">
+        <label><input type="checkbox" id="guardCounts" checked> Guarded hits count</label>
+        <p class="keys">The cap survives Reset ring, so respawns can't be farmed.</p>
+      </div>
+      <div class="group">
+        <span class="label">Stat block (debug)</span>
+        <div class="stats" id="stats"></div>
+      </div>
+      <div class="buttons">
+        <button id="resetRing">Reset ring</button>
+        <button id="resetAll">Reset all</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="below">
+    <section class="card">
+      <h2>Things to try</h2>
+      <ol>
+        <li><strong>Chop a triangle from a different lane.</strong> With a 14-unit depth tolerance you have to line up first. That's Final Fight's whole feel, and its main frustration. Slide the tolerance until it stops being annoying.</li>
+        <li><strong>Wait for a rhombus to leap, then chop.</strong> It's above the chop, so you miss. Sweep instead: slower to come out and costs more POW, but it catches the rhombus in the air and hits across lanes.</li>
+        <li><strong>Watch the shadows while jumping.</strong> In a depth lane the shadow is the only way to tell where you'll land.</li>
+        <li><strong>Swing until POW runs out.</strong> Sweeps drain it faster. Does the choice between a cheap short chop and an expensive wide sweep carry a fight?</li>
+        <li><strong>Heal mid-fight with <kbd>I</kbd>.</strong> The fight slows behind the menu instead of stopping. Open it as a triangle winds up and see if you can heal before the lunge lands. Slide the menu speed: 0% is a pause (FF, Odin Sphere), 100% is real time.</li>
+        <li><strong>Turn starting items and drops down to zero-ish.</strong> How few heals does a ring need before blocking and POW start to matter?</li>
+        <li><strong>Stand in a triangle's way on purpose.</strong> Every few hits you survive raise CON until the area cap. Then hit Reset ring: the enemies come back, the CON doesn't. Does it feel like a reward for getting hit, or a consolation?</li>
+        <li><strong>Grow STR, then go back.</strong> Weapon levels raise STR for the boulder, which hides a Full Circle. Flip the checks to d20 and compare.</li>
+      </ol>
+    </section>
+    <section class="card">
+      <h2>Log</h2>
+      <ul id="log" aria-live="polite"></ul>
+    </section>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ---------- Constants ----------
+// World: x runs along the ring, z is depth into the lane (0 = back, DEPTH = front), y is height above the floor.
+const W = 800;
+const H = 600;
+const BACK_Y = 360; // screen y of the lane's back edge
+const DEPTH = 200; // lane depth; screen y = BACK_Y + z - y
+const RING = 2400;
+const DT = 1 / 60;
+const PR = 18; // player radius
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const floorY = (z) => BACK_Y + z;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// ---------- Knobs ----------
+const knobs = {
+  wrap: true, checks: 'threshold', absorb: 'auto', shortHop: true, hitboxes: true,
+};
+const bindRange = (id) => {
+  const el = document.getElementById(id);
+  const out = document.getElementById(`${id}Out`);
+  const sync = () => { knobs[id] = Number(el.value); out.textContent = el.value; };
+  el.addEventListener('input', sync);
+  sync();
+};
+['chopReach', 'chopDepth', 'chopHeight', 'sweepReach', 'sweepDepth', 'sweepHeight', 'sweepStartup', 'powCost', 'gravity', 'jump',
+  'startPatch', 'startFull', 'dropChance', 'menuSpeed', 'hitsPerCon', 'conCap'].forEach(bindRange);
+const bindCheck = (id) => {
+  const el = document.getElementById(id);
+  knobs[id] = el.checked;
+  el.addEventListener('change', () => { knobs[id] = el.checked; });
+};
+['shortHop', 'hitboxes', 'guardCounts'].forEach(bindCheck);
+
+// ---------- Items ----------
+// Placeholders for an item system: a count per kind, used from the menu
+const ITEMS = [
+  { id: 'patch', name: 'Patch', desc: 'heals 15 HP', use: () => { player.hp = Math.min(maxHp(), player.hp + 15); } },
+  { id: 'full', name: 'Full Circle', desc: 'heals all HP', use: () => { player.hp = maxHp(); } },
+];
+const itemName = (id) => ITEMS.find((it) => it.id === id).name;
+const menu = { open: false, sel: 0 };
+document.getElementById('wrap').addEventListener('change', (e) => { knobs.wrap = e.target.checked; player.x = wrapX(player.x); });
+document.querySelectorAll('input[name=checks]').forEach((el) => el.addEventListener('change', () => { knobs.checks = el.value; }));
+document.querySelectorAll('input[name=absorb]').forEach((el) => el.addEventListener('change', () => { knobs.absorb = el.value; }));
+
+// ---------- Attacks ----------
+// Hitboxes are relative to the attacker: forward reach along x, +/- depth along z, and a height band up from their feet
+const attackDef = (kind) => (kind === 'chop'
+  ? {
+    name: 'Chop', time: 0.26, from: 0.06, to: 0.14, reach: knobs.chopReach, depth: knobs.chopDepth,
+    height: knobs.chopHeight, cost: knobs.powCost, mul: 1, chains: true,
+  }
+  : {
+    name: 'Sweep', time: knobs.sweepStartup + 0.28, from: knobs.sweepStartup, to: knobs.sweepStartup + 0.12,
+    reach: knobs.sweepReach, depth: knobs.sweepDepth, height: knobs.sweepHeight,
+    cost: Math.round(knobs.powCost * 1.6), mul: 1.2, chains: false,
+  });
+
+// ---------- Log ----------
+const logEl = document.getElementById('log');
+const log = (text) => {
+  const li = document.createElement('li');
+  li.textContent = text;
+  logEl.prepend(li);
+  while (logEl.children.length > 60) logEl.lastChild.remove();
+};
+
+// ---------- Ring math ----------
+const wrapX = (x) => (knobs.wrap ? ((x % RING) + RING) % RING : clamp(x, PR, RING - PR));
+// Shortest signed distance from b to a. Round the ring, the long way never counts.
+const dx = (a, b) => {
+  let d = a - b;
+  if (knobs.wrap) d = ((((d + RING / 2) % RING) + RING) % RING) - RING / 2;
+  return d;
+};
+let camX = 0;
+const screenX = (x) => (knobs.wrap ? W / 2 + dx(x, player.x) : x - camX);
+
+// ---------- Stats ----------
+const stats = { STR: 12, CON: 12, DEX: 12, WIT: 10 };
+const mod = (s) => Math.floor((s - 10) / 2);
+const signed = (n) => (n >= 0 ? `+${n}` : `${n}`);
+const maxHp = () => 30 + 6 * mod(stats.CON);
+const maxPow = () => 100 + 10 * mod(stats.DEX);
+const powRegen = () => 35 + 6 * mod(stats.DEX);
+const damage = () => 5 + 2 * player.edgeLv + mod(stats.STR);
+const edgeNext = () => 6 + 3 * player.edgeLv;
+
+const check = (stat, dc) => {
+  if (knobs.checks === 'threshold') {
+    const ok = stats[stat] >= dc;
+    return { ok, text: `[${stat} ${stats[stat]} vs ${dc}: ${ok ? 'pass' : 'fail'}]` };
+  }
+  const roll = 1 + Math.floor(Math.random() * 20);
+  const total = roll + mod(stats[stat]);
+  const ok = total >= dc;
+  return { ok, text: `[${stat} d20 ${roll}${signed(mod(stats[stat]))} = ${total} vs DC ${dc}: ${ok ? 'pass' : 'fail'}]` };
+};
+
+// ---------- State ----------
+let player;
+let enemies;
+let orbs;
+let boulder;
+let flags;
+let bubble = null; // { x, z, h, text, t }
+
+const freshPlayer = () => ({
+  x: 200, z: 110, y: 0, vy: 0, onGround: true, face: 1, hp: 0, pow: 0, exhausted: 0, powDelay: 0,
+  atk: null, combo: 0, comboWindow: 0, blocking: false, inv: 0, kb: 0,
+  edgeLv: 0, edgeXp: 0, items: { patch: knobs.startPatch, full: knobs.startFull },
+  hitsTaken: 0, conGained: {}, // conGained is keyed by area id
+});
+const AREA = 'ring'; // the only area so far
+
+const ENEMY_KINDS = {
+  triangle: { hp: 24, atk: 8, h: 50, w: 44, home: 'chase' },
+  rhombus: { hp: 18, atk: 7, h: 40, w: 36, home: 'approach' },
+};
+const spawnEnemies = () => [
+  ['triangle', 800, 140], ['rhombus', 1150, 150], ['triangle', 1320, 60],
+  ['rhombus', 1950, 100], ['triangle', 2250, 160],
+].map(([kind, x, z], i) => ({
+  id: i, kind, x, z, home: x, y: 0, vx: 0, vy: 0, vz: 0, hp: ENEMY_KINDS[kind].hp, maxHp: ENEMY_KINDS[kind].hp,
+  atk: ENEMY_KINDS[kind].atk, h: ENEMY_KINDS[kind].h, w: ENEMY_KINDS[kind].w,
+  state: 'patrol', t: 0, dir: i % 2 ? -1 : 1, lungeDir: 1, stagger: 0, kbv: 0, flash: 0, alive: true,
+}));
+
+const resetRing = () => {
+  enemies = spawnEnemies();
+  orbs = [];
+  boulder = {
+    x: 1700, z1: 70, z2: 130, w: 90, h: 80, present: true,
+  };
+  log('The ring resets. The angled ones are back, and so is the boulder.');
+};
+
+const resetAll = () => {
+  Object.assign(stats, { STR: 12, CON: 12, DEX: 12, WIT: 10 });
+  player = freshPlayer();
+  player.hp = maxHp();
+  player.pow = maxPow();
+  flags = { riddleSolved: false, stoneStudied: false };
+  bubble = null;
+  menu.open = false;
+  resetRing();
+  renderStats();
+  log('New run.');
+};
+
+// ---------- Solids ----------
+const solids = () => (boulder.present ? [boulder] : []);
+// Is a body at (x, z), standing at height y, inside a solid's footprint and below its top?
+const blockedAt = (x, z, y, r) => solids().some((s) => y < s.h - 1
+  && Math.abs(dx(x, s.x)) < s.w / 2 + r && z > s.z1 - r * 0.5 && z < s.z2 + r * 0.5);
+const overFootprint = (s, x, z) => Math.abs(dx(x, s.x)) < s.w / 2 + PR * 0.6 && z > s.z1 - 6 && z < s.z2 + 6;
+
+// One axis at a time, so a body slides along a solid. Already inside one (knocked in), it may move freely to get out.
+const moveBody = (body, nx, nz, r) => {
+  const inside = blockedAt(body.x, body.z, body.y, r);
+  if (inside || !blockedAt(nx, body.z, body.y, r)) body.x = wrapX(nx);
+  const cz = clamp(nz, 0, DEPTH);
+  if (inside || !blockedAt(body.x, cz, body.y, r)) body.z = cz;
+};
+
+// ---------- Interactables ----------
+const say = (x, z, h, text) => { bubble = { x, z, h, text, t: 4 }; };
+
+const interactables = () => {
+  const list = [
+    {
+      id: 'sign', x: 90, z: 20, w: 30, h: 70,
+      interact: () => say(90, 20, 74, 'THE RING. Walk far enough and you end up here. Very roundist.'),
+    },
+    {
+      id: 'riddler', x: 600, z: 30, w: 44, h: 44,
+      interact: () => {
+        if (flags.riddleSolved) { say(600, 30, 44, 'I have no more riddles. I am, after all, a square.'); return; }
+        const r = check('WIT', 12);
+        log(`Riddle ${r.text}`);
+        if (r.ok) {
+          flags.riddleSolved = true;
+          player.items.patch += 1;
+          log('Got a Patch from the square.');
+          say(600, 30, 44, `${r.text} "Correct! Why was the obtuse angle upset? It was never right." Here, a Patch.`);
+        } else {
+          say(600, 30, 44, `${r.text} "What has four sides and no friends?" You don't know. It's him.`);
+        }
+      },
+    },
+    {
+      id: 'stone', x: 2100, z: 30, w: 50, h: 60,
+      interact: () => {
+        if (flags.stoneStudied) { say(2100, 30, 60, 'You already out-stared it.'); return; }
+        flags.stoneStudied = true;
+        stats.WIT += 2;
+        renderStats();
+        log('Studied the thinking stone. WIT +2.');
+        say(2100, 30, 60, 'You stare at the stone. It stares back. You learn something. WIT +2.');
+      },
+    },
+  ];
+  if (boulder.present) {
+    const zc = (boulder.z1 + boulder.z2) / 2;
+    list.push({
+      id: 'boulder', x: boulder.x, z: zc, w: boulder.w, h: boulder.h, depth: (boulder.z2 - boulder.z1) / 2,
+      interact: () => {
+        const r = check('STR', 14);
+        log(`Boulder ${r.text}`);
+        if (r.ok) {
+          boulder.present = false;
+          for (let i = 0; i < 10; i += 1) spawnOrb(boulder.x, zc, 'point');
+          spawnOrb(boulder.x, zc, 'item', 'full');
+          say(boulder.x, zc, 40, `${r.text} You shove it over. Something was under there.`);
+        } else {
+          say(boulder.x, zc, boulder.h, `${r.text} It doesn't budge. Stand on it instead?`);
+        }
+      },
+    });
+  }
+  return list;
+};
+
+// The probe: a short reach in front, in the same lane. Facing is left or right only, as in Final Fight.
+const findTarget = () => {
+  let best = null;
+  let bestD = Infinity;
+  interactables().forEach((it) => {
+    const d = dx(it.x, player.x) * player.face;
+    const laneOk = Math.abs(it.z - player.z) < 30 + (it.depth || 0);
+    if (laneOk && d > -it.w / 2 && d - it.w / 2 < 45 && player.y < it.h + 30 && Math.abs(d) < bestD) {
+      best = it; bestD = Math.abs(d);
+    }
+  });
+  return best;
+};
+
+// ---------- Orbs: points, and dropped items ----------
+const spawnOrb = (x, z, kind, item = null) => {
+  orbs.push({
+    x, z, h: 30 + Math.random() * 40, vx: (Math.random() - 0.5) * 260, vz: (Math.random() - 0.5) * 120,
+    kind, item, life: kind === 'item' ? 30 : 14, phase: Math.random() * 6,
+  });
+};
+
+const absorbPoint = () => {
+  player.edgeXp += 1;
+  if (player.edgeXp >= edgeNext()) {
+    player.edgeXp = 0; player.edgeLv += 1; stats.STR += 1;
+    renderStats();
+    log(`Weapon level ${player.edgeLv}. STR +1, damage ${damage()}.`);
+  }
+};
+
+// ---------- Item menu ----------
+// Rows are the items, then Close
+const updateMenu = () => {
+  const rows = ITEMS.length + 1;
+  if (wasPressed('ArrowUp', 'KeyW')) menu.sel = (menu.sel - 1 + rows) % rows;
+  if (wasPressed('ArrowDown', 'KeyS')) menu.sel = (menu.sel + 1) % rows;
+  if (wasPressed('KeyI', 'Escape')) { menu.open = false; return; }
+  if (!wasPressed('KeyJ', 'KeyE', 'Enter')) return;
+  if (menu.sel === ITEMS.length) { menu.open = false; return; }
+  const it = ITEMS[menu.sel];
+  if (player.items[it.id] <= 0) { log(`No ${it.name} left.`); return; }
+  if (player.hp >= maxHp()) { log('Already at full HP.'); return; }
+  player.items[it.id] -= 1;
+  it.use();
+  log(`Used a ${it.name}. HP ${Math.ceil(player.hp)}/${maxHp()}.`);
+};
+
+// ---------- Input ----------
+const held = new Set();
+const pressed = new Set();
+const released = new Set();
+const GAME_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS',
+  'KeyJ', 'KeyK', 'KeyL', 'KeyE', 'KeyI', 'KeyQ', 'Escape', 'Enter'];
+window.addEventListener('keydown', (e) => {
+  if (!GAME_KEYS.includes(e.code)) return;
+  if (document.activeElement && document.activeElement !== canvas && document.activeElement !== document.body) return;
+  e.preventDefault();
+  if (!held.has(e.code)) pressed.add(e.code);
+  held.add(e.code);
+});
+window.addEventListener('keyup', (e) => { if (held.delete(e.code)) released.add(e.code); });
+window.addEventListener('blur', () => held.clear());
+canvas.addEventListener('pointerdown', () => canvas.focus());
+const isHeld = (...codes) => codes.some((c) => held.has(c));
+const wasPressed = (...codes) => codes.some((c) => pressed.has(c));
+const wasReleased = (...codes) => codes.some((c) => released.has(c));
+
+// ---------- Combat ----------
+const hurtPlayer = (e) => {
+  const from = Math.sign(dx(e.x, player.x)) || 1;
+  let dmg = Math.max(1, e.atk - mod(stats.CON));
+  const guarded = player.blocking && from === player.face;
+  if (guarded) {
+    dmg = Math.ceil(dmg * 0.25);
+    player.pow -= 14;
+    if (player.pow <= 0) { player.pow = 0; player.exhausted = 1.6; player.blocking = false; log('Guard broken. Out of breath.'); }
+  }
+  player.hp -= dmg;
+  player.inv = 0.7;
+  player.kb = -from * (guarded ? 120 : 280);
+  if (player.hp <= 0) {
+    log('Knocked flat. You wake up by the sign.');
+    Object.assign(player, {
+      x: 200, z: 110, y: 0, vy: 0, onGround: true, atk: null, exhausted: 0,
+    });
+    player.hp = maxHp(); player.pow = maxPow();
+    return;
+  }
+  if (guarded && !knobs.guardCounts) return;
+  toughen();
+};
+
+// Surviving hits grows CON, up to a cap per area
+const toughen = () => {
+  const gained = player.conGained[AREA] || 0;
+  if (gained >= knobs.conCap) return;
+  player.hitsTaken += 1;
+  if (player.hitsTaken < knobs.hitsPerCon) return;
+  player.hitsTaken = 0;
+  player.conGained[AREA] = gained + 1;
+  const before = maxHp();
+  stats.CON += 1;
+  player.hp += maxHp() - before; // new max HP arrives filled
+  renderStats();
+  const capped = gained + 1 >= knobs.conCap ? ' That is all this area can teach.' : '';
+  log(`Took enough hits to toughen up. CON ${stats.CON}, max HP ${maxHp()}.${capped}`);
+};
+
+const startAttack = (kind) => {
+  const p = player;
+  const def = attackDef(kind);
+  const chaining = p.atk && p.atk.kind === 'chop' && kind === 'chop' && attackDef('chop').time - p.atk.t <= 0.06;
+  if ((p.atk && !chaining) || p.exhausted > 0 || p.blocking) return;
+  p.combo = def.chains && (chaining || p.comboWindow > 0) && p.combo < 2 ? p.combo + 1 : 0;
+  p.atk = { kind, t: 0, hit: new Set() };
+  p.pow -= def.cost;
+  p.powDelay = 0.5;
+  if (p.pow <= 0) { p.pow = 0; p.exhausted = 1.6; log('Out of breath.'); }
+};
+
+const hitEnemies = () => {
+  const p = player;
+  if (!p.atk) return;
+  const def = attackDef(p.atk.kind);
+  if (p.atk.t < def.from || p.atk.t > def.to) return;
+  enemies.forEach((e) => {
+    if (!e.alive || p.atk.hit.has(e.id)) return;
+    const d = dx(e.x, p.x) * p.face;
+    const inReach = d > -10 && d < def.reach + e.w / 2;
+    const inLane = Math.abs(e.z - p.z) <= def.depth;
+    const inHeight = e.y < p.y + def.height && e.y + e.h > p.y;
+    if (!(inReach && inLane && inHeight)) return;
+    p.atk.hit.add(e.id);
+    const finisher = def.chains && p.combo === 2;
+    const dmg = Math.round(damage() * def.mul * (finisher ? 1.5 : 1));
+    e.hp -= dmg; e.flash = 0.12;
+    if (e.y > 0.5) {
+      // Knocked out of the air: it falls, then lies there a moment
+      e.state = 'fall'; e.vx = p.face * 160; e.vz = 0; e.vy = Math.max(e.vy, 150);
+      log(`${def.name} caught a ${e.kind} in the air (${dmg} dmg).`);
+    } else {
+      e.stagger = 0.25; e.kbv = p.face * (finisher ? 340 : 160);
+    }
+    if (e.hp <= 0) {
+      e.alive = false;
+      const n = 4 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < n; i += 1) spawnOrb(e.x, e.z, 'point');
+      if (Math.random() * 100 < knobs.dropChance) spawnOrb(e.x, e.z, 'item', 'patch');
+      log(`${e.kind} down. It dropped ${n} points.`);
+    }
+  });
+};
+
+// ---------- Enemies ----------
+const updateEnemy = (e) => {
+  const p = player;
+  e.flash = Math.max(0, e.flash - DT);
+  const d = dx(p.x, e.x);
+  const dist = Math.abs(d);
+  const dz = p.z - e.z;
+  const step = (vx, vz) => moveBody(e, e.x + vx * DT, e.z + vz * DT, e.w / 2);
+
+  // Airborne: leaping at you, or knocked out of the air
+  if (e.state === 'leap' || e.state === 'fall') {
+    e.vy -= knobs.gravity * DT;
+    e.y += e.vy * DT;
+    e.x = wrapX(e.x + e.vx * DT);
+    e.z = clamp(e.z + e.vz * DT, 0, DEPTH);
+    if (e.state === 'leap' && p.inv <= 0 && Math.abs(dx(p.x, e.x)) < 32 && Math.abs(p.z - e.z) < 18
+      && e.y < p.y + PR * 2 && e.y + e.h > p.y) hurtPlayer(e);
+    if (e.y <= 0) {
+      e.y = 0; e.vy = 0;
+      e.t = e.state === 'fall' ? 0.7 : 0.8;
+      e.state = 'recover';
+    }
+    return;
+  }
+  if (e.stagger > 0) {
+    e.stagger -= DT; step(e.kbv, 0); e.kbv -= e.kbv * 6 * DT;
+    if (e.stagger <= 0) e.state = ENEMY_KINDS[e.kind].home;
+    return;
+  }
+
+  switch (e.state) {
+    case 'patrol':
+      step(e.dir * 50, 0);
+      if (Math.abs(dx(e.x, e.home)) > 120) e.dir = -Math.sign(dx(e.x, e.home));
+      if (dist < 320) e.state = ENEMY_KINDS[e.kind].home;
+      break;
+
+    // Triangle: line up in the lane, close in, flash, lunge along x
+    case 'chase':
+      e.dir = Math.sign(d) || 1;
+      step(dist > 85 ? e.dir * 110 : 0, Math.abs(dz) > 6 ? Math.sign(dz) * 70 : 0);
+      if (dist <= 85 && Math.abs(dz) < 14) { e.state = 'telegraph'; e.t = 0.55; }
+      if (dist > 500) e.state = 'patrol';
+      break;
+    case 'telegraph':
+      e.t -= DT;
+      if (e.t <= 0) { e.state = 'lunge'; e.t = 0.22; e.lungeDir = Math.sign(d) || 1; }
+      break;
+    case 'lunge':
+      e.t -= DT;
+      step(e.lungeDir * 420, 0);
+      if (Math.abs(dx(p.x, e.x)) < 36 && Math.abs(p.z - e.z) < 16 && p.y < 48 && p.inv <= 0) hurtPlayer(e);
+      if (e.t <= 0) { e.state = 'recover'; e.t = 0.9; }
+      break;
+
+    // Rhombus: keep its distance in your lane, crouch, then leap to where you are
+    case 'approach': {
+      e.dir = Math.sign(d) || 1;
+      let vx = 0;
+      if (dist > 190) vx = e.dir * 100;
+      else if (dist < 110) vx = -e.dir * 70;
+      step(vx, Math.abs(dz) > 6 ? Math.sign(dz) * 80 : 0);
+      if (dist >= 100 && dist <= 200 && Math.abs(dz) < 24) { e.state = 'crouch'; e.t = 0.45; }
+      if (dist > 500) e.state = 'patrol';
+      break;
+    }
+    case 'crouch':
+      e.t -= DT;
+      if (e.t <= 0) {
+        const vy = 700;
+        const airTime = (2 * vy) / knobs.gravity;
+        e.state = 'leap'; e.vy = vy; e.vx = d / airTime; e.vz = dz / airTime;
+      }
+      break;
+
+    default: // recover
+      e.t -= DT;
+      if (e.t <= 0) e.state = ENEMY_KINDS[e.kind].home;
+  }
+};
+
+// ---------- Update ----------
+const update = () => {
+  const p = player;
+
+  // While the item menu is open it has the controls (see step)
+  const ctrl = !menu.open;
+  const left = ctrl && isHeld('ArrowLeft', 'KeyA');
+  const right = ctrl && isHeld('ArrowRight', 'KeyD');
+  const up = ctrl && isHeld('ArrowUp', 'KeyW');
+  const down = ctrl && isHeld('ArrowDown', 'KeyS');
+
+  if (bubble) { bubble.t -= DT; if (bubble.t <= 0) bubble = null; }
+  p.inv = Math.max(0, p.inv - DT);
+  p.comboWindow = Math.max(0, p.comboWindow - DT);
+  if (p.atk) {
+    p.atk.t += DT;
+    const def = attackDef(p.atk.kind);
+    if (p.atk.t >= def.time) { if (def.chains) p.comboWindow = 0.3; p.atk = null; }
+  }
+
+  // POW: out of breath at zero, refills after a short pause
+  if (p.exhausted > 0) {
+    p.exhausted -= DT;
+    p.pow = Math.min(maxPow(), p.pow + powRegen() * 1.5 * DT);
+  } else if (!p.atk && !p.blocking) {
+    p.powDelay -= DT;
+    if (p.powDelay <= 0) p.pow = Math.min(maxPow(), p.pow + powRegen() * DT);
+  }
+
+  p.blocking = ctrl && isHeld('KeyL') && p.onGround && !p.atk && p.exhausted <= 0;
+  if (ctrl && wasPressed('KeyJ')) startAttack('chop');
+  if (ctrl && wasPressed('KeyK')) startAttack('sweep');
+
+  // Movement: depth is slower than across, as in most beat-'em-ups. Facing turns only between swings.
+  const mx = (right ? 1 : 0) - (left ? 1 : 0);
+  const mz = (down ? 1 : 0) - (up ? 1 : 0);
+  if (mx !== 0 && !p.atk && !p.blocking) p.face = mx;
+  let speed = 230;
+  if (p.exhausted > 0) speed *= 0.45;
+  if (p.blocking) speed = 0;
+  if (p.atk && p.onGround) speed *= 0.25;
+  moveBody(p, p.x + (mx * speed + p.kb) * DT, p.z + mz * speed * 0.65 * DT, PR);
+  p.kb -= p.kb * 8 * DT;
+
+  // Jump: a fixed arc. Releasing early cuts it short.
+  if (ctrl && wasPressed('Space') && p.onGround && !p.blocking && p.exhausted <= 0) { p.vy = knobs.jump; p.onGround = false; }
+  if (knobs.shortHop && wasReleased('Space') && p.vy > 0) p.vy *= 0.45;
+  if (!p.onGround) {
+    const prevY = p.y;
+    p.vy -= knobs.gravity * DT;
+    p.y += p.vy * DT;
+    let floor = 0;
+    solids().forEach((s) => { if (overFootprint(s, p.x, p.z) && prevY >= s.h - 0.5 && p.y <= s.h) floor = Math.max(floor, s.h); });
+    if (p.y <= floor) { p.y = floor; p.vy = 0; p.onGround = true; }
+  } else if (p.y > 0 && !solids().some((s) => overFootprint(s, p.x, p.z) && Math.abs(p.y - s.h) < 1)) {
+    p.onGround = false; p.vy = 0; // walked off the edge
+  }
+
+  hitEnemies();
+  enemies.forEach((e) => { if (e.alive) updateEnemy(e); });
+
+  // Orbs: points drift to the player when absorbing, items are picked up by walking over them
+  const absorbing = knobs.absorb === 'auto' || (ctrl && isHeld('KeyQ'));
+  const absorbRange = knobs.absorb === 'auto' ? 130 : 240;
+  for (let i = orbs.length - 1; i >= 0; i -= 1) {
+    const o = orbs[i];
+    o.life -= DT; o.phase += DT * 3;
+    o.x = wrapX(o.x + o.vx * DT); o.vx -= o.vx * 3 * DT;
+    o.z = clamp(o.z + o.vz * DT, 0, DEPTH); o.vz -= o.vz * 3 * DT;
+    let done = o.life <= 0;
+    const pull = (tx, tz, th, speed, reach) => {
+      const ox = dx(tx, o.x); const oz = tz - o.z;
+      const len = Math.hypot(ox, oz) || 1;
+      const s = Math.min(len, speed * DT);
+      o.x = wrapX(o.x + (ox / len) * s); o.z += (oz / len) * s; o.h += (th - o.h) * 5 * DT;
+      return len < reach;
+    };
+    if (!done && o.kind === 'item') {
+      if (Math.hypot(dx(p.x, o.x), p.z - o.z) < 40 && p.y < 90) {
+        p.items[o.item] += 1; log(`Picked up a ${itemName(o.item)}.`); done = true;
+      }
+    } else if (!done && absorbing && Math.hypot(dx(p.x, o.x), p.z - o.z) < absorbRange) {
+      if (pull(p.x, p.z, p.y + PR, 340, 14)) { absorbPoint(); done = true; }
+    }
+    if (done) orbs.splice(i, 1);
+  }
+
+  if (ctrl && wasPressed('KeyE')) { const target = findTarget(); if (target) target.interact(); }
+
+  camX = knobs.wrap ? p.x - W / 2 : clamp(p.x - W / 2, 0, RING - W);
+  pressed.clear();
+  released.clear();
+};
+
+// ---------- Render helpers ----------
+const hash = (n) => {
+  let h = (n * 0x8DA6B343) | 0;
+  h ^= h >>> 15; h = Math.imul(h, 0x2C1B3C6D); h ^= h >>> 12;
+  return ((h >>> 0) % 1000) / 1000;
+};
+
+// One parallax layer of fixed-period tiles scrolled at factor f. RING * f is a whole number of periods,
+// so the layer lines up again when the ring wraps.
+const drawLayer = (f, period, drawTile) => {
+  const base = camX * f;
+  const count = Math.max(1, Math.round((RING * f) / period));
+  const first = Math.floor(base / period) - 1;
+  for (let i = first; i * period - base < W + period; i += 1) drawTile(i * period - base, ((i % count) + count) % count);
+};
+
+const roundRect = (x, y, w, h, r) => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+};
+
+const wrapText = (text, maxW) => {
+  const lines = [];
+  let line = '';
+  text.split(' ').forEach((w) => {
+    const test = line ? `${line} ${w}` : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  });
+  if (line) lines.push(line);
+  return lines;
+};
+
+const drawBubble = (sx, topY, text) => {
+  ctx.font = '500 14px "IBM Plex Mono", monospace';
+  const lines = wrapText(text, 280);
+  const w = Math.min(300, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20);
+  const h = lines.length * 18 + 14;
+  const x = clamp(sx - w / 2, 8, W - w - 8);
+  const y = Math.max(8, topY - h - 14);
+  ctx.fillStyle = '#fff'; roundRect(x, y, w, h, 8); ctx.fill();
+  ctx.fillStyle = '#000';
+  lines.forEach((l, i) => ctx.fillText(l, x + 10, y + 20 + i * 18));
+};
+
+const bar = (x, y, w, h, frac, fill, label) => {
+  ctx.fillStyle = '#222'; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = fill; ctx.fillRect(x, y, w * clamp(frac, 0, 1), h);
+  ctx.strokeStyle = '#666'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  if (label) { ctx.fillStyle = '#ddd'; ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.fillText(label, x + 6, y + h - 4); }
+};
+
+// A shadow on the floor under a body, smaller and fainter the higher it is. In a depth lane it's how you read where you'll land.
+const shadow = (x, z, y, r) => {
+  const k = 1 - Math.min(0.55, y / 300);
+  ctx.fillStyle = `rgba(255,255,255,${0.10 * k})`;
+  ctx.beginPath(); ctx.ellipse(screenX(x), floorY(z), r * k, r * 0.32 * k, 0, 0, Math.PI * 2); ctx.fill();
+};
+
+// ---------- Render ----------
+const render = () => {
+  const p = player;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // Far: the angled ones' mountains. Mid: their towers.
+  drawLayer(0.25, 200, (sx, idx) => {
+    const hgt = 80 + hash(idx) * 120;
+    ctx.fillStyle = '#161616';
+    ctx.beginPath(); ctx.moveTo(sx - 40, BACK_Y); ctx.lineTo(sx + 100, BACK_Y - hgt); ctx.lineTo(sx + 240, BACK_Y); ctx.fill();
+  });
+  drawLayer(0.5, 300, (sx, idx) => {
+    const hgt = 60 + hash(idx + 99) * 140;
+    const w = 50 + hash(idx + 7) * 60;
+    ctx.fillStyle = '#232323'; ctx.fillRect(sx + 40, BACK_Y - hgt, w, hgt);
+    ctx.fillStyle = '#2e2e2e';
+    for (let y = BACK_Y - hgt + 12; y < BACK_Y - 10; y += 22) ctx.fillRect(sx + 50, y, 8, 8);
+  });
+
+  // The lane: a floor with slanted seams that scroll with it, so depth reads
+  ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, BACK_Y, W, H - BACK_Y);
+  ctx.strokeStyle = '#181818'; ctx.lineWidth = 2;
+  drawLayer(1, 120, (sx) => { ctx.beginPath(); ctx.moveTo(sx + 40, BACK_Y); ctx.lineTo(sx - 20, floorY(DEPTH)); ctx.stroke(); });
+  ctx.fillStyle = '#555'; ctx.fillRect(0, BACK_Y, W, 2);
+  ctx.fillStyle = '#2a2a2a'; ctx.fillRect(0, floorY(DEPTH), W, 2);
+  if (!knobs.wrap) {
+    ctx.fillStyle = '#333';
+    const l = screenX(0); const r = screenX(RING);
+    if (l > 0) ctx.fillRect(0, 0, l, H);
+    if (r < W) ctx.fillRect(r, 0, W - r, H);
+  }
+
+  // Floor marks: the boulder's footprint, then every shadow, before anything stands on them
+  if (boulder.present) {
+    ctx.fillStyle = '#171717';
+    ctx.fillRect(screenX(boulder.x) - boulder.w / 2, floorY(boulder.z1), boulder.w, boulder.z2 - boulder.z1);
+  }
+  enemies.forEach((e) => { if (e.alive) shadow(e.x, e.z, e.y, e.w / 2); });
+  orbs.forEach((o) => shadow(o.x, o.z, o.h, 5));
+  shadow(p.x, p.z, p.y, PR * 1.1);
+
+  // Everything standing in the lane, drawn back to front
+  const drawables = [];
+  const add = (z, draw) => drawables.push({ z, draw });
+
+  add(20, () => {
+    const sx = screenX(90); const base = floorY(20);
+    ctx.fillStyle = '#777'; ctx.fillRect(sx - 3, base - 70, 6, 70);
+    ctx.fillStyle = '#aaa'; ctx.fillRect(sx - 26, base - 74, 52, 26);
+  });
+  add(30, () => {
+    const sx = screenX(600); const base = floorY(30);
+    ctx.fillStyle = '#bbb'; ctx.fillRect(sx - 22, base - 44, 44, 44);
+    ctx.fillStyle = '#000'; ctx.fillRect(sx - 12, base - 32, 6, 6); ctx.fillRect(sx + 6, base - 32, 6, 6);
+  });
+  add(30, () => {
+    const sx = screenX(2100); const base = floorY(30);
+    ctx.fillStyle = '#666'; ctx.beginPath(); ctx.ellipse(sx, base - 30, 25, 30, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000'; ctx.fillRect(sx - 10, base - 40, 5, 5); ctx.fillRect(sx + 5, base - 40, 5, 5);
+  });
+  if (boulder.present) {
+    add((boulder.z1 + boulder.z2) / 2, () => {
+      const x = screenX(boulder.x); const base = floorY((boulder.z1 + boulder.z2) / 2);
+      ctx.fillStyle = '#4a4a4a';
+      ctx.beginPath();
+      ctx.moveTo(x - 45, base + 20); ctx.lineTo(x - 38, base - 50); ctx.lineTo(x - 10, base - 80);
+      ctx.lineTo(x + 30, base - 72); ctx.lineTo(x + 45, base - 20); ctx.lineTo(x + 42, base + 20);
+      ctx.fill();
+      ctx.fillStyle = '#5c5c5c'; ctx.fillRect(x - 40, base - 82, 80, 6); // the top you can stand on
+    });
+  }
+  orbs.forEach((o) => add(o.z, () => {
+    const x = screenX(o.x);
+    const y = floorY(o.z) - o.h + Math.sin(o.phase) * 3;
+    ctx.globalAlpha = o.life < 3 ? o.life / 3 : 1;
+    if (o.kind === 'item') {
+      // A plus: small for a Patch, ringed for a Full Circle
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x - 7, y - 2, 14, 4); ctx.fillRect(x - 2, y - 7, 4, 14);
+      if (o.item === 'full') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.stroke(); }
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }));
+  enemies.forEach((e) => {
+    if (!e.alive) return;
+    add(e.z, () => {
+      const x = screenX(e.x);
+      if (x < -80 || x > W + 80) return;
+      const base = floorY(e.z) - e.y;
+      const warn = (e.state === 'telegraph' || e.state === 'crouch') && Math.floor(e.t * 12) % 2 === 0;
+      ctx.fillStyle = e.flash > 0 || warn ? '#fff' : '#8a8a8a';
+      ctx.beginPath();
+      if (e.kind === 'triangle') {
+        const s = e.state === 'lunge' ? 1.4 : 1;
+        ctx.moveTo(x - e.dir * 22 * s, base); ctx.lineTo(x + e.dir * 26 * s, base - 22); ctx.lineTo(x - e.dir * 22 * s, base - 50);
+      } else {
+        const squash = e.state === 'crouch' ? 0.7 : 1;
+        const top = base - e.h * squash;
+        ctx.moveTo(x, base); ctx.lineTo(x + 18, (base + top) / 2); ctx.lineTo(x, top); ctx.lineTo(x - 18, (base + top) / 2);
+      }
+      ctx.closePath(); ctx.fill();
+      if (e.state === 'recover' && e.y === 0) { ctx.fillStyle = '#666'; ctx.font = '600 12px "IBM Plex Mono", monospace'; ctx.fillText('dazed', x - 18, base - e.h - 8); }
+      if (e.hp < e.maxHp) bar(x - 22, base - e.h - 14, 44, 5, e.hp / e.maxHp, '#ccc', '');
+    });
+  });
+  add(p.z, () => {
+    const sx = screenX(p.x);
+    const py = floorY(p.z) - p.y - PR;
+    if (!(p.inv > 0 && Math.floor(p.inv * 20) % 2 === 0)) {
+      ctx.fillStyle = p.exhausted > 0 ? '#777' : '#fff';
+      ctx.beginPath(); ctx.arc(sx, py, PR, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(sx + p.face * 8, py - 4, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    if (p.blocking) { ctx.fillStyle = '#bbb'; ctx.fillRect(sx + p.face * 24 - 4, py - 22, 8, 44); }
+    if (p.atk) {
+      const def = attackDef(p.atk.kind);
+      const t = clamp((p.atk.t - def.from * 0.5) / (def.to - def.from * 0.5), 0, 1);
+      ctx.strokeStyle = p.combo === 2 && def.chains ? '#fff' : '#ccc';
+      ctx.lineWidth = p.atk.kind === 'sweep' ? 5 : 4;
+      ctx.beginPath();
+      if (p.atk.kind === 'chop') {
+        // Overhead to the floor, in front
+        ctx.arc(sx, py, 46, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 0.75) * t * p.face, p.face < 0);
+      } else if (p.atk.t >= def.from * 0.6) {
+        // A flat ellipse round the body at chest height: horizontal
+        ctx.ellipse(sx + p.face * 20, py - 6, def.reach * 0.75, 14, 0, Math.PI, Math.PI + Math.PI * 2 * t);
+      }
+      ctx.stroke();
+    }
+    if (p.exhausted > 0) { ctx.fillStyle = '#aaa'; ctx.font = '600 14px "IBM Plex Mono", monospace'; ctx.fillText('~ huff ~', sx - 30, py - 30); }
+  });
+  drawables.sort((a, b) => a.z - b.z).forEach((d) => d.draw());
+
+  // Hitbox debug: the attack's footprint on the floor, and its height band at the far edge
+  if (knobs.hitboxes && p.atk) {
+    const def = attackDef(p.atk.kind);
+    const active = p.atk.t >= def.from && p.atk.t <= def.to;
+    const x0 = screenX(p.x) - p.face * 10;
+    const x1 = screenX(p.x) + p.face * def.reach;
+    ctx.strokeStyle = active ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(Math.min(x0, x1), floorY(p.z - def.depth), Math.abs(x1 - x0), def.depth * 2);
+    ctx.beginPath();
+    ctx.moveTo(x1, floorY(p.z) - p.y); ctx.lineTo(x1, floorY(p.z) - p.y - def.height);
+    ctx.moveTo(x1 - 6, floorY(p.z) - p.y - def.height); ctx.lineTo(x1 + 6, floorY(p.z) - p.y - def.height);
+    ctx.stroke();
+  }
+
+  // Foreground: occluders sliding past faster than the floor
+  drawLayer(1.4, 480, (fx, idx) => {
+    if (hash(idx + 31) < 0.45) return;
+    ctx.fillStyle = 'rgba(40,40,40,0.85)';
+    ctx.beginPath(); ctx.moveTo(fx, H); ctx.lineTo(fx + 30, H - 70 - hash(idx) * 50); ctx.lineTo(fx + 60, H); ctx.fill();
+  });
+
+  // Prompt and bubble
+  const target = bubble ? null : findTarget();
+  if (target) {
+    const tx = screenX(target.x); const ty = floorY(target.z) - target.h;
+    ctx.fillStyle = '#fff'; roundRect(tx - 12, ty - 34, 24, 22, 4); ctx.fill();
+    ctx.fillStyle = '#000'; ctx.font = '600 14px "IBM Plex Mono", monospace'; ctx.fillText('E', tx - 4, ty - 18);
+  }
+  if (bubble) drawBubble(screenX(bubble.x), floorY(bubble.z) - bubble.h, bubble.text);
+
+  // HUD
+  bar(16, 16, 220, 16, p.hp / maxHp(), '#e6e6e6', `HP ${Math.ceil(p.hp)}/${maxHp()}`);
+  bar(16, 36, 220, 12, p.pow / maxPow(), p.exhausted > 0 ? '#555' : '#9a9a9a', p.exhausted > 0 ? 'POW  out of breath' : `POW ${Math.floor(p.pow)}`);
+  ctx.fillStyle = '#bbb'; ctx.font = '500 12px "IBM Plex Mono", monospace';
+  ctx.fillText(`Weapon Lv ${p.edgeLv} (${p.edgeXp}/${edgeNext()})  DMG ${damage()}`, 16, 66);
+  ctx.fillText(`Patch ${p.items.patch}  Full Circle ${p.items.full}  [I] items`, 16, 82);
+  const conLeft = knobs.conCap - (p.conGained[AREA] || 0);
+  ctx.fillText(conLeft > 0
+    ? `CON ${stats.CON}  hits ${p.hitsTaken}/${knobs.hitsPerCon}  (${conLeft} left here)`
+    : `CON ${stats.CON}  (area capped)`, 16, 98);
+
+  // Ring map, Odin Sphere style
+  const cx = W - 60; const cy = 60; const r = 38;
+  ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (knobs.wrap) ctx.arc(cx, cy, r, 0, Math.PI * 2); else { ctx.moveTo(cx - 44, cy); ctx.lineTo(cx + 44, cy); }
+  ctx.stroke();
+  const mapPos = (x) => {
+    if (knobs.wrap) { const a = (x / RING) * Math.PI * 2 - Math.PI / 2; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; }
+    return [cx - 44 + (x / RING) * 88, cy];
+  };
+  const dot = (x, size, fill) => { const [mx, my] = mapPos(x); ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(mx, my, size, 0, Math.PI * 2); ctx.fill(); };
+  if (boulder.present) dot(boulder.x, 4, '#555');
+  dot(600, 3, '#aaa'); dot(2100, 3, '#777');
+  enemies.forEach((e) => { if (e.alive) dot(e.x, 2.5, '#8a8a8a'); });
+  dot(p.x, 4.5, '#fff');
+
+  if (menu.open) drawMenu();
+};
+
+// The item menu, over the game area. The slower the fight behind it, the dimmer.
+const drawMenu = () => {
+  const speed = knobs.menuSpeed / 100;
+  ctx.fillStyle = `rgba(0,0,0,${0.55 * (1 - speed)})`; ctx.fillRect(0, 0, W, H);
+  const x = 40; const y = 110; const w = 330; const rowH = 30;
+  const rows = ITEMS.length + 1;
+  ctx.fillStyle = 'rgba(12,12,12,0.94)'; roundRect(x, y, w, 52 + rows * rowH, 10); ctx.fill();
+  ctx.strokeStyle = '#777'; ctx.lineWidth = 2; roundRect(x, y, w, 52 + rows * rowH, 10); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font = '700 16px "Chakra Petch", sans-serif';
+  ctx.fillText('Items', x + 16, y + 26);
+  ctx.fillStyle = '#888'; ctx.font = '500 12px "IBM Plex Mono", monospace';
+  let speedText = `time ×${speed.toFixed(2)}: it is still coming`;
+  if (speed === 0) speedText = 'paused';
+  else if (speed === 1) speedText = 'real time: it is still coming';
+  ctx.fillText(speedText, x + 80, y + 26);
+  for (let i = 0; i < rows; i += 1) {
+    const ry = y + 42 + i * rowH;
+    const selected = i === menu.sel;
+    if (selected) { ctx.fillStyle = '#fff'; ctx.fillRect(x + 8, ry, w - 16, rowH - 4); }
+    ctx.fillStyle = selected ? '#000' : '#ddd';
+    ctx.font = '600 14px "IBM Plex Mono", monospace';
+    if (i < ITEMS.length) {
+      const it = ITEMS[i];
+      const n = player.items[it.id];
+      if (!selected && n === 0) ctx.fillStyle = '#666';
+      ctx.fillText(`${it.name} ×${n}`, x + 18, ry + 19);
+      ctx.font = '500 12px "IBM Plex Mono", monospace';
+      ctx.fillText(it.desc, x + 190, ry + 19);
+    } else {
+      ctx.fillText('Close', x + 18, ry + 19);
+    }
+  }
+};
+
+// ---------- Stat block ----------
+const statsEl = document.getElementById('stats');
+const clampVitals = () => { player.hp = Math.min(player.hp, maxHp()); player.pow = Math.min(player.pow, maxPow()); };
+const renderStats = () => {
+  statsEl.innerHTML = '';
+  Object.keys(stats).forEach((k) => {
+    const name = document.createElement('span'); name.textContent = k;
+    const val = document.createElement('span'); val.textContent = `${stats[k]} (${signed(mod(stats[k]))})`;
+    const minus = document.createElement('button'); minus.textContent = '−'; minus.setAttribute('aria-label', `Lower ${k}`);
+    const plus = document.createElement('button'); plus.textContent = '+'; plus.setAttribute('aria-label', `Raise ${k}`);
+    minus.addEventListener('click', () => { stats[k] = Math.max(6, stats[k] - 1); clampVitals(); renderStats(); });
+    plus.addEventListener('click', () => { stats[k] = Math.min(20, stats[k] + 1); renderStats(); });
+    statsEl.append(name, val, minus, plus);
+  });
+};
+
+document.getElementById('resetRing').addEventListener('click', () => { resetRing(); canvas.focus(); });
+document.getElementById('resetAll').addEventListener('click', () => { resetAll(); canvas.focus(); });
+
+// ---------- Loop: fixed step, drawn every frame ----------
+resetAll();
+log('Click the game area. Arrows move (up/down is depth), Space jumps, J chops, K sweeps, L blocks, E interacts, I opens items.');
+let last = performance.now();
+let acc = 0;
+let worldAcc = 0; // fraction of a world step owed; the menu slows the world by feeding it less
+
+// One real fixed step. The menu runs every step; the world still steps by a whole DT, just less often while the menu is open.
+const step = () => {
+  const menuWasOpen = menu.open;
+  if (menuWasOpen) updateMenu();
+  else if (wasPressed('KeyI')) { menu.open = true; menu.sel = 0; }
+  // Keys the menu used (and the key that opened it) shouldn't reach the fight
+  if (menuWasOpen || menu.open) { pressed.clear(); released.clear(); }
+  worldAcc += menuWasOpen || menu.open ? knobs.menuSpeed / 100 : 1;
+  while (worldAcc >= 1) { update(); worldAcc -= 1; }
+};
+
+const frame = (now) => {
+  acc += Math.min(0.25, (now - last) / 1000);
+  last = now;
+  while (acc >= DT) { step(); acc -= DT; }
+  render();
+  requestAnimationFrame(frame);
+};
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
