@@ -2,6 +2,7 @@ import type { GameMode, GameState } from './gameState';
 import type { PlayerIntent } from '../services/input';
 import type { TypeSafeEventBus } from './events';
 import type { Settings } from './settings/settings';
+import type { Vec3 } from '../types/common';
 
 // The 2D scene lives in a fixed logical space (units, not screen pixels).
 // The renderer fits it to any viewport, centered and undistorted.
@@ -15,6 +16,8 @@ export const SCENE_HEIGHT_PX = Math.round(SCENE_GRID_HEIGHT * SCENE_TILE_SIZE); 
 const SCENE_TRANSITION_DURATION = 1.0; // seconds
 // Logical units per second, about two tiles. The speed the old PLAYER_SPEED * dt + 1 per tick came to at 60 Hz.
 export const SCENE_SPEED = 70;
+export const SCENE_BEZEL_COLOR: Readonly<Vec3> = { x: 0.15, y: 0.15, z: 0.15 };
+export const SCENE_GAME_AREA_COLOR: Readonly<Vec3> = { x: 0, y: 0, z: 0 };
 
 interface Scene {
     collisionGrid: Uint8Array; // 25 x 19 = 475 bytes, tile-based (0 = walkable, 1 = solid)

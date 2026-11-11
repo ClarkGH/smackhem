@@ -5,6 +5,7 @@ import type { Mat4, Vec3 } from '../../../types/common';
 import { identity } from '../../../core/math/mathHelpers';
 import DrawList from './drawList';
 import { computeLightViewProj } from './shadowMath';
+import { logicalRectToScissor, type ScissorRect } from './scissorRect';
 import {
     CLOUD_CYCLE_SECONDS, CLOUD_HIGH_OCTAVE_LAPS, CLOUD_NOISE_PERIOD, CLOUD_OCTAVE_LAPS,
 } from '../../../core/lighting/clouds';
@@ -284,6 +285,11 @@ export default class WebGLRenderer implements Renderer {
     // Draws are recorded during the frame and replayed in endFrame, so later
     // passes (shadow depth) can walk the same list. Sized above a full load radius of chunks
     private readonly drawList = new DrawList(1024);
+
+    // fillRect's rect in pixels, rewritten per call and copied into the draw list (M-1)
+    private readonly fillScissor: ScissorRect = {
+        x: 0, y: 0, width: 0, height: 0,
+    };
 
     // Copied in by setShadowCaster once per frame. Strength 0 skips the depth pass.
     private readonly shadowDirection: Vec3 = { x: 0, y: 1, z: 0 };
@@ -1192,7 +1198,7 @@ ${LIGHT_CARD_GLSL}
         this.drawSky();
         this.sendLitFrameUniforms();
 
-        // Replay in call order: scene_2d clears over its meshes before the screen quad
+        // Replay in call order: scene_2d clears to its bezel and fills its game area before the screen quad
         const list = this.drawList;
         for (let i = 0; i < list.size(); i += 1) {
             const cmd = list.get(i);
@@ -1208,6 +1214,9 @@ ${LIGHT_CARD_GLSL}
                     break;
                 case 'clear':
                     this.clearNow(cmd.color.x, cmd.color.y, cmd.color.z, cmd.alpha);
+                    break;
+                case 'fillRect':
+                    this.fillRectNow(cmd.rect, cmd.color);
                     break;
                 default:
                     break;
@@ -2162,6 +2171,23 @@ ${FOG_GLSL}
     private clearNow(r: number, g: number, b: number, a: number): void {
         this.gl.clearColor(r, g, b, a);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    }
+
+    // The rect goes to pixels now, under this call's view projection: replay runs after the frame's last
+    // setViewProjection, which may not be the one the caller meant
+    public fillRect(x: number, y: number, width: number, height: number, color: Vec3): void {
+        logicalRectToScissor(this.viewProj, x, y, width, height, this.canvas.width, this.canvas.height, this.fillScissor);
+        this.drawList.pushFillRect(this.fillScissor, color);
+    }
+
+    // A clear limited to the rect: one flat color, no shader or mesh needed
+    private fillRectNow(rect: Readonly<ScissorRect>, color: Readonly<Vec3>): void {
+        const { gl } = this;
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(rect.x, rect.y, rect.width, rect.height);
+        gl.clearColor(color.x, color.y, color.z, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.disable(gl.SCISSOR_TEST);
     }
 
     public getViewportWidth(): number {

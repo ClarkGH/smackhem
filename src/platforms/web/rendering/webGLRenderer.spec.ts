@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import WebGLRenderer from './webGLRenderer';
 import type { Mat4 } from '../../../types/common';
-import { identity } from '../../../core/math/mathHelpers';
+import { identity, orthographic } from '../../../core/math/mathHelpers';
 import { createFakeWebGL } from '../../../testing/fakeWebGL';
 
 // A frame as the render system drives it, with these meshes and nothing else.
@@ -94,5 +94,47 @@ describe('WebGLRenderer on a fake GL context', () => {
         drawFrame(renderer, () => renderer.drawMesh(cube, identity(), { x: 1, y: 0, z: 0 }), thisFrame);
 
         expect(fake.sentTo('u_viewProj', lit).map((call) => call.args[2])).toEqual([thisFrame.elements]);
+    });
+
+    it('fills a rect as a scissored clear, in whole pixels with y flipped for GL, and turns the scissor back off', () => {
+        const fake = createFakeWebGL(800, 600);
+        const renderer = new WebGLRenderer(fake.canvas);
+        // The scene's projection: 800 x 600 logical units, y down
+        const ortho = orthographic(0, 800, 600, 0, 0.1, 100);
+
+        drawFrame(renderer, () => {}, ortho);
+        fake.calls.length = 0;
+        drawFrame(renderer, () => renderer.fillRect(100, 50, 200, 100, { x: 0.5, y: 0.25, z: 0 }), ortho);
+
+        const names = fake.calls.map((call) => call.name);
+        const at = (name: string): number => names.indexOf(name);
+        const args = (name: string): unknown[] => fake.calls[at(name)].args;
+        const { gl } = fake;
+
+        expect(fake.calls.find((call) => call.name === 'enable' && call.args[0] === gl.SCISSOR_TEST)).toBeDefined();
+        expect(args('scissor')).toEqual([100, 450, 200, 100]);
+        // The fill's own clear comes after the scissor is set, and before it's turned off
+        const fillClear = names.lastIndexOf('clearColor');
+        expect(fake.calls[fillClear].args).toEqual([0.5, 0.25, 0, 1]);
+        expect(fillClear).toBeGreaterThan(at('scissor'));
+        const scissorOff = fake.calls.findIndex((call) => call.name === 'disable' && call.args[0] === gl.SCISSOR_TEST);
+        expect(scissorOff).toBeGreaterThan(fillClear);
+    });
+
+    it('replays a clear and a fill in the order they were called', () => {
+        const fake = createFakeWebGL(800, 600);
+        const renderer = new WebGLRenderer(fake.canvas);
+        const ortho = orthographic(0, 800, 600, 0, 0.1, 100);
+
+        drawFrame(renderer, () => {}, ortho);
+        fake.calls.length = 0;
+        drawFrame(renderer, () => {
+            renderer.clear(0.15, 0.15, 0.15, 1);
+            renderer.fillRect(0, 0, 800, 600, { x: 0, y: 0, z: 0 });
+        }, ortho);
+
+        const colors = fake.calls.filter((call) => call.name === 'clearColor').map((call) => call.args);
+        // beginFrame clears first, whatever color it uses, so look at the last two
+        expect(colors.slice(-2)).toEqual([[0.15, 0.15, 0.15, 1], [0, 0, 0, 1]]);
     });
 });

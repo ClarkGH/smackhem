@@ -144,6 +144,7 @@ src/
 │  │  ├─ pause.spec.ts        # Pause, resume and quit-to-menu
 │  │  ├─ presses.spec.ts      # Presses on a frame with no tick wait for the next one, used once
 │  │  ├─ scene.spec.ts        # 2D scene movement, the whole grid walkable
+│  │  ├─ sceneDraw.spec.ts    # 2D scene drawing: bezel, then game area in logical units, no fade, no world under it
 │  │  └─ timeOfDay.spec.ts    # Day clock: advances per tick, wraps, stands still when frozen
 │  └─ math/                   # Shared engine math logic
 │     ├─ aabb.ts              # Axis aligned bounding box
@@ -181,7 +182,9 @@ src/
 │  │  │  ├─ drawList.ts       # A frame's draws, copied in and replayed in endFrame
 │  │  │  ├─ drawList.spec.ts  # Copies scratch matrices, keeps call order, pool reuse
 │  │  │  ├─ shadowMath.ts     # Light view-projection for the shadow map, texel-snapped
-│  │  │  └─ shadowMath.spec.ts # Centring, overhead light, no shimmer as the focus moves
+│  │  │  ├─ shadowMath.spec.ts # Centring, overhead light, no shimmer as the focus moves
+│  │  │  ├─ scissorRect.ts    # fillRect's rect, logical units to whole GL scissor pixels
+│  │  │  └─ scissorRect.spec.ts # Exact fit, y flip, letterbox bars, scaling, whole pixels
 │  │  ├─ input/
 │  │  │  ├─ webInput.ts       # Web input state management
 │  │  │  ├─ webInput.spec.ts  # Gamepad mapping tests (faked navigator.getGamepads)

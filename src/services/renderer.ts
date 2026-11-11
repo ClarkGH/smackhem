@@ -59,4 +59,6 @@ export interface Renderer {
     getViewportHeight?(): number;
     setWireframe(_enabled: boolean): void;
     getWireframeEnabled?(): boolean;
+    // Logical units under the current setViewProjection; x, y ist the top-left corner
+    fillRect?(_x: number, _y: number, _width: number, _height: number, _color: Vec3): void;
 }

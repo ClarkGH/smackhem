@@ -1,15 +1,17 @@
 import type { Mat4, Vec3 } from '../../../types/common';
+import type { ScissorRect } from './scissorRect';
 
-export type DrawKind = 'mesh' | 'texturedQuad' | 'screenQuad' | 'clear';
+export type DrawKind = 'mesh' | 'texturedQuad' | 'screenQuad' | 'clear' | 'fillRect';
 
 // One pooled struct for every kind; each kind reads only the fields it fills
 export interface DrawCommand {
     kind: DrawKind;
-    id: string; // mesh or texture id ('' for clear)
+    id: string; // mesh or texture id ('' for clear and fillRect)
     matrix: Mat4; // model (mesh, texturedQuad) or full transform (screenQuad)
-    color: Vec3; // mesh color, or clear rgb
+    color: Vec3; // mesh color, clear rgb, or fill color
     normal: Vec3; // texturedQuad lighting normal
     alpha: number; // clear alpha
+    rect: ScissorRect; // fillRect, already in pixels
     isLightSource: boolean;
 }
 
@@ -20,6 +22,9 @@ const createCommand = (): DrawCommand => ({
     color: { x: 0, y: 0, z: 0 },
     normal: { x: 0, y: 1, z: 0 },
     alpha: 0,
+    rect: {
+        x: 0, y: 0, width: 0, height: 0,
+    },
     isLightSource: false,
 });
 
@@ -78,6 +83,13 @@ export default class DrawList {
         const cmd = this.next('clear', '');
         cmd.color.x = r; cmd.color.y = g; cmd.color.z = b;
         cmd.alpha = a;
+    }
+
+    public pushFillRect(rect: Readonly<ScissorRect>, color: Readonly<Vec3>): void {
+        const cmd = this.next('fillRect', '');
+        cmd.rect.x = rect.x; cmd.rect.y = rect.y;
+        cmd.rect.width = rect.width; cmd.rect.height = rect.height;
+        copyVec3(color, cmd.color);
     }
 
     private next(kind: DrawKind, id: string): DrawCommand {

@@ -15,9 +15,11 @@ import { World } from '../world';
 import EnvironmentSystem from './environment';
 import { Vec3, Mat4 } from '../../types/common';
 import { getCameraMatrixInto, INSTANCE_CHARACTER_SIZE } from '../camera';
-import { SCENE_HEIGHT_PX, SCENE_TILE_SIZE, SCENE_WIDTH_PX } from '../scene';
 import {
-    matrixMultiplyInto, smoothstep, orthographic, fitLogicalOrtho, quaternionFromYawPitch, quaternionApplyToVector,
+    SCENE_BEZEL_COLOR, SCENE_GAME_AREA_COLOR, SCENE_HEIGHT_PX, SCENE_TILE_SIZE, SCENE_WIDTH_PX,
+} from '../scene';
+import {
+    matrixMultiplyInto, orthographic, fitLogicalOrtho, quaternionFromYawPitch, quaternionApplyToVector,
 } from '../math/mathHelpers';
 
 // The sky colours copied from the palette each frame, listed once rather than every frame (M-1)
@@ -108,7 +110,7 @@ export default class RenderSystem {
         private environmentSystem: EnvironmentSystem,
         private getAspectRatio: () => number,
         // Mesh geometries passed down from core asset ownership contexts
-        private wallDebugMesh: any,
+        private wallDebugMesh: MeshHandle,
     ) {
         // Pre-allocate tracking transforms to strictly prevent garbage collection spikes
         this.sceneSpriteMVP = { elements: new Float32Array(16) };
@@ -332,16 +334,7 @@ export default class RenderSystem {
 
         // 1. Process 2D UI Overlay Pass
         if (discreteState.gameMode === 'scene_2d') {
-            const aspect = this.getAspectRatio();
-            this.renderer.setViewProjection(getCameraMatrixInto(camera, aspect, this.viewProj, this.viewProjScratch));
-            this.renderer.setViewPosition?.(camera.position);
-
-            this.renderBoundaryWireframe(wallDebugTransform, WALL_DEBUG_COLOR);
-
-            this.declareLighting(camera.position, shadowsEnabled);
-
-            this.renderWorldMeshes();
-
+            // No world underneath: the bezel and the game area cover the whole canvas
             const width = this.renderer.getViewportWidth?.() ?? 800;
             const height = this.renderer.getViewportHeight?.() ?? 600;
 
@@ -357,10 +350,13 @@ export default class RenderSystem {
                 }
             }
 
-            if (this.renderer.clear) {
-                const alpha = smoothstep(interpolatedState.sceneTransitionProgress);
-                this.renderer.clear(1.0 * alpha, 0.41 * alpha, 0.71 * alpha, alpha);
-            }
+            // The game area's logical units from here on, so fillRect's rect is in them too
+            this.renderer.setViewProjection(this.sceneOrthoProj);
+
+            // At full strength from the first frame: no fade. The transition timer still runs,
+            // for the iris wipe to draw later (scene spike, Later-phase notes)
+            this.renderer.clear?.(SCENE_BEZEL_COLOR.x, SCENE_BEZEL_COLOR.y, SCENE_BEZEL_COLOR.z, 1);
+            this.renderer.fillRect?.(0, 0, SCENE_WIDTH_PX, SCENE_HEIGHT_PX, SCENE_GAME_AREA_COLOR);
 
             if (partyMemberTexture1) {
                 const spriteSize = SCENE_TILE_SIZE;

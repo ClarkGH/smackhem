@@ -278,6 +278,10 @@ export default class NullRenderer implements Renderer {
         // Stub implementation - could track clear color state here
     }
 
+    public fillRect(_x: number, _y: number, _width: number, _height: number, _color: Vec3): void {
+        // Draws nothing. Present so tests can spy on it, like clear
+    }
+
     public getViewportWidth(): number {
         // Stub implementation - return default canvas width
         return 800;

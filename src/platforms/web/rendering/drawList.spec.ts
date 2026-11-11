@@ -39,6 +39,24 @@ describe('DrawList', () => {
         expect(list.get(3).normal.z).toBe(1);
     });
 
+    it('copies a fill\'s rect and color, so reused scratch values don\'t change it', () => {
+        const list = new DrawList(2);
+        const rect = {
+            x: 1, y: 2, width: 3, height: 4,
+        };
+        const color = { x: 0.15, y: 0.15, z: 0.15 };
+
+        list.pushFillRect(rect, color);
+        rect.x = 99;
+        color.x = 1;
+
+        expect(list.get(0).kind).toBe('fillRect');
+        expect(list.get(0).rect).toEqual({
+            x: 1, y: 2, width: 3, height: 4,
+        });
+        expect(list.get(0).color.x).toBe(0.15);
+    });
+
     it('reuses pooled commands after reset, and grows past capacity', () => {
         const list = new DrawList(1);
         const m = identity();
