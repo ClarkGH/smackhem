@@ -47,7 +47,7 @@ The web build is planned for itch.io, which runs HTML5 games inside an iframe. T
 **Suggested upload settings:**
 
 - **Embed in page**, viewport 960×540 (16:9)
-- **Fullscreen Button:** on. The in-game Fullscreen option also works when the iframe allows it, and greys itself out when it doesn't.
+- **Fullscreen Button:** on. The in-game Fullscreen option also works when the iframe allows it, and grays itself out when it doesn't.
 - **Click to Play:** on
 - **Mobile Friendly:** off. There's no touch input yet.
 

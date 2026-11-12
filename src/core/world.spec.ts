@@ -43,7 +43,7 @@ describe('World', () => {
             expect(world.getBoundaryWallAABBs()).toHaveLength(4);
         });
 
-        it('opens the shared side when a neighbour arrives, and closes it again when it leaves', () => {
+        it('opens the shared side when a neighbor arrives, and closes it again when it leaves', () => {
             const world = new World();
             world.addChunk(chunkAt(0, 0));
             expect(world.getBoundaryWallAABBs().some(isWallBetweenZeroAndEast)).toBe(true);
@@ -58,7 +58,7 @@ describe('World', () => {
             expect(world.getBoundaryWallAABBs().some(isWallBetweenZeroAndEast)).toBe(true);
         });
 
-        it('keeps the wall against a neighbour with no map data', () => {
+        it('keeps the wall against a neighbor with no map data', () => {
             const world = new World();
             world.addChunk(chunkAt(0, 0));
             world.addChunk(chunkAt(1, 0, { hasContent: false }));

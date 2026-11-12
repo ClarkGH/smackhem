@@ -49,7 +49,8 @@ export class Scene2DSystem {
             }
         }
 
-        if (discreteState.gameMode !== 'scene_2d' || discreteState.instanceIsOpen || discreteState.sceneIsTransitioning) return;
+        // Not drawn yet, acts like we're hung otherwise
+        if (discreteState.gameMode !== 'scene_2d' || discreteState.instanceIsOpen) return;
 
         const { x: moveX, y: moveY } = intent.move;
 

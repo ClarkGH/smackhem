@@ -43,3 +43,19 @@ describe('2D scene movement - scenario (stub platform)', () => {
         expect({ x: Math.floor(x / SCENE_TILE_SIZE), y: Math.floor(y / SCENE_TILE_SIZE) }).toEqual({ x: 24, y: 18 });
     });
 });
+
+describe('2D scene entry - scenario (stub platform)', () => {
+    // Nothing on screen shows the transition yet, so holding input through it looked like a hang
+    it('walks straight away, while the entry transition still runs', () => {
+        const scenario = createScenario({ debugSettings: createDebugSettings() });
+        scenario.enterScene();
+        const { gameState, input, tick } = scenario;
+        const startX = gameState.interpolated.sceneCharacterPositionPx.x;
+
+        input.setIntent({ move: { x: 1, y: 0 } });
+        tick();
+
+        expect(gameState.discrete.sceneIsTransitioning).toBe(true);
+        expect(gameState.interpolated.sceneCharacterPositionPx.x).toBeGreaterThan(startX);
+    });
+});

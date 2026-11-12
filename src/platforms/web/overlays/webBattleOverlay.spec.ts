@@ -83,7 +83,7 @@ describe('WebBattleOverlay', () => {
         expect(shownText(enemies)).toEqual([['▼', 'Evil Circle']]);
     });
 
-    it('greys out and strikes through a defeated enemy', () => {
+    it('grays out and strikes through a defeated enemy', () => {
         overlay.render(view({
             enemies: [combatant({
                 id: 'enemy:0', name: 'Evil Circle', hp: null, maxHp: null, isDefeated: true,

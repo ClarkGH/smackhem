@@ -1,4 +1,5 @@
 import type { Mat4 } from '../../../types/common';
+import { projectPointInto } from '../../../core/math/mathHelpers';
 
 // A rect in whole pixels, as gl.scissor takes it: x, y from the bottom-left corner
 export interface ScissorRect {
@@ -8,10 +9,19 @@ export interface ScissorRect {
     height: number;
 }
 
+// Each corner's NDC, reused every call (M-1)
+const cornerA = { x: 0, y: 0 };
+const cornerB = { x: 0, y: 0 };
+
+// NDC (-1..1) to the nearest whole pixel along an axis of `size` pixels
+const ndcToPixel = (ndc: number, size: number): number => Math.round(((ndc + 1) / 2) * size);
+
 /**
  * Where a rect in the caller's units (under viewProj) lands on the viewport, written into out (no allocation).
- * Two opposite corners go through viewProj to clip space, then to pixels. Whichever way the projection
- * points y, min/max picks the right edges, and GL's bottom-left origin falls out of clip space's y-up.
+ * viewProj must be orthographic (axis-aligned, w = 1), like the scene's: under a perspective projection
+ * a corner can sit behind the camera and the rect comes out mirrored or NaN.
+ * Two opposite corners go through viewProj to NDC, then to pixels. Whichever way the projection
+ * points y, min/max picks the right edges, and GL's bottom-left origin falls out of NDC's y-up.
  * Edges round to the nearest pixel, so two rects that share an edge still share it on screen.
  */
 export const logicalRectToScissor = (
@@ -24,17 +34,13 @@ export const logicalRectToScissor = (
     viewportHeight: number,
     out: ScissorRect,
 ): ScissorRect => {
-    // Column-major, like every Mat4 here. z is 0: a scissor has no depth
-    const m = viewProj.elements;
-    const right = x + width;
-    const bottom = y + height;
-
-    const w0 = m[3] * x + m[7] * y + m[15];
-    const w1 = m[3] * right + m[7] * bottom + m[15];
-    const x0 = Math.round((((m[0] * x + m[4] * y + m[12]) / w0 + 1) / 2) * viewportWidth);
-    const x1 = Math.round((((m[0] * right + m[4] * bottom + m[12]) / w1 + 1) / 2) * viewportWidth);
-    const y0 = Math.round((((m[1] * x + m[5] * y + m[13]) / w0 + 1) / 2) * viewportHeight);
-    const y1 = Math.round((((m[1] * right + m[5] * bottom + m[13]) / w1 + 1) / 2) * viewportHeight);
+    // z is 0: a scissor has no depth
+    projectPointInto(viewProj, x, y, 0, cornerA);
+    projectPointInto(viewProj, x + width, y + height, 0, cornerB);
+    const x0 = ndcToPixel(cornerA.x, viewportWidth);
+    const x1 = ndcToPixel(cornerB.x, viewportWidth);
+    const y0 = ndcToPixel(cornerA.y, viewportHeight);
+    const y1 = ndcToPixel(cornerB.y, viewportHeight);
 
     // + 0 turns -0 (a tiny negative, rounded) into 0, like fitLogicalOrtho's 0 - pad
     out.x = Math.min(x0, x1) + 0;

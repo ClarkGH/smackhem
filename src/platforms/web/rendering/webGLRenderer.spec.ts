@@ -21,7 +21,7 @@ describe('WebGLRenderer on a fake GL context', () => {
         expect(fake.count('linkProgram')).toBeGreaterThan(0);
     });
 
-    it('draws each mesh once, in its own colour', () => {
+    it('draws each mesh once, in its own color', () => {
         const fake = createFakeWebGL();
         const renderer = new WebGLRenderer(fake.canvas);
         const cube = renderer.createCubeMesh(1);
@@ -136,5 +136,42 @@ describe('WebGLRenderer on a fake GL context', () => {
         const colors = fake.calls.filter((call) => call.name === 'clearColor').map((call) => call.args);
         // beginFrame clears first, whatever color it uses, so look at the last two
         expect(colors.slice(-2)).toEqual([[0.15, 0.15, 0.15, 1], [0, 0, 0, 1]]);
+    });
+
+    it('skips the sky pass in a frame that opens with a clear, which would paint over it', () => {
+        const fake = createFakeWebGL(800, 600);
+        const renderer = new WebGLRenderer(fake.canvas);
+        const ortho = orthographic(0, 800, 600, 0, 0.1, 100);
+
+        // The sky is the only thing an empty frame draws, so this one means something
+        drawFrame(renderer, () => {});
+        expect(fake.count('drawArrays')).toBeGreaterThan(0);
+        fake.calls.length = 0;
+
+        drawFrame(renderer, () => {
+            renderer.clear(0.15, 0.15, 0.15, 1);
+        }, ortho);
+
+        expect(fake.count('drawArrays')).toBe(0);
+    });
+
+    it('runs no shadow depth pass in a frame that declares no caster, after one that did', () => {
+        const fake = createFakeWebGL();
+        const renderer = new WebGLRenderer(fake.canvas);
+        const cube = renderer.createCubeMesh(1);
+        const origin = { x: 0, y: 0, z: 0 };
+
+        // A world frame with shadows on, so the check below means something
+        drawFrame(renderer, () => {
+            renderer.setShadowCaster({ x: 0, y: 1, z: 0 }, 1, origin);
+            renderer.drawMesh(cube, identity(), { x: 1, y: 1, z: 1 });
+        });
+        expect(fake.count('bindFramebuffer')).toBeGreaterThan(0);
+        fake.calls.length = 0;
+
+        // Like a scene_2d frame: no setShadowCaster
+        drawFrame(renderer, () => {});
+
+        expect(fake.count('bindFramebuffer')).toBe(0);
     });
 });

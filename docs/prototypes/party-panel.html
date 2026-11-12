@@ -441,7 +441,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
             <button type="button" data-v="facing" aria-pressed="false">Tilted to the camera</button>
           </div>
         </div>
-        <label class="check"><input type="checkbox" id="centre" checked> Centre the view in the open field</label>
+        <label class="check"><input type="checkbox" id="center" checked> Center the view in the open field</label>
         <div class="field">
           <div class="field-head"><label for="yaw">Turn</label><span class="val" id="yaw-val"></span></div>
           <input type="range" id="yaw" min="-180" max="180" step="1">
@@ -1328,7 +1328,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
     distance: PRESETS.ours.distance,
     yaw: 0,
     billboard: 'upright',
-    centre: true,
+    center: true,
     focal: (SCREEN_H / 2) / Math.tan(FOV / 2),
     cx: SCREEN_W / 2,
     cy: SCREEN_H / 2,
@@ -1350,8 +1350,8 @@ footer { color: var(--muted); font-size: 0.85rem; }
     cam.f = { x: sb * c, y: -s, z: cb * c };
     cam.u = { x: sb * s, y: c, z: cb * s };
     cam.pos = { x: TARGET.x - cam.distance * c * sb, y: TARGET.y + cam.distance * s, z: TARGET.z - cam.distance * c * cb };
-    // Off-centre projection: the view's centre sits in the middle of the open field, not the middle of the screen
-    cam.cy = cam.centre ? (banner.offsetHeight + panel.offsetTop) / 2 : SCREEN_H / 2;
+    // Off-center projection: the view's center sits in the middle of the open field, not the middle of the screen
+    cam.cy = cam.center ? (banner.offsetHeight + panel.offsetTop) / 2 : SCREEN_H / 2;
   };
 
   const toView = (x, y, z) => {
@@ -1566,7 +1566,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
     relayout();
   });
   segment('billboard', (v) => { cam.billboard = v; relayout(); });
-  $('centre').addEventListener('change', (e) => { cam.centre = e.target.checked; relayout(); });
+  $('center').addEventListener('change', (e) => { cam.center = e.target.checked; relayout(); });
   syncCam();
 
   // ---------- Idle pan: the comedy beat ----------

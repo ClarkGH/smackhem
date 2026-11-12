@@ -123,7 +123,7 @@ A related race: chunk updates are async on the web. If the player crosses two ch
 
 **Loading gate (consider when the player can outrun streaming):** today the player can walk into a chunk whose data hasn't arrived yet and briefly see an empty area until it does. Many games instead pause play and show a spinner when the player gets ahead of loading. When it becomes an issue:
 - **When to trigger:** fast travel or vehicles, teleports, loading a save (which drops the player somewhere new), or slow storage and networks.
-- **How it could fit:** each tick, core checks whether the player's chunk and its neighbours are in `world.activeChunks`. If not, it holds the simulation, the same way `isPaused` does, and shows a loading overlay until they arrive. Rendering keeps running so the spinner animates.
+- **How it could fit:** each tick, core checks whether the player's chunk and its neighbors are in `world.activeChunks`. If not, it holds the simulation, the same way `isPaused` does, and shows a loading overlay until they arrive. Rendering keeps running so the spinner animates.
 - **Trade-off:** a visible stop is honest and avoids walking into missing geometry, but it interrupts play. Prefer preventing it first, with a larger load radius in the direction of travel or prefetching before teleports, and keep the gate as the fallback.
 
 ### Chunk flow
@@ -457,7 +457,7 @@ The 2D scene system (more TBD). Entered from Pause → Debug → Enter 2D Scene:
 - **The menu owns the tick:** in `main_menu` or while paused, `GameLoop.updateSimulation` runs only the menu and returns. So one press of interact can't confirm New Game and also reach the world, such as talking to an NPC standing in front of the camera.
 - **Sound:** choosing an enabled item, or going back, plays `ui_menu_select` on the `ui` bus. Moving the selection and disabled items stay silent.
 - **Settings rows:** Master/Music/Ambient/SFX/UI volume (steps of 10%), Mouse Sensitivity and Controller Sensitivity (0.2×–2×, steps of 0.1), Invert Mouse Y and Invert Controller Y, Render Scale, Window Size (native only), Fullscreen, then Accessibility and Back.
-  - **Display rows depend on the platform:** the screens are built from `DisplayCapabilities`. Window Size is hidden on the web, and Fullscreen is greyed out where the browser won't allow it. The menu also redraws on any `settings_changed`, so the Fullscreen value stays true when Escape exits fullscreen. See [Rendering](rendering.md#display-size-and-resolution).
+  - **Display rows depend on the platform:** the screens are built from `DisplayCapabilities`. Window Size is hidden on the web, and Fullscreen is grayed out where the browser won't allow it. The menu also redraws on any `settings_changed`, so the Fullscreen value stays true when Escape exits fullscreen. See [Rendering](rendering.md#display-size-and-resolution).
   - **Changing values:** ←/→, A/D, the D-pad or the `< >` arrows step a value, silently (the changing value is the feedback). Confirm flips a toggle, with the select sound, and does nothing on a slider.
   - **Effects:** every change publishes `settings_changed`. A volume change also publishes `audio_bus_volume_changed`.
 - **Accessibility rows** (Settings → Accessibility):

@@ -19,10 +19,10 @@ import {
     SCENE_BEZEL_COLOR, SCENE_GAME_AREA_COLOR, SCENE_HEIGHT_PX, SCENE_TILE_SIZE, SCENE_WIDTH_PX,
 } from '../scene';
 import {
-    matrixMultiplyInto, orthographic, fitLogicalOrtho, quaternionFromYawPitch, quaternionApplyToVector,
+    matrixMultiplyInto, orthographic, fitLogicalOrtho, projectPointInto, quaternionFromYawPitch, quaternionApplyToVector,
 } from '../math/mathHelpers';
 
-// The sky colours copied from the palette each frame, listed once rather than every frame (M-1)
+// The sky colors copied from the palette each frame, listed once rather than every frame (M-1)
 const SKY_COLOR_FIELDS = ['horizon', 'upper', 'zenith', 'glow', 'cloudLight', 'cloudMid', 'cloudShadow'] as const;
 
 // Blob shadows: a disc a bit narrower than the sprite and shallower front to back, almost flat,
@@ -57,6 +57,9 @@ export default class RenderSystem {
     private readonly viewProj: Mat4 = { elements: new Float32Array(16) };
 
     private readonly viewProjScratch = { proj: { elements: new Float32Array(16) }, view: { elements: new Float32Array(16) } };
+
+    // projectToViewport's NDC, reused every call (M-1)
+    private readonly projectScratch = { x: 0, y: 0 };
 
     // Whether a world frame has been drawn, so overlays have a camera to be placed with
     private hasWorldViewProj = false;
@@ -266,14 +269,11 @@ export default class RenderSystem {
      */
     public projectToViewport(point: Vec3, out: { x: number; y: number }): boolean {
         if (!this.hasWorldViewProj) return false;
-        const m = this.viewProj.elements;
-        // Column-major, like every Mat4 here
-        const clipX = m[0] * point.x + m[4] * point.y + m[8] * point.z + m[12];
-        const clipY = m[1] * point.x + m[5] * point.y + m[9] * point.z + m[13];
-        const clipW = m[3] * point.x + m[7] * point.y + m[11] * point.z + m[15];
-        if (clipW <= 0) return false;
-        out.x = (clipX / clipW + 1) / 2;
-        out.y = (1 - clipY / clipW) / 2;
+        // Into a scratch, so out is left alone when the point is behind the camera
+        const ndc = this.projectScratch;
+        if (projectPointInto(this.viewProj, point.x, point.y, point.z, ndc) <= 0) return false;
+        out.x = (ndc.x + 1) / 2;
+        out.y = (1 - ndc.y) / 2;
         return true;
     }
 

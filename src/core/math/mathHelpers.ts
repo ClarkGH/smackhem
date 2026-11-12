@@ -133,6 +133,19 @@ export const matrixMultiplyInto = (a: Mat4, b: Mat4, out: Mat4): void => {
     }
 };
 
+/**
+ * Where a point lands in normalized device coordinates (-1..1, y up) through m, written into out (no allocation).
+ * Returns clip-space w: at or below 0 the point is behind the camera, and out holds nothing useful.
+ */
+export const projectPointInto = (m: Mat4, x: number, y: number, z: number, out: { x: number; y: number }): number => {
+    // Column-major, like every Mat4 here
+    const e = m.elements;
+    const w = e[3] * x + e[7] * y + e[11] * z + e[15];
+    out.x = (e[0] * x + e[4] * y + e[8] * z + e[12]) / w;
+    out.y = (e[1] * x + e[5] * y + e[9] * z + e[13]) / w;
+    return w;
+};
+
 // TODO: Add rotation
 export const createTranslationMatrix = (x: number, y: number, z: number): Mat4 => {
     const m = new Float32Array(16);

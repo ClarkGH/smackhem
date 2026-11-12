@@ -99,7 +99,7 @@ const DAY = {
     sunLight: hex(0xfeedc2),
     moonLight: MOONLIGHT,
     sunDisc: hex(0xf7d038),
-    // White over blue-grey
+    // White over blue-gray
     cloudLight: hex(0xf4f7fa),
     cloudMid: hex(0xc9d6e3),
     cloudShadow: hex(0x8fa3ba),
@@ -109,7 +109,7 @@ const DAY = {
 
 /**
  * The art-directed keys, sorted by time. The list is circular: the last key blends into the first,
- * across midnight. Two neighbours with the same values are a hold (night; the day's sky).
+ * across midnight. Two neighbors with the same values are a hold (night; the day's sky).
  * Dawn and sunset sit where the sun crosses the horizon, which the spec checks against EnvironmentSystem.
  * Colors are seeds eyedropped from the references, to tune in game.
  */

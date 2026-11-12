@@ -4,7 +4,7 @@ import type { Mat4, Vec3 } from '../../../types/common';
  * View-projection for a directional shadow map, written into out (no allocation).
  * Orthographic, looking along -direction (direction is surface -> light, unit length).
  * Covers a square halfExtent either side of focus, and depthRadius either side of it along the light.
- * The centre snaps to whole texels: without that, every small camera move re-rasterises
+ * The center snaps to whole texels: without that, every small camera move re-rasterizes
  * shadow edges at slightly different spots and they crawl ("shimmer").
  */
 export const computeLightViewProj = (
@@ -32,16 +32,16 @@ export const computeLightViewProj = (
     const uz = d.x * sy - d.y * sx;
 
     const texel = (2 * halfExtent) / mapSize;
-    const centreS = Math.round((sx * focus.x + sy * focus.y + sz * focus.z) / texel) * texel;
-    const centreU = Math.round((ux * focus.x + uy * focus.y + uz * focus.z) / texel) * texel;
-    const centreD = d.x * focus.x + d.y * focus.y + d.z * focus.z;
+    const centerS = Math.round((sx * focus.x + sy * focus.y + sz * focus.z) / texel) * texel;
+    const centerU = Math.round((ux * focus.x + uy * focus.y + uz * focus.z) / texel) * texel;
+    const centerD = d.x * focus.x + d.y * focus.y + d.z * focus.z;
 
     // Rows: right / halfExtent, up / halfExtent, and depth -d / depthRadius
     // (nearer the light is smaller depth). Column-major, as WebGL reads it.
     const o = out.elements;
-    o[0] = sx / halfExtent; o[4] = sy / halfExtent; o[8] = sz / halfExtent; o[12] = -centreS / halfExtent;
-    o[1] = ux / halfExtent; o[5] = uy / halfExtent; o[9] = uz / halfExtent; o[13] = -centreU / halfExtent;
-    o[2] = -d.x / depthRadius; o[6] = -d.y / depthRadius; o[10] = -d.z / depthRadius; o[14] = centreD / depthRadius;
+    o[0] = sx / halfExtent; o[4] = sy / halfExtent; o[8] = sz / halfExtent; o[12] = -centerS / halfExtent;
+    o[1] = ux / halfExtent; o[5] = uy / halfExtent; o[9] = uz / halfExtent; o[13] = -centerU / halfExtent;
+    o[2] = -d.x / depthRadius; o[6] = -d.y / depthRadius; o[10] = -d.z / depthRadius; o[14] = centerD / depthRadius;
     o[3] = 0; o[7] = 0; o[11] = 0; o[15] = 1;
 };
 

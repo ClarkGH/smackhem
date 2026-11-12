@@ -226,7 +226,7 @@ describe('WebAudioService', () => {
 
             voice.stop(1);
 
-            // The fade-in is cancelled, and the fade-out starts from the quarter it reached
+            // The fade-in is canceled, and the fade-out starts from the quarter it reached
             expect(voiceGain().gain.sets).toEqual([{ value: 0.25, time: 1 }]);
             expect(voiceGain().gain.ramps).toEqual([{ value: 0, endTime: 2 }]);
         });

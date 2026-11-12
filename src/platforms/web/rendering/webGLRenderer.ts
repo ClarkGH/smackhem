@@ -128,10 +128,10 @@ const SHADOW_SAMPLING_GLSL = `
                 vec3 p = lightClip * 0.5 + 0.5;
 
                 // Receiver-plane depth bias: how this surface's depth changes across the map, from
-                // how p changes between neighbouring screen pixels. Each tap below then compares
-                // against the surface's own depth at the tap, not at the centre, so the outer taps of
+                // how p changes between neighboring screen pixels. Each tap below then compares
+                // against the surface's own depth at the tap, not at the center, so the outer taps of
                 // a sloped floor don't land "behind" the floor itself. Must run before any branch
-                // that differs between neighbouring pixels, or the derivatives are undefined.
+                // that differs between neighboring pixels, or the derivatives are undefined.
                 vec3 dx = dFdx(p);
                 vec3 dy = dFdy(p);
                 float det = dx.x * dy.y - dx.y * dy.x;
@@ -210,7 +210,7 @@ export default class WebGLRenderer implements Renderer {
 
     private ambientIntensity: number = 0.3;
 
-    // Copied in by setSky before beginFrame. Starts as the old flat grey, so a core that
+    // Copied in by setSky before beginFrame. Starts as the old flat gray, so a core that
     // never sets a sky looks the same as before.
     private readonly sky: SkyState = {
         horizon: { x: 160 / 255, y: 160 / 255, z: 160 / 255 },
@@ -291,7 +291,7 @@ export default class WebGLRenderer implements Renderer {
         x: 0, y: 0, width: 0, height: 0,
     };
 
-    // Copied in by setShadowCaster once per frame. Strength 0 skips the depth pass.
+    // Copied in by setShadowCaster once per frame, after beginFrame resets the strength. Strength 0 skips the depth pass.
     private readonly shadowDirection: Vec3 = { x: 0, y: 1, z: 0 };
 
     private shadowStrength = 0;
@@ -541,7 +541,7 @@ ${FOG_GLSL}
             }
         `;
 
-        // No colour output, only depth is written
+        // No color output, only depth is written
         const fragmentShaderSource = `#version 300 es
             precision mediump float;
             void main() {}
@@ -1060,6 +1060,9 @@ ${LIGHT_CARD_GLSL}
         this.gl.clearColor(this.sky.horizon.x, this.sky.horizon.y, this.sky.horizon.z, 1);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
         this.drawList.reset();
+        // No shadows unless this frame declares a caster, so a frame that doesn't (scene_2d)
+        // never runs the depth pass on the last world frame's strength
+        this.shadowStrength = 0;
     }
 
     public drawMesh(mesh: MeshHandle, model: Mat4, color: Vec3, isLightSource: boolean = false): void {
@@ -1194,12 +1197,14 @@ ${LIGHT_CARD_GLSL}
         gl.bindTexture(gl.TEXTURE_2D, this.shadowTexture);
         gl.activeTexture(gl.TEXTURE0);
 
-        // Behind everything, before the replay draws the world over it
-        this.drawSky();
+        // Behind everything, before the replay draws the world over it. Skipped when the frame opens
+        // with a clear (scene_2d's bezel), which would paint straight over it
+        const list = this.drawList;
+        const opensWithClear = list.size() > 0 && list.get(0).kind === 'clear';
+        if (!opensWithClear) this.drawSky();
         this.sendLitFrameUniforms();
 
         // Replay in call order: scene_2d clears to its bezel and fills its game area before the screen quad
-        const list = this.drawList;
         for (let i = 0; i < list.size(); i += 1) {
             const cmd = list.get(i);
             switch (cmd.kind) {
@@ -1512,7 +1517,7 @@ ${SKY_COLOR_GLSL}
             // .y coverage (0..1)
             vec2 cloudAt(vec3 viewDir) {
                 // Every value that fwidth needs is computed on every pixel, before any early return:
-                // derivatives are undefined once neighbouring pixels take different paths. A near-flat
+                // derivatives are undefined once neighboring pixels take different paths. A near-flat
                 // ray uses a clamped height here and is faded out below.
                 float rayLength = (CLOUD_HEIGHT - u_eye.y) / max(viewDir.y, 0.01);
                 vec2 layerPos = u_eye.xz + viewDir.xz * rayLength;
@@ -1591,7 +1596,7 @@ ${SKY_COLOR_GLSL}
 
             void main() {
                 vec3 viewDir = normalize(v_far.xyz / v_far.w - v_near.xyz / v_near.w);
-                // Before any branch: derivatives need neighbouring pixels on the same path. From the
+                // Before any branch: derivatives need neighboring pixels on the same path. From the
                 // view direction, which is smooth everywhere; face coordinates jump where faces meet.
                 float pixelAngle = length(fwidth(viewDir));
                 vec3 color = skyColor(viewDir) + vec3(starLight(viewDir, pixelAngle));

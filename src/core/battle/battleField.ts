@@ -14,7 +14,7 @@ export interface BattleLayout {
     // Units from the center, along the facing: the party back towards you, the enemies away
     partyDepth: number;
     enemyDepth: number;
-    // Units between neighbours on the same side
+    // Units between neighbors on the same side
     spacing: number;
 }
 

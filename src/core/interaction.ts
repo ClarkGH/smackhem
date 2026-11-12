@@ -5,7 +5,7 @@ import type { AABB } from './math/aabb';
 import type { World } from './world';
 import { flatForwardInto, PLAYER_RADIUS } from './camera';
 
-// How close, across the floor, the interactor has to be to an interactable's edge (not its centre)
+// How close, across the floor, the interactor has to be to an interactable's edge (not its center)
 export const INTERACT_RANGE = 2.0;
 
 // What a hostile NPC asks. One shared array, never copied per conversation (M-1).
@@ -18,7 +18,7 @@ export const ENCOUNTER_YES = 0;
 // How far off straight ahead an NPC can be and still be talked to (45 degrees)
 const INTERACT_FACING_COS = Math.cos(Math.PI / 4);
 
-// How close, across the floor, the interactor's centre has to be to a touch NPC's box to be touching it.
+// How close, across the floor, the interactor's center has to be to a touch NPC's box to be touching it.
 // Collision stops the player PLAYER_RADIUS from a box, so this is a little more than that.
 export const CONTACT_RANGE = PLAYER_RADIUS + 0.1;
 
@@ -103,7 +103,7 @@ export default class InteractionSystem {
             const dz = candidates[i].position.z - interactor.position.z;
             const distance = Math.sqrt(dx * dx + dz * dz);
             const edge = distance - candidates[i].size / 2;
-            // Facing goes by the centre. Standing on top of it counts as facing it.
+            // Facing goes by the center. Standing on top of it counts as facing it.
             const inFront = forward === null || distance < 0.0001
                 || (dx * forward.x + dz * forward.z) / distance >= INTERACT_FACING_COS;
             if (edge <= nearestEdge && inFront) {

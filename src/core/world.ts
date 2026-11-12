@@ -175,7 +175,7 @@ export class World {
             }
         });
 
-        // Every chunk's walls, since adding or removing one changes its neighbours' walls too
+        // Every chunk's walls, since adding or removing one changes its neighbors' walls too
         this.rebuildBoundaryWalls();
         for (let i = 0; i < this.boundaryWalls.length; i += 1) this.collidableAABBs.push(this.boundaryWalls[i]);
     }

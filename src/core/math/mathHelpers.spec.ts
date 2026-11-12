@@ -4,6 +4,7 @@ import {
     lookDirectionInto,
     perspective,
     perspectiveInto,
+    projectPointInto,
     quaternionApplyToVector,
     quaternionFromYawPitch,
 } from './mathHelpers';
@@ -101,5 +102,42 @@ describe('fitLogicalOrtho', () => {
         expect(b.right).toBe(800);
         expect(b.top).toBeCloseTo(-(b.bottom - 600));
         expect(aspectOf(b)).toBeCloseTo(390 / 844);
+    });
+});
+
+describe('projectPointInto', () => {
+    it('maps an 800 x 600, y-down area onto NDC, with w 1', () => {
+        // Written out by hand (column-major), so it doesn't lean on orthographic():
+        // x: 0..800 -> -1..1, y: 0..600 -> 1..-1
+        const m = newMat4();
+        m.elements[0] = 2 / 800; m.elements[12] = -1;
+        m.elements[5] = -2 / 600; m.elements[13] = 1;
+        m.elements[10] = 1; m.elements[15] = 1;
+        const out = { x: 0, y: 0 };
+
+        expect(projectPointInto(m, 0, 0, 0, out)).toBe(1);
+        expect(out).toEqual({ x: -1, y: 1 });
+        projectPointInto(m, 800, 600, 0, out);
+        expect(out.x).toBeCloseTo(1, 6);
+        expect(out.y).toBeCloseTo(-1, 6);
+        projectPointInto(m, 200, 450, 0, out);
+        expect(out.x).toBeCloseTo(-0.5, 6);
+        expect(out.y).toBeCloseTo(-0.5, 6);
+    });
+
+    it('divides by w under a perspective projection, and gives w <= 0 behind the camera', () => {
+        // 90 degree fov, square: a point at depth 1 projects to its own x, y
+        const m = perspectiveInto(Math.PI / 2, 1, 0.1, 100, newMat4());
+        const out = { x: 0, y: 0 };
+
+        expect(projectPointInto(m, 0.5, -0.25, -1, out)).toBeCloseTo(1, 6);
+        expect(out.x).toBeCloseTo(0.5, 6);
+        expect(out.y).toBeCloseTo(-0.25, 6);
+        // Twice as far: half as far from the center
+        projectPointInto(m, 0.5, -0.25, -2, out);
+        expect(out.x).toBeCloseTo(0.25, 6);
+        expect(out.y).toBeCloseTo(-0.125, 6);
+
+        expect(projectPointInto(m, 0, 0, 1, out)).toBeLessThan(0);
     });
 });

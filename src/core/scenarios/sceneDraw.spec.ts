@@ -8,6 +8,7 @@ import {
 import type { Vec3 } from '../../types/common';
 import { createScenario, type Scenario } from '../../testing/scenario';
 import { createDebugSettings } from '../settings/debugSettings';
+import { projectPointInto } from '../math/mathHelpers';
 import {
     SCENE_BEZEL_COLOR, SCENE_GAME_AREA_COLOR, SCENE_WIDTH_PX, SCENE_HEIGHT_PX,
 } from '../scene';
@@ -40,10 +41,11 @@ const recordDraws = (scenario: Scenario): Draw[] => {
     return draws;
 };
 
-// Where a logical point lands in clip space (-1..1, y up), through a column-major matrix
+// Where a logical point lands in NDC (-1..1, y up). projectPointInto has its own spec in mathHelpers.spec.ts
 const toNdc = (m: Float32Array, x: number, y: number): { x: number; y: number } => {
-    const w = m[3] * x + m[7] * y + m[15];
-    return { x: (m[0] * x + m[4] * y + m[12]) / w, y: (m[1] * x + m[5] * y + m[13]) / w };
+    const out = { x: 0, y: 0 };
+    projectPointInto({ elements: m }, x, y, 0, out);
+    return out;
 };
 
 describe('Drawing the scene - scenario (stub platform)', () => {

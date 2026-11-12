@@ -25,15 +25,15 @@ const project = (m: Mat4, p: Vec3): Vec3 => {
 describe('computeLightViewProj', () => {
     const sun = normalize({ x: 0.5, y: 0.8, z: 0.3 });
 
-    it('centres on focus, with depth growing away from the light', () => {
+    it('centers on focus, with depth growing away from the light', () => {
         const m = identity();
         const focus = { x: 0, y: 0, z: 0 };
         computeLightViewProj(sun, focus, HALF, RADIUS, SIZE, m);
 
-        const centre = project(m, focus);
-        expect(centre.x).toBeCloseTo(0, 5);
-        expect(centre.y).toBeCloseTo(0, 5);
-        expect(centre.z).toBeCloseTo(0, 5);
+        const center = project(m, focus);
+        expect(center.x).toBeCloseTo(0, 5);
+        expect(center.y).toBeCloseTo(0, 5);
+        expect(center.z).toBeCloseTo(0, 5);
 
         // A point 50 units toward the light covers the same spot, but nearer
         const above = project(m, { x: sun.x * 50, y: sun.y * 50, z: sun.z * 50 });

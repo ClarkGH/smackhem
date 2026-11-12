@@ -182,7 +182,7 @@ src/
 │  │  │  ├─ drawList.ts       # A frame's draws, copied in and replayed in endFrame
 │  │  │  ├─ drawList.spec.ts  # Copies scratch matrices, keeps call order, pool reuse
 │  │  │  ├─ shadowMath.ts     # Light view-projection for the shadow map, texel-snapped
-│  │  │  ├─ shadowMath.spec.ts # Centring, overhead light, no shimmer as the focus moves
+│  │  │  ├─ shadowMath.spec.ts # Centering, overhead light, no shimmer as the focus moves
 │  │  │  ├─ scissorRect.ts    # fillRect's rect, logical units to whole GL scissor pixels
 │  │  │  └─ scissorRect.spec.ts # Exact fit, y flip, letterbox bars, scaling, whole pixels
 │  │  ├─ input/
