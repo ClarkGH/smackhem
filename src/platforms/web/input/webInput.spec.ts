@@ -119,4 +119,26 @@ describe('web gamepad mapping', () => {
         expect(state.axes.lookRateX).toBe(0);
         expect(state.axes.moveX).toBe(0);
     });
+
+    it('caps a full diagonal on the left stick at full speed', () => {
+        // Some pads report (1, 1) at the corner, a length of about 1.41
+        pad.axes[0] = 1;
+        pad.axes[1] = -1;
+
+        const { moveX, moveY } = frame().axes;
+
+        expect(Math.hypot(moveX, moveY)).toBeCloseTo(1);
+        expect(moveX).toBeCloseTo(moveY);
+        expect(moveY).toBeGreaterThan(0);
+    });
+
+    it('keeps a partial tilt on the left stick as it is', () => {
+        pad.axes[0] = 0.5;
+        pad.axes[1] = 0.5;
+
+        const { moveX, moveY } = frame().axes;
+
+        expect(moveX).toBeCloseTo(0.5);
+        expect(moveY).toBeCloseTo(-0.5);
+    });
 });

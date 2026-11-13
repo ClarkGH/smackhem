@@ -235,8 +235,11 @@ export const syncWebInput = (
         finalLookRateY = dz(gamepad.axes[3]);
 
         if (padMoveX !== 0 || padMoveY !== 0) {
-            finalMoveX = padMoveX;
-            finalMoveY = -padMoveY;
+            // Cap at length 1, not normalize: a corner can read (1, 1), a half tilt stays half speed
+            const padLength = Math.sqrt(padMoveX * padMoveX + padMoveY * padMoveY);
+            const padScale = padLength > 1 ? 1 / padLength : 1;
+            finalMoveX = padMoveX * padScale;
+            finalMoveY = -padMoveY * padScale;
         }
 
         // Buttons act on the press, not while held
