@@ -45,3 +45,29 @@ describe('walking diagonally into a corner - scenario (stub platform)', () => {
         });
     });
 });
+
+// Walks straight forward for a second at a cube of the given size, 2 ahead on the floor
+const walkAtCube = (size: number) => {
+    const scenario = createScenario({ mode: 'world_3d' });
+    scenario.addChunk({
+        meshes: [{
+            type: 'cube', pos: [0, 0, -2], scale: size, color: [1, 1, 1],
+        }],
+    });
+    scenario.input.setIntent({ move: { x: 0, y: 1 } });
+    scenario.tick(60);
+    return scenario.gameState.interpolated.cameraPosition.z;
+};
+
+// The cube's near face is at z = -2 + size / 2
+describe('walking straight at a cube on the floor - scenario (stub platform)', () => {
+    it('stops at a full height cube', () => {
+        expect(walkAtCube(1)).toBeGreaterThan(-1.5);
+    });
+
+    // KNOWN BUG: the player's box spans y 0.8..2.4, not 0..1.6, so cubes under 0.8 tall
+    // are walked through. it.fails passes while the bug is there; when fixed, make it a plain it.
+    it.fails('stops at a low cube', () => {
+        expect(walkAtCube(0.5)).toBeGreaterThan(-1.75);
+    });
+});

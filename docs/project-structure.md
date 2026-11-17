@@ -134,7 +134,7 @@ src/
 │  │  ├─ battleTurns.spec.ts  # Turn loop: Command/Target/Back, one confirm once, beats, pause, log order, win/lose
 │  │  ├─ battleEnemyCommand.spec.ts # A refused enemy command throws, enemies can't run (enemyAi mocked)
 │  │  ├─ choice.spec.ts       # NPC Yes/No choice: selection, Interact and Back picks, choice_made, pause
-│  │  ├─ collision.spec.ts    # Walking diagonally into a corner stops outside the box, and can back away
+│  │  ├─ collision.spec.ts    # Walking diagonally into a corner stops outside the box, and can back away; low cubes are walked through (known bug)
 │  │  ├─ debugMenu.spec.ts    # Debug screen: wireframe, shadows, bias and time reach the renderer
 │  │  ├─ frameCap.spec.ts     # Catch-up after a stall is capped at a quarter second
 │  │  ├─ gameOver.spec.ts     # A lost fight goes to Game Over, keeps the enemy, only Return to Title leaves
