@@ -151,7 +151,7 @@ src/
 │     ├─ aabb.ts              # Axis aligned bounding box
 │     ├─ aabb.spec.ts         # Contains and intersects with touching edges counted, center, size, fresh default boxes
 │     ├─ mathHelpers.ts       # Matrix/vector/etc math helper methods
-│     └─ mathHelpers.spec.ts  # fitLogicalOrtho at 4:3, 16:9, 16:10 and tall viewports
+│     └─ mathHelpers.spec.ts  # View, perspective and ortho matrices, ortho fit per aspect, projection, multiply order, quaternions, smoothstep, lerp
 ├─ services/
 │  ├─ renderer.ts             # Abstract Renderer interface
 │  ├─ input.ts                # Abstract Input service
