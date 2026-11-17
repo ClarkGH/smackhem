@@ -148,6 +148,7 @@ src/
 │  │  └─ timeOfDay.spec.ts    # Day clock: advances per tick, wraps, stands still when frozen
 │  └─ math/                   # Shared engine math logic
 │     ├─ aabb.ts              # Axis aligned bounding box
+│     ├─ aabb.spec.ts         # Contains and intersects with touching edges counted, center, size, fresh default boxes
 │     ├─ mathHelpers.ts       # Matrix/vector/etc math helper methods
 │     └─ mathHelpers.spec.ts  # fitLogicalOrtho at 4:3, 16:9, 16:10 and tall viewports
 ├─ services/
