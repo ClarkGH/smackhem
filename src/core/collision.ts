@@ -49,6 +49,15 @@ export const checkCollision = (
     worldAABB: AABB,
 ): boolean => aabbIntersects(playerAABB, worldAABB);
 
+export const hitsAnyAABB = (box: AABB, worldAABBs: readonly AABB[]): boolean => {
+    for (let i = 0; i < worldAABBs.length; i += 1) {
+        if (checkCollision(box, worldAABBs[i])) {
+            return true;
+        }
+    }
+    return false;
+};
+
 export const resolveCollision = (
     playerPos: Vec3,
     movement: Vec3,
@@ -63,15 +72,7 @@ export const resolveCollision = (
     context.newPos.z = playerPos.z + movement.z;
     updatePlayerAABB(context.newPos, playerHeight, playerRadius, context.playerAABB);
 
-    let hasCollision = false;
-    for (let i = 0; i < worldAABBs.length; i += 1) {
-        if (checkCollision(context.playerAABB, worldAABBs[i])) {
-            hasCollision = true;
-            break;
-        }
-    }
-
-    if (!hasCollision) {
+    if (!hitsAnyAABB(context.playerAABB, worldAABBs)) {
         context.resolvedMovement.x = movement.x;
         context.resolvedMovement.y = movement.y;
         context.resolvedMovement.z = movement.z;
@@ -83,26 +84,14 @@ export const resolveCollision = (
     context.xOnlyPos.y = playerPos.y;
     context.xOnlyPos.z = playerPos.z;
     updatePlayerAABB(context.xOnlyPos, playerHeight, playerRadius, context.xOnlyAABB);
-    let xCollision = false;
-    for (let i = 0; i < worldAABBs.length; i += 1) {
-        if (checkCollision(context.xOnlyAABB, worldAABBs[i])) {
-            xCollision = true;
-            break;
-        }
-    }
+    let xCollision = hitsAnyAABB(context.xOnlyAABB, worldAABBs);
 
     // Try Z-only movement
     context.zOnlyPos.x = playerPos.x;
     context.zOnlyPos.y = playerPos.y;
     context.zOnlyPos.z = playerPos.z + movement.z;
     updatePlayerAABB(context.zOnlyPos, playerHeight, playerRadius, context.zOnlyAABB);
-    let zCollision = false;
-    for (let i = 0; i < worldAABBs.length; i += 1) {
-        if (checkCollision(context.zOnlyAABB, worldAABBs[i])) {
-            zCollision = true;
-            break;
-        }
-    }
+    let zCollision = hitsAnyAABB(context.zOnlyAABB, worldAABBs);
 
     // Heading into a corner, each axis alone is clear but both together go into the box.
     // Slide along the larger one only, x on an exact tie.

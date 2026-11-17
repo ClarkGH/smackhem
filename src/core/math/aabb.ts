@@ -36,6 +36,3 @@ export const aabbGetSize = (aabb: AABB): Vec3 => ({
     y: aabb.max.y - aabb.min.y,
     z: aabb.max.z - aabb.min.z,
 });
-
-// Default export for backward compatibility during migration
-export default createAABB;

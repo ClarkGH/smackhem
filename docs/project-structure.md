@@ -68,7 +68,7 @@ src/
 │  ├─ chunkStreamer.ts        # Loads and unloads chunks around the player, for every platform; ChunkUpdater
 │  ├─ chunkStreamer.spec.ts   # Chunk streaming when loads finish out of order
 │  ├─ collision.ts            # Collision logic
-│  ├─ collision.spec.ts       # Player box, wall slides, corners and ties, two walls, flush is stuck, scratch reuse
+│  ├─ collision.spec.ts       # Player box, hitsAnyAABB, wall slides, corners and ties, two walls, flush is stuck, scratch reuse
 │  ├─ combat.ts               # Combat rules: HP, attacks, battle outcome (pure)
 │  ├─ combat.spec.ts          # Sheets, HP clamping, damage and battle outcomes
 │  ├─ combatSheets.ts         # Player and enemy sheets and attacks, fixed templates

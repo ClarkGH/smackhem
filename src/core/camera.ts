@@ -61,9 +61,6 @@ export const getCameraMatrixInto = (
     return out;
 };
 
-// View matrix for normal matrix computation
-export const getViewMatrix = (camera: Camera): Mat4 => lookDirection(camera.position, camera.yaw, camera.pitch);
-
 // The flat direction a yaw looks in, written into out so it can run every tick (M-1).
 // camera.spec checks it against the camera's quaternion rotation.
 export const flatForwardInto = (yaw: number, out: Vec3): Vec3 => {

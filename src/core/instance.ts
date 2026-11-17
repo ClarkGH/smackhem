@@ -12,7 +12,7 @@ import {
 } from './camera';
 import {
     updatePlayerAABB,
-    checkCollision,
+    hitsAnyAABB,
     resolveCollision,
     type CollisionContext,
 } from './collision';
@@ -52,13 +52,7 @@ export default class Instance3DSystem {
             this.collisionContext.playerAABB,
         );
 
-        const worldAABBs = this.world.getCollidableAABBs();
-        for (let i = 0; i < worldAABBs.length; i += 1) {
-            if (checkCollision(this.collisionContext.playerAABB, worldAABBs[i])) {
-                return true;
-            }
-        }
-        return false;
+        return hitsAnyAABB(this.collisionContext.playerAABB, this.world.getCollidableAABBs());
     }
 
     public propagateInstance(gameState: GameState): void {

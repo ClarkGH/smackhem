@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { Vec3 } from '../types/common';
 import { createAABB, type AABB } from './math/aabb';
-import { createCollisionContext, resolveCollision, updatePlayerAABB } from './collision';
+import {
+    createCollisionContext, hitsAnyAABB, resolveCollision, updatePlayerAABB,
+} from './collision';
 
 const HEIGHT = 2;
 const RADIUS = 0.5;
@@ -30,6 +32,19 @@ describe('updatePlayerAABB', () => {
         expect(out.min.z).toBeCloseTo(-2.3);
         expect(out.max.z).toBeCloseTo(-1.7);
         expect(out.max.y - out.min.y).toBeCloseTo(1.6);
+    });
+});
+
+describe('hitsAnyAABB', () => {
+    const box = createAABB({ x: -0.5, y: 0, z: -0.5 }, { x: 0.5, y: 2, z: 0.5 });
+
+    it('is false for no walls, or walls out of reach', () => {
+        expect(hitsAnyAABB(box, [])).toBe(false);
+        expect(hitsAnyAABB(box, [wall(1, -5, 2, 5), wall(-5, 1, 5, 2)])).toBe(false);
+    });
+
+    it('is true when any one wall overlaps, wherever it is in the list', () => {
+        expect(hitsAnyAABB(box, [wall(1, -5, 2, 5), wall(0.4, -5, 2, 5)])).toBe(true);
     });
 });
 
