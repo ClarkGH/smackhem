@@ -21,8 +21,9 @@ export { FIXED_DT };
  *
  * Timing rules worth knowing:
  * - A frame runs update() then render(), like main.ts.
- * - Events are flushed once, at the end of update(). Requests published while handling an event
- *   (e.g. modeAudio reacting to game_mode_changed) are handled on the next frame's flush.
+ * - Events are flushed at the end of every tick. Requests published while handling an event
+ *   (e.g. modeAudio reacting to game_mode_changed) are handled on the next tick's flush.
+ *   A frame that runs no tick flushes nothing.
  * - StubInput clears edge actions (interact, back, menu, ...) once read, like the web input service,
  *   so press() is a single press.
  */

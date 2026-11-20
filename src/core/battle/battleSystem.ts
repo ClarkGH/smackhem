@@ -138,7 +138,7 @@ export default class BattleSystem {
 
     /**
      * Yes to a hostile NPC's question asks for its fight. Any other answer, or a plain NPC, does nothing.
-     * Published from here, battle_requested is handled on the next flush (one frame after Yes).
+     * Published from here, battle_requested is handled on the next flush (one tick after Yes).
      */
     public answer(event: Extract<GameEvent, { type: 'choice_made' }>): void {
         if (event.optionIndex === ENCOUNTER_YES) this.requestFight(event.npcId);

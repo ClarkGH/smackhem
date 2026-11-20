@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { NpcJSON } from '../chunkLoader';
 import { createDebugSettings } from '../settings/debugSettings';
-import { createScenario, type Scenario } from '../../testing/scenario';
+import { createScenario, FIXED_DT, type Scenario } from '../../testing/scenario';
 import { HOSTILE, skip } from '../../testing/battleScenario';
 
 // Two units ahead of the player (at the origin, looking down -z): a second of walking reaches it
@@ -34,6 +34,29 @@ describe('Fights that start on touch - scenario (stub platform)', () => {
         expect(scenario.gameState.discrete.gameMode).toBe('battle_25djrpg');
         expect(scenario.gameState.discrete.battle?.npcId).toBe('npc_evil_circle_1');
         expect(scenario.gameState.discrete.activeSpeech).toBeNull();
+    });
+
+    it('starts the fight on the tick after contact, even when one frame runs both ticks', () => {
+        // How many one-tick frames of walking it takes to start the fight
+        const reference = withNpc(TOUCHY);
+        reference.input.setIntent({ move: { x: 0, y: 1 } });
+        let ticks = 0;
+        while (!reference.gameState.discrete.battle && ticks < 120) {
+            reference.tick();
+            ticks += 1;
+        }
+        expect(reference.gameState.discrete.battle).not.toBeNull();
+
+        // The same walk, but contact lands on the first tick of a frame that runs two
+        const scenario = withNpc(TOUCHY);
+        scenario.input.setIntent({ move: { x: 0, y: 1 } });
+        scenario.tick(ticks - 1);
+        scenario.frame(2 * FIXED_DT);
+
+        // The second tick is the fight's: the world's time doesn't move on it
+        expect(scenario.gameState.discrete.gameMode).toBe('battle_25djrpg');
+        expect(scenario.gameState.interpolated.simulationTime)
+            .toBe(reference.gameState.interpolated.simulationTime);
     });
 
     it('leaves a talk NPC alone when you walk into it', () => {

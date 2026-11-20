@@ -64,7 +64,7 @@ describe('Starting a fight - scenario (stub platform)', () => {
         ]);
     });
 
-    it('starts one frame after Yes: choice_made, then battle_requested, each on its own flush', () => {
+    it('starts one tick after Yes: choice_made, then battle_requested, each on its own flush', () => {
         const scenario = withNpc(HOSTILE);
         scenario.press({ interact: true });
 

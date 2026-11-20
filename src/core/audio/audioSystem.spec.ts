@@ -171,7 +171,7 @@ describe('AudioSystem - event integration', () => {
     it('restarts a one-shot, leaving one live voice', async () => {
         await audioSystem.preload('ui_menu_select', 'ui');
 
-        // Two requests in the same flush, as from two fixed ticks in one frame
+        // Two requests in the same flush, as from two systems on one tick
         eventBus.publish({ type: 'play_sound_requested', soundId: 'ui_menu_select', category: 'ui' });
         eventBus.publish({ type: 'play_sound_requested', soundId: 'ui_menu_select', category: 'ui' });
         eventBus.flush();

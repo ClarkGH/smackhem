@@ -501,9 +501,12 @@ export class GameLoop {
             this.clearPendingPresses();
 
             this.accumulator -= FIXED_DT;
-        }
 
-        this.eventBus.flush();
+            // Every tick, so what a tick publishes is handled before the next one, however many run per frame.
+            // No flush after the loop: it would handle the last tick's follow-ups a tick early.
+            // Published outside a tick (the instance toggle, platform callbacks), it waits for the next tick.
+            this.eventBus.flush();
+        }
     }
 
     // Adds this frame's presses to any still waiting, and puts them all on the intent for the next tick
