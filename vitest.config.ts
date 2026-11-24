@@ -14,6 +14,9 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
+      // The perf bench's own tests use node:test (run with node --test), not Vitest
+      '.claude/**',
+      'scripts/bench/**',
     ],
   },
 });

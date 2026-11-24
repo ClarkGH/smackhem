@@ -289,7 +289,7 @@ Root level configuration:
 Specs sit next to the code they test (`*.spec.ts`). `pnpm test` runs them all, `pnpm test:coverage` adds a coverage report.
 
 - **Scenario tests** (`src/testing/scenario.ts`): `createScenario()` runs the real `GameLoop` on the stub platform, one fixed tick per frame, and gives `press`, `tick`, `frame` and `click`. Use it for anything that crosses systems (modes, menus, look, audio rules) instead of building a loop by hand.
-  - **Timing rule:** events flush at the end of each frame, so a request published while handling an event (e.g. audio reacting to a mode change) is handled on the next frame.
+  - **Timing rule:** events flush at the end of each tick, so a request published while handling an event (e.g. audio reacting to a mode change) is handled on the next tick.
 - **The stub platform behaves like the real one.** `StubInput` clears one-shot actions once read, like `WebInputService`, so a `press` is seen by exactly one frame.
 - **Contract tests:** the same suite runs against a stub and its web implementation (`AudioService`, `KeyValueStore`), so passing on the stub means the same thing as passing on the real backend. Add one when adding a service.
 - **Web platform tests:** browser APIs are replaced by small fakes (`fakeDom.ts`, `fakeWebAudio.ts`) that only implement what our code calls. No DOM library.

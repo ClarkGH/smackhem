@@ -76,7 +76,7 @@ walked into it    ──► BattleSystem.touched ─┴► requestFight ──�
 
 `requestFight` looks the NPC up with `world.findNpc`, which only sees visible NPCs. A beaten NPC is hidden, so it can't be fought again.
 
-`start` builds the fight one frame after it's asked for, and refuses (with a warning where it's a surprise) if:
+`start` builds the fight one tick after it's asked for, and refuses (with a warning where it's a surprise) if:
 - a fight is already running
 - the mode isn't `world_3d` or `instance_3d`
 - the NPC has unloaded in between
@@ -202,7 +202,7 @@ A fight is decided when `outcome` leaves `'ongoing'`: `decideOutcome` after each
 | `fled` | Kept HP is updated and the mode goes back. Nobody is defeated, and the NPC stays to be talked to again |
 | `lost` | The fight is dropped and `game_over_requested` is published. Nothing else: the NPC stays, nothing is kept |
 
-**Game over** is its own `GameMode`, `'game_over'`, with its own root menu screen. Return to Title is the only way out. A loss publishes an event rather than switching modes itself, so `BattleSystem` never opens menus. For the one frame in between, the mode is still `battle_25djrpg` with `battle` already `null`, and `update` does nothing.
+**Game over** is its own `GameMode`, `'game_over'`, with its own root menu screen. Return to Title is the only way out. A loss publishes an event rather than switching modes itself, so `BattleSystem` never opens menus. The fight ends inside a tick, so that tick's flush handles the event, and the mode is already `game_over` before the next tick runs or the frame renders.
 
 **Defeated means gone, and the World is the only gate.** Two places hold a defeat:
 - **`GameState.discrete.defeatedNpcIds`** remembers it. It's plain, serializable data, the part a save will store.

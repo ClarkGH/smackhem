@@ -60,7 +60,9 @@ flowchart TB
 
 ### How it runs today
 
-There's no MPSC queue yet, and the bus is flushed once per frame, after all of the frame's ticks, not twice per tick.
+There's no MPSC queue yet, and the bus is flushed once at the end of every fixed tick, not twice per tick.
+
+It's per tick, not per frame, so timing doesn't depend on the frame rate. A slow frame can run several ticks. With one flush after all of them, what the first tick published would be handled only after the second tick had already run on stale state: a fight started by contact on tick one would let tick two advance the world first. There's no extra flush after the loop either: that would handle the last tick's follow-ups a tick early. Anything published outside a tick (the instance toggle, platform callbacks) waits for the next tick's flush, and a frame that runs no tick flushes nothing.
 
 ```mermaid
 sequenceDiagram
@@ -74,14 +76,16 @@ sequenceDiagram
     loop each FIXED_DT tick the frame owes
         L->>L: updateSimulation: menu, fight, speech, scene, instance or world
         Note over L: systems publish, nothing is handled yet
+        L->>B: flush()
+        Note over B: handlers run now. What they publish waits for the next tick's flush.
     end
-    L->>B: flush()
-    Note over B: handlers run now. What they publish waits for the next frame's flush.
     F->>F: stream chunks if the player changed chunk
     F->>R: render()
 ```
 
-So a chain of events moves one frame per link: a mode change is handled on one flush, and the sounds it asks for on the next. Scenario specs tick twice after a change before asserting on its audio.
+So a chain of events moves one tick per link: a mode change is handled on one flush, and the sounds it asks for on the next. Scenario specs tick twice after a change before asserting on its audio.
+
+What a tick publishes is handled before that frame renders. A lost fight publishes `game_over_requested` on the tick it ends, so the mode is already `game_over` when the frame draws (pinned in `scenarios/gameOver.spec.ts`).
 
 ## Proposed Implementation
 
@@ -291,7 +295,7 @@ Requests, all handled by `AudioSystem`. What it does with each is in [audio.md](
 Covered in full in [battle.md](battle.md).
 
 - `choice_made { npcId, optionIndex }`: published when a speech choice is picked. Back picks the last option. `BattleSystem.answer` listens, and Yes on a hostile NPC asks for its fight. The choice system itself knows nothing about battles, so later event flags can listen too.
-- `battle_requested { encounterId, npcId }`: every way into a fight ends here, whether talking or walking into the NPC. `BattleSystem.start` handles it on the next flush, one frame after it's asked for, and switches the mode to `battle_25djrpg`.
+- `battle_requested { encounterId, npcId }`: every way into a fight ends here, whether talking or walking into the NPC. `BattleSystem.start` handles it on the next flush, one tick after it's asked for, and switches the mode to `battle_25djrpg`.
 - `game_over_requested` has no payload. A lost fight publishes it, and `GameLoop` switches to `game_over` and opens the Game Over screen. `BattleSystem` never opens menus itself.
 
 ### Settings Events

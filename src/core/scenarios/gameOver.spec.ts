@@ -15,11 +15,12 @@ const withHostile = (npc: NpcJSON = HOSTILE): Scenario & { modeChanges: ModeChan
     return { ...scenario, modeChanges };
 };
 
-// Talks, answers Yes, loses straight away (testing/battleScenario.ts), then the frames for game_over_requested
+// Talks, answers Yes, loses straight away (testing/battleScenario.ts). The losing tick already switched to game_over.
+// One more tick for game_mode_changed: enterGameOver publishes it while handling game_over_requested, so it's heard next flush.
 const loseFight = (scenario: Scenario): void => {
     startFight(scenario);
     loseQuickly(scenario);
-    scenario.tick(2);
+    scenario.tick();
 };
 
 describe('Game over - scenario (stub platform)', () => {
@@ -35,6 +36,17 @@ describe('Game over - scenario (stub platform)', () => {
         expect(scenario.modeChanges.at(-1)).toEqual(
             { type: 'game_mode_changed', previousMode: 'battle_25djrpg', currentMode: 'game_over' },
         );
+    });
+
+    it('switches on the tick the fight is lost, so no frame draws the world in between', () => {
+        const scenario = withHostile();
+        startFight(scenario);
+
+        // No extra ticks: the last skip ends the fight, and that tick's flush handles game_over_requested
+        loseQuickly(scenario);
+
+        expect(scenario.gameState.discrete.battle).toBeNull();
+        expect(scenario.gameState.discrete.gameMode).toBe('game_over');
     });
 
     it('never goes back to the world first', () => {

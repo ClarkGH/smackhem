@@ -421,8 +421,8 @@ export default class BattleSystem {
 
     /**
      * The fight is dropped. A win removes the NPC for good and play goes back where it was. Running away goes
-     * back too, with nobody defeated. A loss never removes it, and goes to game over instead: the mode stays
-     * battle for the one frame until game_over_requested is handled, and update has no fight to run in between.
+     * back too, with nobody defeated. A loss never removes it, and goes to game over instead: this runs inside a tick,
+     * so game_over_requested is handled on that tick's flush and the mode is game_over before the frame renders.
      */
     private end(gameState: GameState, battle: BattleState): void {
         const discreteState = gameState.discrete;

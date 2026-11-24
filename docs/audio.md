@@ -75,7 +75,7 @@ flowchart LR
     svc --> stub["StubAudioService"]
 ```
 
-Requests go through the event bus, which is flushed once per frame ([events.md](events.md#how-it-runs-today)). A request published while handling another event waits for the next frame, so audio follows a mode change one frame later.
+Requests go through the event bus, which is flushed at the end of every tick ([events.md](events.md#how-it-runs-today)). A request published while handling another event waits for the next tick, so audio follows a mode change one tick later.
 
 ## Sounds and files
 

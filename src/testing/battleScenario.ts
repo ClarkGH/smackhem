@@ -58,7 +58,7 @@ export const winFight = (scenario: Scenario): void => {
 /**
  * From the party's choice, a quick loss: the party is left on 2 HP. Its hit lands, its beat and run home
  * are skipped, the enemy runs over and its hit finishes the party, and that last beat is skipped.
- * The fight is over, and game_over_requested waits for the next flush.
+ * The fight is over, and that last tick's flush handled game_over_requested: the mode is already game_over.
  */
 export const loseFight = (scenario: Scenario): void => {
     const { battle } = scenario.gameState.discrete;
