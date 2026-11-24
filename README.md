@@ -2,9 +2,6 @@
 
 Geometric 3D/2D game engine wrapper
 
-<img width="887" height="756" alt="image" src="https://github.com/user-attachments/assets/7d94d284-1cb2-4e68-b066-5cbb129181fb" />
-
-
 ## Paradigms and Intent
 
 3D/2D "game engine" inspired by Drakkhen's exploration and Crosscode's use of web technologies. Since that's what I'm comfortable with, I figure it's the best first-step into putting a game I'm proud of up for other people to play. Working with 2D/3D paradigms mainly for fun and learning.
