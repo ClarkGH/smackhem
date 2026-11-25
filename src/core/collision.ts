@@ -27,20 +27,19 @@ export const createCollisionContext = (): CollisionContext => ({
 });
 
 // TODO: review if we want to be cylinder or box
-// Player AABB is a capsule-like box: centered at (position.x, position.y - height/2, position.z)
-// with size (radius*2, height, radius*2). Fills out in place.
+// A box centered on position, (radius*2, height, radius*2) in size. Fills out in place.
 export const updatePlayerAABB = (
     position: Vec3,
     height: number,
     radius: number,
     out: AABB,
 ): void => {
-    const centerY = position.y - height / 2;
+    const bottomY = position.y - height / 2;
     out.min.x = position.x - radius;
-    out.min.y = centerY;
+    out.min.y = bottomY;
     out.min.z = position.z - radius;
     out.max.x = position.x + radius;
-    out.max.y = centerY + height;
+    out.max.y = bottomY + height;
     out.max.z = position.z + radius;
 };
 

@@ -35,10 +35,6 @@ export default class StubClock implements Clock {
         this.fixedDeltaTime = dt;
     }
 
-    public getFixedDeltaTime(): number {
-        return this.fixedDeltaTime;
-    }
-
     public step(frames: number = 1): void {
         for (let i = 0; i < frames; i += 1) {
             this.update();
@@ -54,17 +50,6 @@ export default class StubClock implements Clock {
     }
 
     public resume(): void {
-        this.frozen = false;
-    }
-
-    public isTimeFrozen(): boolean {
-        return this.frozen;
-    }
-
-    public reset(): void {
-        this.currentTime = 0;
-        this.deltaTime = 0;
-        this.fixedDeltaTime = 1 / 60;
         this.frozen = false;
     }
 }
