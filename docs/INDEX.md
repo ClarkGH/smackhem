@@ -86,3 +86,4 @@ Not all code examples in the documentation are 1:1 with how the code actually fu
 - **[Data Formats](data-formats.md)** - Chunk, settings, and save data formats
 - **[Project Structure](project-structure.md)** - Code organization and project structure
 - **[Porting Strategy](porting-strategy.md)** - Porting approach, learning path, and publishing
+- **[Performance](performance.md)** - Code size and boot time on every commit: method, results, limits

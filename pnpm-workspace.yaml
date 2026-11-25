@@ -1,2 +1,6 @@
+# The perf bench has its own package (Playwright), so a root install sets it up too
+packages:
+  - scripts/bench
+
 onlyBuiltDependencies:
   - unrs-resolver
