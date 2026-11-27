@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "lint": "eslint --ext .ts src",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "bench": "node scripts/bench/bench.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

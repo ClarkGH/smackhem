@@ -156,3 +156,98 @@ export const percentile = (values, p) => {
     const rank = Math.ceil((p / 100) * sorted.length);
     return sorted[Math.min(sorted.length - 1, Math.max(0, rank - 1))];
 };
+
+/** Rows from CSV text, as objects keyed by the header. Reads what csvCell writes. Empty text → []. */
+export const parseCsv = (text) => {
+    const records = [];
+    let row = [];
+    let cell = '';
+    let quoted = false;
+    const endCell = () => {
+        row.push(cell);
+        cell = '';
+    };
+    const endRow = () => {
+        endCell();
+        records.push(row);
+        row = [];
+    };
+    for (let i = 0; i < text.length; i += 1) {
+        const ch = text[i];
+        if (quoted && ch === '"' && text[i + 1] === '"') {
+            cell += '"'; // "" inside quotes is one quote
+            i += 1;
+        } else if (ch === '"') {
+            quoted = !quoted;
+        } else if (quoted) {
+            cell += ch; // commas and newlines inside quotes are text
+        } else if (ch === ',') {
+            endCell();
+        } else if (ch === '\n') {
+            endRow();
+        } else if (ch !== '\r') {
+            cell += ch;
+        }
+    }
+    if (cell !== '' || row.length) endRow(); // last line without a trailing newline
+    if (!records.length) return [];
+    const [header, ...body] = records;
+    return body.map((r) => Object.fromEntries(header.map((h, j) => [h, r[j] ?? ''])));
+};
+
+/** Commits not measured yet, oldest first. measured holds the shas already in a CSV. */
+export const newCommits = (commits, measured) => commits.filter((c) => !measured.has(c.sha));
+
+/** The reference's range from its control rows: { min, max, n } of firstDraw_median, or null if it has none. */
+export const referenceRange = (summaryRows, referenceSha) => {
+    const medians = summaryRows
+        .filter((r) => r.role === 'control' && r.sha === referenceSha && r.firstDraw_median !== '')
+        .map((r) => Number(r.firstDraw_median))
+        .filter(Number.isFinite);
+    if (!medians.length) return null;
+    return { min: Math.min(...medians), max: Math.max(...medians), n: medians.length };
+};
+
+/** Is this sitting comparable to the baseline? outsideBy is 0 inside the range, else ms past the nearest edge. */
+export const checkReference = (median, range) => {
+    if (!range || !Number.isFinite(median)) return { comparable: false, median, range, outsideBy: null };
+    const outsideBy = Math.max(0, range.min - median, median - range.max);
+    return { comparable: outsideBy === 0, median, range, outsideBy };
+};
+
+// A change in any of these stops the run. os isn't one: kernel updates are routine, and the reference check catches their effect.
+export const ENV_STOP_FIELDS = ['cpu', 'cores', 'node', 'chromium', 'playwright', 'launchArgs'];
+
+/** env.json fields that differ between the baseline and now. [] means comparable. */
+export const envDiff = (baseline, current, fields = ENV_STOP_FIELDS) => fields.filter(
+    (f) => JSON.stringify(baseline?.[f]) !== JSON.stringify(current?.[f]),
+);
+
+const ms = (v) => (v === null || v === undefined || v === '' ? '–' : `${Number(v).toFixed(1)} ms`);
+// 1 KB = 1000 bytes, as in docs/performance.md
+const kb = (bytes) => (bytes === null || bytes === undefined || bytes === '' ? '–' : `${(Number(bytes) / 1000).toFixed(1)} KB`);
+
+/**
+ * results/latest.md. rows: [{ sha, date, subject, jsBrotli, initialBrotli, firstDraw_median, firstDraw_iqr }].
+ * check comes from checkReference; era is the baseline run's date.
+ */
+export const renderLatest = ({ era, generatedAt, referenceSha, check, rows, osNote = '' }) => {
+    const verdict = check.comparable
+        ? `Comparable: the reference \`${referenceSha}\` measured ${ms(check.median)}, inside its range (${ms(check.range.min)}–${ms(check.range.max)}).`
+        : `**Not comparable:** the reference \`${referenceSha}\` measured ${ms(check.median)}, ${check.outsideBy === null ? 'and has no saved range' : `${ms(check.outsideBy)} outside its range (${ms(check.range?.min)}–${ms(check.range?.max)})`}. These rows are kept, but don't compare them with the baseline.`;
+    const table = rows.length
+        ? ['| Commit | Date | JS (brotli) | At startup | First draw (median) | IQR |', '| --- | --- | --- | --- | --- | --- |',
+            ...rows.map((r) => `| \`${r.sha}\` ${r.subject.replace(/\|/g, '\\|')} | ${r.date} | ${kb(r.jsBrotli)} | ${kb(r.initialBrotli)} | ${ms(r.firstDraw_median)} | ${ms(r.firstDraw_iqr)} |`)]
+        : ['No new commits since the last run.'];
+    return [
+        '# Latest benchmark',
+        '',
+        `Generated ${generatedAt} by \`pnpm bench\`. Era: ${era} (the baseline run). Method and limits: [docs/performance.md](../../../docs/performance.md).`,
+        '',
+        verdict,
+        ...(osNote ? ['', osNote] : []),
+        '',
+        ...table,
+        '',
+    ].join('\n');
+};

@@ -1,7 +1,10 @@
 // Size pass: build every commit and measure its dist (code only). Sequential.
 //
-// usage: node size-pass.mjs <repo> <workDir> <outCsv> [--limit N] [--only sha,sha]
-import { appendFileSync, writeFileSync } from 'node:fs';
+// usage: node size-pass.mjs <repo> <workDir> <outCsv> [--limit N] [--only sha,sha] [--append]
+//   --append  add to outCsv instead of replacing it. Stops if its header doesn't match.
+import {
+    appendFileSync, writeFileSync, existsSync, readFileSync,
+} from 'node:fs';
 import { createBuilder, listCommits } from './build.mjs';
 import { measureDist, toCsv, csvCell } from './lib.mjs';
 
@@ -12,7 +15,7 @@ const opt = (name) => {
     return i > 0 ? args[i + 1] : null;
 };
 if (!repo || !workDir || !outCsv) {
-    console.error('usage: node size-pass.mjs <repo> <workDir> <outCsv> [--limit N] [--only sha,sha]');
+    console.error('usage: node size-pass.mjs <repo> <workDir> <outCsv> [--limit N] [--only sha,sha] [--append]');
     process.exit(2);
 }
 const limit = opt('limit') ? Number(opt('limit')) : Infinity;
@@ -26,7 +29,13 @@ const COLUMNS = [
 
 const commits = listCommits(repo).filter((c) => !only || only.has(c.sha)).slice(0, limit);
 const builder = createBuilder(repo, workDir);
-writeFileSync(outCsv, toCsv(COLUMNS, []));
+if (!args.includes('--append')) {
+    writeFileSync(outCsv, toCsv(COLUMNS, []));
+} else if (!existsSync(outCsv) || readFileSync(outCsv, 'utf8').split('\n', 1)[0] !== COLUMNS.join(',')) {
+    // Appending to a CSV with other columns would misalign every new row
+    console.error(`can't append to ${outCsv}: missing, or its header doesn't match this script's columns`);
+    process.exit(2);
+}
 console.log(`size pass: ${commits.length} commits`);
 
 commits.forEach((c, i) => {

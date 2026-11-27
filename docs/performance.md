@@ -128,7 +128,35 @@ node scripts/bench/size-pass.mjs . /tmp/smackhem-bench scripts/bench/results/siz
 node scripts/bench/perf-pass.mjs . /tmp/smackhem-bench scripts/bench/results/quick --profile quick
 ```
 
-Each script prints its options when run without arguments. `--only sha,sha` measures just those commits, and `--every N` measures every Nth commit plus HEAD.
+Each script prints its options when run without arguments. `--only sha,sha` measures just those commits, and `--every N` measures every Nth commit plus HEAD. Both passes replace their CSV unless given `--append`.
+
+### Keeping it current
+
+`pnpm bench` measures only the commits the CSVs don't have yet, and appends them. It also measures the reference commit (`b58937d`) before and after. If the reference lands outside its overnight range (112–119 ms), the new rows are kept but marked not comparable. If the CPU, Node, Chromium, Playwright or the launch flags changed, it stops before measuring anything. Each run adds a line to `results/quick/checks.csv` and rewrites `results/latest.md` with the newest numbers.
+
+It runs weekly on my machine (a systemd timer, Fridays at 2:00 AM), never in CI: a different machine is a different ruler.
+
+### Weekly run
+
+The timer and its service are templates in [scripts/bench/systemd/](../scripts/bench/systemd/). To install them, from the repo root:
+
+```sh
+mkdir -p ~/.config/systemd/user
+sed -e "s|@REPO@|$(pwd)|" -e "s|@NODE@|$(command -v node)|" \
+  scripts/bench/systemd/smackhem-bench.service > ~/.config/systemd/user/smackhem-bench.service
+cp scripts/bench/systemd/smackhem-bench.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now smackhem-bench.timer
+```
+
+```sh
+systemctl --user list-timers smackhem-bench.timer   # next and last run
+journalctl --user -u smackhem-bench                 # what each run printed
+systemctl --user start smackhem-bench               # run it now, as the timer would
+systemctl --user disable --now smackhem-bench.timer # stop the schedule
+```
+
+It's systemd and not cron because it logs to the journal, `systemd-inhibit` keeps the machine awake through a run, and exit 3 (the environment changed) can count as expected instead of failed. It only runs while you're logged in and the machine is awake: a missed Friday is skipped, not caught up. Switching Node versions changes the path in the installed service, so reinstall it (and start a new era, since Node is a stop field).
 
 ## Navigation
 

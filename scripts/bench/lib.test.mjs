@@ -104,3 +104,77 @@ test('mannWhitney: symmetric in argument order', () => {
     const b = [2, 3, 5, 7, 8, 10, 11];
     assert.ok(Math.abs(mannWhitney(a, b).p - mannWhitney(b, a).p) < 1e-12);
 });
+
+import {
+    parseCsv, newCommits, referenceRange, checkReference, envDiff, renderLatest,
+} from './lib.mjs';
+
+test('parseCsv: empty, header only, no trailing newline, CRLF', () => {
+    assert.deepEqual(parseCsv(''), []);
+    assert.deepEqual(parseCsv('a,b\n'), []);
+    assert.deepEqual(parseCsv('a,b\n1,2'), [{ a: '1', b: '2' }]);
+    assert.deepEqual(parseCsv('a,b\r\n1,2\r\n'), [{ a: '1', b: '2' }]);
+});
+
+test('parseCsv: reads back what toCsv writes, quotes and all', () => {
+    const rows = [{ sha: 'abc', subject: 'Fix "x", then y' }, { sha: 'def', subject: 'line\nbreak' }, { sha: 'ghi', subject: '' }];
+    assert.deepEqual(parseCsv(toCsv(['sha', 'subject'], rows)), rows);
+});
+
+test('parseCsv: a short row fills missing cells with empty strings', () => {
+    assert.deepEqual(parseCsv('a,b,c\n1\n'), [{ a: '1', b: '', c: '' }]);
+});
+
+test('newCommits: keeps order, drops measured, handles none and all', () => {
+    const commits = [{ sha: 'a' }, { sha: 'b' }, { sha: 'c' }];
+    assert.deepEqual(newCommits(commits, new Set(['b'])), [{ sha: 'a' }, { sha: 'c' }]);
+    assert.deepEqual(newCommits(commits, new Set(['a', 'b', 'c'])), []);
+    assert.deepEqual(newCommits([], new Set()), []);
+});
+
+test('referenceRange: only the reference\'s control rows count; none → null', () => {
+    const rows = [
+        { role: 'control', sha: 'ref', firstDraw_median: '112.5' },
+        { role: 'control', sha: 'ref', firstDraw_median: '119' },
+        { role: 'commit', sha: 'ref', firstDraw_median: '200' }, // a commit row, not a control
+        { role: 'control', sha: 'other', firstDraw_median: '50' },
+        { role: 'control', sha: 'ref', firstDraw_median: '' }, // a failed control
+    ];
+    assert.deepEqual(referenceRange(rows, 'ref'), { min: 112.5, max: 119, n: 2 });
+    assert.equal(referenceRange(rows, 'missing'), null);
+    assert.equal(referenceRange([], 'ref'), null);
+});
+
+test('checkReference: inside, on the edge, outside either side, no range', () => {
+    const range = { min: 112, max: 119, n: 14 };
+    assert.deepEqual(checkReference(115, range), { comparable: true, median: 115, range, outsideBy: 0 });
+    assert.equal(checkReference(119, range).comparable, true);
+    assert.equal(checkReference(125, range).outsideBy, 6);
+    assert.equal(checkReference(110, range).outsideBy, 2);
+    assert.equal(checkReference(125, range).comparable, false);
+    assert.equal(checkReference(115, null).comparable, false);
+    assert.equal(checkReference(NaN, range).comparable, false);
+});
+
+test('envDiff: same is empty; stop fields differ; os alone does not stop', () => {
+    const base = { cpu: 'R7', cores: 16, node: 'v26', chromium: '159', playwright: '1.65.1', launchArgs: ['--a'], os: 'k42' };
+    assert.deepEqual(envDiff(base, { ...base }), []);
+    assert.deepEqual(envDiff(base, { ...base, os: 'k43' }), []);
+    assert.deepEqual(envDiff(base, { ...base, chromium: '160', launchArgs: ['--b'] }), ['chromium', 'launchArgs']);
+    assert.deepEqual(envDiff(base, {}).length, 6);
+});
+
+test('renderLatest: comparable, not comparable, nothing new; pipes in subjects are escaped', () => {
+    const range = { min: 112, max: 119, n: 14 };
+    const row = { sha: 'f22d633', date: '2026-11-27', subject: 'a | b', jsBrotli: '43520', initialBrotli: '19900', firstDraw_median: '118.2', firstDraw_iqr: '6.1' };
+    const ok = renderLatest({ era: '2026-11-24', generatedAt: 'now', referenceSha: 'ref', check: checkReference(115, range), rows: [row] });
+    assert.match(ok, /^Comparable/m);
+    assert.match(ok, /a \\\| b/);
+    assert.match(ok, /118\.2 ms/);
+    assert.match(ok, /43\.5 KB/); // 1000 bytes to the KB, like docs/performance.md
+    const bad = renderLatest({ era: 'e', generatedAt: 'now', referenceSha: 'ref', check: checkReference(130, range), rows: [] });
+    assert.match(bad, /\*\*Not comparable:\*\*.*11\.0 ms outside/);
+    assert.match(bad, /No new commits/);
+    const none = renderLatest({ era: 'e', generatedAt: 'now', referenceSha: 'ref', check: checkReference(115, null), rows: [] });
+    assert.match(none, /has no saved range/);
+});

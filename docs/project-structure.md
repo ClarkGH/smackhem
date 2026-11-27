@@ -265,11 +265,13 @@ scripts/
 ├─ audio-aliases.sh           # FFMPEG trim and compression scripts
 ├─ mutate.sh                  # Mutation check: break a line on purpose, see if a spec notices
 └─ bench/                     # Size and boot benchmark of every commit (performance.md)
+   ├─ bench.mjs               # pnpm bench: only new commits, appended, with a reference check
    ├─ size-pass.mjs           # Build each commit, measure its JS
    ├─ perf-pass.mjs           # Build each commit, time its boot in headless Chromium
    ├─ build.mjs               # git archive + install + vite build, outside the repo
    ├─ measure-boot.mjs        # In-page timing: first WebGL draw, frames, long tasks
    ├─ lib.mjs                 # Pure helpers (stats, CSV), tested by lib.test.mjs
+   ├─ systemd/                # The weekly timer and its service, as install templates
    └─ results/                # Raw CSVs and env.json per run, committed
 ```
 

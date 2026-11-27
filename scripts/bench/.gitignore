@@ -1,2 +1,4 @@
 # Build output the perf pass keeps for its control runs
 results/*/.control-dist/
+# The saved reference build (--reference), reused between runs
+results/reference/

@@ -1,0 +1,12 @@
+[Unit]
+Description=Smackhem weekly benchmark (pnpm bench)
+
+# A template: @REPO@ and @NODE@ are filled in at install (docs/performance.md, Weekly run).
+[Service]
+Type=oneshot
+WorkingDirectory=@REPO@
+# A full path to node, because a service doesn't get your shell's PATH (nvm, for one).
+# systemd-inhibit keeps the machine from suspending mid-run.
+ExecStart=/usr/bin/systemd-inhibit --what=sleep:idle --why="Smackhem benchmark" @NODE@ scripts/bench/bench.mjs
+# Exit 3: the environment changed, nothing was measured, and latest.md says why. Expected, not a failure.
+SuccessExitStatus=3
