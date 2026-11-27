@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import {
+    describe, it, expect, vi,
+} from 'vitest';
 import WebGLRenderer from './webGLRenderer';
 import type { Mat4 } from '../../../types/common';
 import { identity, orthographic } from '../../../core/math/mathHelpers';
@@ -173,5 +175,43 @@ describe('WebGLRenderer on a fake GL context', () => {
         drawFrame(renderer, () => {});
 
         expect(fake.count('bindFramebuffer')).toBe(0);
+    });
+});
+
+// Image files that load, unless server.failing is set. Restored after each test by the vitest config (unstubGlobals).
+const serveImages = (server = { failing: false }): string[] => {
+    const requested: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+        requested.push(url);
+        return { ok: !server.failing, blob: async () => new Blob() };
+    });
+    vi.stubGlobal('createImageBitmap', async () => ({ width: 2, height: 2 }));
+    return requested;
+};
+
+describe('WebGLRenderer.loadTexture', () => {
+    it('makes one GL texture when the same id is asked for twice before the first load finishes', async () => {
+        const fake = createFakeWebGL();
+        const renderer = new WebGLRenderer(fake.canvas);
+        const requested = serveImages();
+        fake.calls.length = 0;
+
+        const [first, second] = await Promise.all([renderer.loadTexture('npc'), renderer.loadTexture('npc')]);
+
+        expect(fake.count('createTexture')).toBe(1);
+        expect(requested).toHaveLength(1);
+        expect(second).toBe(first);
+    });
+
+    it('tries again after a load fails, instead of keeping the failure', async () => {
+        const fake = createFakeWebGL();
+        const renderer = new WebGLRenderer(fake.canvas);
+        const server = { failing: true };
+        serveImages(server);
+
+        await expect(renderer.loadTexture('npc')).rejects.toThrow();
+        server.failing = false;
+
+        await expect(renderer.loadTexture('npc')).resolves.toEqual({ id: 'npc' });
     });
 });

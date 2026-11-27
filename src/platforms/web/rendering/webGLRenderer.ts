@@ -190,7 +190,8 @@ export default class WebGLRenderer implements Renderer {
 
     private textures = new Map<string, WebGLTextureData>();
 
-    private textureCache = new Map<string, TextureHandle>();
+    // Loads in flight count too, so a second call for the same id waits instead of making another GL texture
+    private textureCache = new Map<string, Promise<TextureHandle>>();
 
     private textureProgram: WebGLProgram | null = null;
 
@@ -1875,12 +1876,18 @@ ${FOG_GLSL}
         this.quadVAO = vao;
     }
 
-    public async loadTexture(assetId: string): Promise<TextureHandle> {
-        // Check cache first
-        if (this.textureCache.has(assetId)) {
-            return this.textureCache.get(assetId)!;
-        }
+    public loadTexture(assetId: string): Promise<TextureHandle> {
+        const cached = this.textureCache.get(assetId);
+        if (cached) return cached;
 
+        const pending = this.fetchTexture(assetId);
+        this.textureCache.set(assetId, pending);
+        // A failed load is forgotten, so it can be tried again
+        pending.catch(() => { this.textureCache.delete(assetId); });
+        return pending;
+    }
+
+    private async fetchTexture(assetId: string): Promise<TextureHandle> {
         // Map asset ID to file path (backend-specific)
         // For now, assume asset ID is the filename without extension
         // Vite serves files from src/ at root, so use absolute path
@@ -1928,11 +1935,7 @@ ${FOG_GLSL}
 
         this.textures.set(assetId, webglTexture);
 
-        // Create handle and cache
-        const handle: TextureHandle = { id: assetId };
-        this.textureCache.set(assetId, handle);
-
-        return handle;
+        return { id: assetId };
     }
 
     public drawTexturedQuad(texture: TextureHandle, model: Mat4, normal: Vec3 = { x: 0, y: 1, z: 0 }): void {
