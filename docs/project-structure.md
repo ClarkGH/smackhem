@@ -271,7 +271,6 @@ scripts/
    ├─ build.mjs               # git archive + install + vite build, outside the repo
    ├─ measure-boot.mjs        # In-page timing: first WebGL draw, frames, long tasks
    ├─ lib.mjs                 # Pure helpers (stats, CSV), tested by lib.test.mjs
-   ├─ systemd/                # The weekly timer and its service, as install templates
    └─ results/                # Raw CSVs and env.json per run, committed
 ```
 

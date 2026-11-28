@@ -1,5 +1,5 @@
 // pnpm bench: measure the commits the CSVs don't have yet, append them, recheck the reference, write latest.md.
-// Run on an idle machine (the weekly timer runs it at night). Never edits docs or commits anything.
+// Run by hand on an idle machine. Never edits docs or commits anything.
 //
 // Exit codes: 0 done (comparable or not, see latest.md), 3 the environment changed (nothing measured), 1 a pass failed.
 import { spawnSync } from 'node:child_process';
@@ -14,7 +14,7 @@ import {
     parseCsv, newCommits, referenceRange, checkReference, renderLatest, toCsv, csvCell,
 } from './lib.mjs';
 
-// The ruler: every weekly run measures this build and compares it with its overnight range (docs/performance.md)
+// The ruler: every run measures this build and compares it with its overnight range (docs/performance.md)
 const REFERENCE = 'b58937d';
 
 const BENCH = dirname(fileURLToPath(import.meta.url));
@@ -40,7 +40,7 @@ const commits = listCommits(REPO);
 const sizeRows = read(SIZE_CSV);
 const summaryBefore = read(SUMMARY_CSV);
 
-// A commit the size pass couldn't build (docs only, or broken) has no perf row, but it's known: don't retry it weekly
+// A commit the size pass couldn't build (docs only, or broken) has no perf row, but it's known: don't retry it
 const sizeKnown = new Set(sizeRows.map((r) => r.sha));
 const perfKnown = new Set(summaryBefore.filter((r) => r.role === 'commit').map((r) => r.sha));
 sizeRows.forEach((r) => { if (r.build !== 'pass') perfKnown.add(r.sha); });
@@ -53,7 +53,7 @@ if (sizeNew.length && run('size-pass.mjs', [REPO, `${WORK}-size`, SIZE_CSV, '--a
     process.exit(1);
 }
 
-// The reference is measured at the start and end even when nothing is new: a weekly check on the ruler itself
+// The reference is measured at the start and end even when nothing is new: a check on the ruler itself
 const perfStatus = run('perf-pass.mjs', [
     REPO, `${WORK}-perf`, QUICK, '--append', '--reference', REFERENCE, '--control-every', '0',
     '--env-check', join(QUICK, 'env.json'), '--only', perfNew.map((c) => c.sha).join(','),
